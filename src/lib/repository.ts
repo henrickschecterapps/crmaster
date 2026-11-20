@@ -142,8 +142,10 @@ async function seedFirestoreIfEmpty(): Promise<CrmStoreData | null> {
   const db = getFirestoreDb();
   if (!db) return null;
 
-  const leadsSnap = await getDocs(collection(db, FIRESTORE_COLLECTIONS.leads));
-  if (!leadsSnap.empty) return null;
+  const settingsSnap = await getDoc(
+    doc(db, FIRESTORE_COLLECTIONS.settings, "default")
+  );
+  if (settingsSnap.exists()) return null;
 
   const seed = createInitialSeedData();
   const batch = writeBatch(db);
