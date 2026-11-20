@@ -1,6 +1,15 @@
 import { promises as fs } from "fs";
 import path from "path";
 import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import {
   ContractDocumentRef,
   CrmStoreData,
   InteractionType,
@@ -15,6 +24,12 @@ import {
   createInitialSeedData,
   createPhase2FollowupTemplates,
 } from "@/lib/seed";
+import {
+  FIRESTORE_COLLECTIONS,
+  getFirestoreDb,
+  isFirebaseConfigured,
+  stripUndefined,
+} from "@/lib/firebase";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import {
   buildPostSaleChecklist,
@@ -118,6 +133,91 @@ async function writeLocalStore(data: CrmStoreData): Promise<void> {
     // Graceful in-memory fallback if filesystem is read-only
   }
 }
+
+// ============================================================================
+// FIREBASE FIRESTORE ADAPTER
+// ============================================================================
+
+async function seedFirestoreIfEmpty(): Promise<CrmStoreData | null> {
+  const db = getFirestoreDb();
+  if (!db) return null;
+
+  const leadsSnap = await getDocs(collection(db, FIRESTORE_COLLECTIONS.leads));
+  if (!leadsSnap.empty) return null;
+
+  const seed = createInitialSeedData();
+  const batch = writeBatch(db);
+
+  batch.set(
+    doc(db, FIRESTORE_COLLECTIONS.settings, "default"),
+    stripUndefined(seed.settings)
+  );
+  for (const partner of seed.partners) {
+    batch.set(
+      doc(db, FIRESTORE_COLLECTIONS.partners, partner.id),
+      stripUndefined(partner)
+    );
+  }
+  for (const lead of seed.leads) {
+    batch.set(
+      doc(db, FIRESTORE_COLLECTIONS.leads, lead.id),
+      stripUndefined(lead)
+    );
+  }
+  for (const tpl of seed.templates) {
+    batch.set(
+      doc(db, FIRESTORE_COLLECTIONS.templates, tpl.id),
+      stripUndefined(tpl)
+    );
+  }
+
+  await batch.commit();
+  return seed;
+}
+
+async function readFirestoreStore(): Promise<CrmStoreData | null> {
+  const db = getFirestoreDb();
+  if (!db) return null;
+
+  const seeded = await seedFirestoreIfEmpty();
+  if (seeded) return hydrateStoreData(seeded);
+
+  const [settingsSnap, partnersSnap, leadsSnap, templatesSnap] =
+    await Promise.all([
+      getDoc(doc(db, FIRESTORE_COLLECTIONS.settings, "default")),
+      getDocs(collection(db, FIRESTORE_COLLECTIONS.partners)),
+      getDocs(collection(db, FIRESTORE_COLLECTIONS.leads)),
+      getDocs(collection(db, FIRESTORE_COLLECTIONS.templates)),
+    ]);
+
+  const defaults = createInitialSeedData();
+  const settings = settingsSnap.exists()
+    ? (settingsSnap.data() as StudioSettings)
+    : defaults.settings;
+
+  const partners = partnersSnap.docs
+    .map((d) => d.data() as Partner)
+    .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+
+  const leads = leadsSnap.docs
+    .map((d) => d.data() as Lead)
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+  const templates = templatesSnap.docs
+    .map((d) => d.data() as ScriptTemplate)
+    .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+
+  return hydrateStoreData({
+    settings,
+    partners: partners.length > 0 ? partners : defaults.partners,
+    leads,
+    templates: templates.length > 0 ? templates : defaults.templates,
+  });
+}
+
+// ============================================================================
+// SUPABASE ADAPTER (OPTIONAL ALTERNATIVE)
+// ============================================================================
 
 function mapSupabaseLeadRow(
   row: Record<string, unknown>,
@@ -298,120 +398,159 @@ async function seedSupabaseIfEmpty(): Promise<void> {
   }
 }
 
+// ============================================================================
+// PUBLIC REPOSITORY API (Firebase -> Supabase -> Local JSON)
+// ============================================================================
+
 export async function getStoreData(): Promise<CrmStoreData> {
-  if (!isSupabaseConfigured()) {
-    return readLocalStore();
+  if (isFirebaseConfigured()) {
+    try {
+      const firestoreData = await readFirestoreStore();
+      if (firestoreData) {
+        memoryFallback = firestoreData;
+        return firestoreData;
+      }
+    } catch {
+      // Fall through cleanly if Firestore rules/network temporarily fail
+    }
   }
 
-  try {
-    await seedSupabaseIfEmpty();
-    const supabase = getSupabaseClient()!;
+  if (isSupabaseConfigured()) {
+    try {
+      await seedSupabaseIfEmpty();
+      const supabase = getSupabaseClient()!;
 
-    const [settingsRes, partnersRes, leadsRes, interactionsRes, templatesRes] =
-      await Promise.all([
-        supabase
-          .from("studio_settings")
-          .select("*")
-          .eq("id", "default")
-          .maybeSingle(),
-        supabase
-          .from("partners")
-          .select("*")
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("leads")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("lead_interactions")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("script_templates")
-          .select("*")
-          .order("created_at", { ascending: true }),
-      ]);
+      const [settingsRes, partnersRes, leadsRes, interactionsRes, templatesRes] =
+        await Promise.all([
+          supabase
+            .from("studio_settings")
+            .select("*")
+            .eq("id", "default")
+            .maybeSingle(),
+          supabase
+            .from("partners")
+            .select("*")
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("leads")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("lead_interactions")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("script_templates")
+            .select("*")
+            .order("created_at", { ascending: true }),
+        ]);
 
-    if (leadsRes.error) {
-      return readLocalStore();
-    }
-
-    const interactionsByLead = new Map<string, LeadInteraction[]>();
-    for (const row of interactionsRes.data ?? []) {
-      const item: LeadInteraction = {
-        id: String(row.id),
-        leadId: String(row.lead_id),
-        type: row.type as InteractionType,
-        title: String(row.title),
-        description: String(row.description ?? ""),
-        createdAt: String(row.created_at),
-      };
-      const arr = interactionsByLead.get(item.leadId) ?? [];
-      arr.push(item);
-      interactionsByLead.set(item.leadId, arr);
-    }
-
-    const seed = createInitialSeedData();
-    const sRow = settingsRes.data;
-    const settings: StudioSettings = sRow
-      ? {
-          id: String(sRow.id),
-          monthlyGoal: Number(sRow.monthly_goal),
-          studioName: String(sRow.studio_name),
-          nextAvailableDate: String(sRow.next_available_date),
-          whatsappProvider:
-            sRow.whatsapp_provider === "zapi" ? "zapi" : "evolution",
-          whatsappApiUrl: String(sRow.whatsapp_api_url ?? ""),
-          whatsappApiKey: String(sRow.whatsapp_api_key ?? ""),
-          whatsappInstance: String(sRow.whatsapp_instance ?? ""),
-          adminEmail: String(
-            sRow.admin_email ||
-              process.env.ADMIN_EMAIL ||
-              "henrickschecter@gmail.com"
-          ),
-          pixKey: String(
-            sRow.pix_key ||
-              process.env.NEXT_PUBLIC_PIX_KEY ||
-              "henrickschecter@gmail.com"
-          ),
-          pixRecipientName: String(sRow.pix_recipient_name || "Henrique Matos"),
-          pixCity: String(sRow.pix_city || "BELO HORIZONTE"),
-          updatedAt: String(sRow.updated_at),
+      if (!leadsRes.error) {
+        const interactionsByLead = new Map<string, LeadInteraction[]>();
+        for (const row of interactionsRes.data ?? []) {
+          const item: LeadInteraction = {
+            id: String(row.id),
+            leadId: String(row.lead_id),
+            type: row.type as InteractionType,
+            title: String(row.title),
+            description: String(row.description ?? ""),
+            createdAt: String(row.created_at),
+          };
+          const arr = interactionsByLead.get(item.leadId) ?? [];
+          arr.push(item);
+          interactionsByLead.set(item.leadId, arr);
         }
-      : seed.settings;
 
-    const partners: Partner[] = (partnersRes.data ?? []).map((p) => ({
-      id: String(p.id),
-      name: String(p.name),
-      role: p.role as Partner["role"],
-      company: String(p.company ?? ""),
-      phone: String(p.phone ?? ""),
-      commissionRate: Number(p.commission_rate ?? 15),
-      createdAt: String(p.created_at),
-    }));
+        const seed = createInitialSeedData();
+        const sRow = settingsRes.data;
+        const settings: StudioSettings = sRow
+          ? {
+              id: String(sRow.id),
+              monthlyGoal: Number(sRow.monthly_goal),
+              studioName: String(sRow.studio_name),
+              nextAvailableDate: String(sRow.next_available_date),
+              whatsappProvider:
+                sRow.whatsapp_provider === "zapi" ? "zapi" : "evolution",
+              whatsappApiUrl: String(sRow.whatsapp_api_url ?? ""),
+              whatsappApiKey: String(sRow.whatsapp_api_key ?? ""),
+              whatsappInstance: String(sRow.whatsapp_instance ?? ""),
+              adminEmail: String(
+                sRow.admin_email ||
+                  process.env.ADMIN_EMAIL ||
+                  "henrickschecter@gmail.com"
+              ),
+              pixKey: String(
+                sRow.pix_key ||
+                  process.env.NEXT_PUBLIC_PIX_KEY ||
+                  "henrickschecter@gmail.com"
+              ),
+              pixRecipientName: String(
+                sRow.pix_recipient_name || "Henrique Matos"
+              ),
+              pixCity: String(sRow.pix_city || "BELO HORIZONTE"),
+              updatedAt: String(sRow.updated_at),
+            }
+          : seed.settings;
 
-    const leads: Lead[] = (leadsRes.data ?? []).map((l) =>
-      mapSupabaseLeadRow(l, interactionsByLead.get(String(l.id)) ?? [])
-    );
+        const partners: Partner[] = (partnersRes.data ?? []).map((p) => ({
+          id: String(p.id),
+          name: String(p.name),
+          role: p.role as Partner["role"],
+          company: String(p.company ?? ""),
+          phone: String(p.phone ?? ""),
+          commissionRate: Number(p.commission_rate ?? 15),
+          createdAt: String(p.created_at),
+        }));
 
-    const templates: ScriptTemplate[] = (templatesRes.data ?? []).map((t) => ({
-      id: String(t.id),
-      name: String(t.name),
-      funnel: t.funnel as ScriptTemplate["funnel"],
-      channel: t.channel as ScriptTemplate["channel"],
-      subject: String(t.subject ?? ""),
-      body: String(t.body),
-      createdAt: String(t.created_at),
-      updatedAt: String(t.updated_at),
-    }));
+        const leads: Lead[] = (leadsRes.data ?? []).map((l) =>
+          mapSupabaseLeadRow(l, interactionsByLead.get(String(l.id)) ?? [])
+        );
 
-    return hydrateStoreData({ settings, partners, leads, templates });
-  } catch {
-    return readLocalStore();
+        const templates: ScriptTemplate[] = (templatesRes.data ?? []).map(
+          (t) => ({
+            id: String(t.id),
+            name: String(t.name),
+            funnel: t.funnel as ScriptTemplate["funnel"],
+            channel: t.channel as ScriptTemplate["channel"],
+            subject: String(t.subject ?? ""),
+            body: String(t.body),
+            createdAt: String(t.created_at),
+            updatedAt: String(t.updated_at),
+          })
+        );
+
+        return hydrateStoreData({ settings, partners, leads, templates });
+      }
+    } catch {
+      // Fall through to local store
+    }
   }
+
+  return readLocalStore();
 }
 
 export async function getLeadById(leadId: string): Promise<Lead | null> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.leads, leadId));
+        if (snap.exists()) {
+          const lead = snap.data() as Lead;
+          const hydrated = hydrateStoreData({
+            settings: createInitialSeedData().settings,
+            partners: [],
+            leads: [lead],
+            templates: [],
+          });
+          return hydrated.leads[0] ?? null;
+        }
+      }
+    } catch {
+      // Fall through to full store lookup
+    }
+  }
+
   const store = await getStoreData();
   return store.leads.find((l) => l.id === leadId) ?? null;
 }
@@ -501,6 +640,21 @@ export async function createLead(
     interactions: [initialInteraction],
   };
 
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.leads, lead.id),
+          stripUndefined(lead)
+        );
+        return { lead, duplicate: false };
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
     const { error } = await supabase
@@ -558,12 +712,11 @@ export async function updateLead(
   const nextStage = patch.stage ?? current.stage;
   const nextFunnel = patch.funnel ?? current.funnel;
 
-  // Safety lock: Moving to Sinal Pago / Fechado or marking Respondeu automatically disables follow-up automation
   let automacaoAtiva =
     patch.automacaoAtiva !== undefined
       ? patch.automacaoAtiva
       : current.automacaoAtiva;
-  let respondeu =
+  const respondeu =
     patch.respondeu !== undefined ? patch.respondeu : current.respondeu;
 
   const movedToClosedOrPaid =
@@ -572,7 +725,6 @@ export async function updateLead(
     automacaoAtiva = false;
   }
 
-  // Automatic Post-Sale Checklist creation when moved into Fechado
   let postSaleChecklist =
     patch.postSaleChecklist ?? current.postSaleChecklist ?? [];
   const extraInteractions: LeadInteraction[] = [];
@@ -622,6 +774,21 @@ export async function updateLead(
     ],
   };
 
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.leads, updated.id),
+          stripUndefined(updated)
+        );
+        return updated;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
     const { error } = await supabase
@@ -655,6 +822,18 @@ export async function updateLead(
 }
 
 export async function deleteLead(leadId: string): Promise<boolean> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await deleteDoc(doc(db, FIRESTORE_COLLECTIONS.leads, leadId));
+        return true;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
     const { error } = await supabase.from("leads").delete().eq("id", leadId);
@@ -754,7 +933,7 @@ export async function approveProposal(
       proposalAddons: payload.addons,
       estimatedValue: payload.totalValue,
       propostaAprovadaEm: now,
-      automacaoAtiva: false, // Cliente aprovou -> desliga régua de cobrança automática
+      automacaoAtiva: false,
       respondeu: true,
       contractDocument,
       stage: nextStage,
@@ -779,6 +958,21 @@ export async function updateSettings(
     id: "default",
     updatedAt: now,
   };
+
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.settings, "default"),
+          stripUndefined(updated)
+        );
+        return updated;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
 
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
@@ -818,6 +1012,21 @@ export async function createPartner(
     commissionRate: Number(input.commissionRate) || 15,
     createdAt: now,
   };
+
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.partners, partner.id),
+          stripUndefined(partner)
+        );
+        return partner;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
 
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
@@ -861,6 +1070,21 @@ export async function upsertTemplate(
     updatedAt: now,
   };
 
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.templates, template.id),
+          stripUndefined(template)
+        );
+        return template;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
     const { error } = await supabase.from("script_templates").upsert({
@@ -888,6 +1112,18 @@ export async function upsertTemplate(
 }
 
 export async function deleteTemplate(templateId: string): Promise<boolean> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await deleteDoc(doc(db, FIRESTORE_COLLECTIONS.templates, templateId));
+        return true;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient()!;
     const { error } = await supabase
@@ -907,6 +1143,42 @@ export async function deleteTemplate(templateId: string): Promise<boolean> {
 
 export async function resetDemoData(): Promise<CrmStoreData> {
   const seeded = createInitialSeedData();
+
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        const batch = writeBatch(db);
+        batch.set(
+          doc(db, FIRESTORE_COLLECTIONS.settings, "default"),
+          stripUndefined(seeded.settings)
+        );
+        for (const p of seeded.partners) {
+          batch.set(
+            doc(db, FIRESTORE_COLLECTIONS.partners, p.id),
+            stripUndefined(p)
+          );
+        }
+        for (const l of seeded.leads) {
+          batch.set(
+            doc(db, FIRESTORE_COLLECTIONS.leads, l.id),
+            stripUndefined(l)
+          );
+        }
+        for (const t of seeded.templates) {
+          batch.set(
+            doc(db, FIRESTORE_COLLECTIONS.templates, t.id),
+            stripUndefined(t)
+          );
+        }
+        await batch.commit();
+        return seeded;
+      }
+    } catch {
+      // Fallback to local
+    }
+  }
+
   await writeLocalStore(seeded);
   return seeded;
 }

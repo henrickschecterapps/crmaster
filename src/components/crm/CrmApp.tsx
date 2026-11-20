@@ -402,12 +402,16 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
           <div className="rounded-2xl bg-[var(--bg-surface-solid)]/80 border border-[var(--border-hairline)] p-3 text-[11px]">
             <div className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
               <Database className="h-3.5 w-3.5 text-[var(--accent)]" />
-              {status.databaseMode === "supabase"
+              {status.databaseMode === "firebase"
+                ? "Firebase Conectado"
+                : status.databaseMode === "supabase"
                 ? "Supabase Conectado"
                 : "Modo Local + Fallback"}
             </div>
             <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-muted)]">
-              {status.databaseMode === "supabase"
+              {status.databaseMode === "firebase"
+                ? `Cloud Firestore ativo (${status.firebaseProjectId || "Firebase"}).`
+                : status.databaseMode === "supabase"
                 ? "Persistência sincronizada em nuvem."
                 : "Dados salvos localmente (.data + localStorage). Insira as chaves no .env.local quando desejar."}
             </p>

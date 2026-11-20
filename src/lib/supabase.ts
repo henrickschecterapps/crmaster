@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { IntegrationStatus, StudioSettings } from "@/types/crm";
 import { resolveWhatsappConfig } from "@/lib/whatsappQueue";
+import { getFirebaseProjectId, isFirebaseConfigured } from "@/lib/firebase";
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -35,14 +36,21 @@ export function getIntegrationStatus(
   settings?: Partial<StudioSettings>
 ): IntegrationStatus {
   const waConfig = resolveWhatsappConfig(settings);
+  const databaseMode: IntegrationStatus["databaseMode"] = isFirebaseConfigured()
+    ? "firebase"
+    : isSupabaseConfigured()
+    ? "supabase"
+    : "local";
+
   return {
-    databaseMode: isSupabaseConfigured() ? "supabase" : "local",
+    databaseMode,
+    firebaseProjectId: getFirebaseProjectId(),
     googlePlacesLive: Boolean(process.env.GOOGLE_PLACES_API_KEY),
     resendLive: Boolean(process.env.RESEND_API_KEY),
     whatsappApiLive: Boolean(waConfig),
-    whatsappProvider: waConfig?.provider ?? settings?.whatsappProvider ?? "evolution",
-    whatsappNumber:
-      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5531998427100",
+    whatsappProvider:
+      waConfig?.provider ?? settings?.whatsappProvider ?? "evolution",
+    whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5531998427100",
     adminEmail:
       settings?.adminEmail ||
       process.env.ADMIN_EMAIL ||

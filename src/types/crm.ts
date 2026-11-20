@@ -158,7 +158,8 @@ export interface PlaceCandidate {
 }
 
 export interface IntegrationStatus {
-  databaseMode: "supabase" | "local";
+  databaseMode: "firebase" | "supabase" | "local";
+  firebaseProjectId?: string;
   googlePlacesLive: boolean;
   resendLive: boolean;
   whatsappApiLive: boolean;
