@@ -90,11 +90,15 @@ export function CaptureView({
     setMFunnel(defaultFunnel);
   }, [defaultFunnel]);
 
-  const [placesQuery, setPlacesQuery] = useState("confecção Barro Preto");
+  const [placesQuery, setPlacesQuery] = useState("confecção moda Barro Preto");
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesMode, setPlacesMode] = useState<
-    "google_live" | "osm_free" | "demo"
-  >(integrationStatus.googlePlacesLive ? "google_live" : "osm_free");
+    "overture_bh" | "google_live" | "osm_free" | "demo"
+  >("overture_bh");
+  const [overtureMeta, setOvertureMeta] = useState<{
+    release?: string;
+    total?: number;
+  }>({});
   const [placeResults, setPlaceResults] = useState<PlaceCandidate[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [placeFunnels, setPlaceFunnels] = useState<Record<string, FunnelId>>(
@@ -102,6 +106,24 @@ export function CaptureView({
   );
   const [sendingPlaceId, setSendingPlaceId] = useState<string | null>(null);
   const [enrichingPlaceId, setEnrichingPlaceId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/places/search", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.available) {
+          setOvertureMeta({ release: json.release, total: json.total });
+          setPlacesMode("overture_bh");
+        } else {
+          setPlacesMode(
+            integrationStatus.googlePlacesLive ? "google_live" : "osm_free"
+          );
+        }
+      })
+      .catch(() => {
+        // Ignore silent metadata fetch error
+      });
+  }, [integrationStatus.googlePlacesLive]);
 
   const [mCompany, setMCompany] = useState("");
   const [mContact, setMContact] = useState("");
@@ -163,6 +185,12 @@ export function CaptureView({
         return;
       }
       setPlacesMode(json.mode);
+      if (json.release || json.totalIndexed) {
+        setOvertureMeta({
+          release: json.release,
+          total: json.totalIndexed,
+        });
+      }
       setPlaceResults(json.results || []);
       const funnelDefaults: Record<string, FunnelId> = {};
       for (const item of (json.results || []) as PlaceCandidate[]) {
@@ -249,7 +277,9 @@ export function CaptureView({
         funnel: chosenFunnel,
         estimatedValue: defaultVal,
         origin:
-          placesMode === "google_live"
+          candidate.source === "overture" || placesMode === "overture_bh"
+            ? "Overture Maps BH"
+            : placesMode === "google_live"
             ? "Google Places BH"
             : "OpenStreetMap BH",
         notes: `Captado em BH (${candidate.category}). Endereço: ${candidate.address}.`,
@@ -542,16 +572,24 @@ export function CaptureView({
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 self-start rounded-md px-3 py-1 text-[11px] font-semibold",
-                  placesMode === "google_live" || placesMode === "osm_free"
+                  placesMode === "overture_bh" ||
+                    placesMode === "google_live" ||
+                    placesMode === "osm_free"
                     ? "badge-success"
                     : "badge-accent"
                 )}
               >
                 <MapPin className="h-3 w-3" aria-hidden="true" />
-                {placesMode === "google_live"
+                {placesMode === "overture_bh"
+                  ? `Overture Maps BH Ativo${
+                      overtureMeta.total
+                        ? ` (${overtureMeta.total.toLocaleString("pt-BR")} empresas)`
+                        : ""
+                    }`
+                  : placesMode === "google_live"
                   ? "Google Places API Ativa"
                   : placesMode === "osm_free"
-                  ? "OpenStreetMap BH Ativo (100% Gratuito)"
+                  ? "OpenStreetMap BH (Fallback)"
                   : "Modo Demonstração Offline"}
               </span>
             </div>
@@ -647,7 +685,7 @@ export function CaptureView({
                           </h3>
                         </div>
 
-                        {place.rating && (
+                        {place.rating ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2.5 py-1 font-mono-num text-xs font-semibold text-[var(--text-primary)] shrink-0">
                             <Star
                               className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]"
@@ -655,7 +693,14 @@ export function CaptureView({
                             />
                             {place.rating.toFixed(1)}
                           </span>
-                        )}
+                        ) : place.confidence ? (
+                          <span
+                            title="Score de confiança Overture Maps"
+                            className="badge-success inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-mono-num text-[11px] font-semibold shrink-0"
+                          >
+                            {Math.round(place.confidence * 100)}% ativo
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-3 space-y-1.5 text-xs text-[var(--text-secondary)]">

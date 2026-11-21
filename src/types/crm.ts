@@ -195,6 +195,8 @@ export interface PlaceCandidate {
   website: string;
   category: string;
   rating?: number;
+  confidence?: number;
+  source?: "overture" | "osm" | "google" | "demo";
   suggestedFunnel: FunnelId;
   enrichedEmail?: string;
   enrichedInstagram?: string;

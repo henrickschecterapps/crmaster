@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEMO_BH_PLACES } from "@/lib/seed";
+import { getOvertureMeta, searchOvertureBH } from "@/lib/overturePlaces";
 import { FunnelId, PlaceCandidate } from "@/types/crm";
 
 export const dynamic = "force-dynamic";
+
+export async function GET() {
+  return NextResponse.json(getOvertureMeta(), {
+    headers: { "Cache-Control": "no-store" },
+  });
+}
 
 const BH_NEIGHBORHOOD_COORDS: Record<string, { lat: number; lon: number; label: string }> = {
   lourdes: { lat: -19.9295, lon: -43.9415, label: "Lourdes" },
@@ -399,9 +406,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 1. Primary: Overture Maps Places BH & Nova Lima regional index (fast, free, high contact density)
+    const overture = searchOvertureBH(combinedQuery, rawNeighborhood, 16);
+    if (overture && overture.results.length >= 4) {
+      return NextResponse.json({
+        mode: "overture_bh",
+        release: overture.release,
+        totalIndexed: overture.totalIndexed,
+        query: combinedQuery,
+        results: overture.results,
+      });
+    }
+
     const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
 
-    // 1. Try Google Places API (New) if configured and billing active
+    // 2. Optional Google Places API (New) if configured and billing active
     if (apiKey) {
       try {
         const response = await fetch(
@@ -450,6 +469,7 @@ export async function POST(req: NextRequest) {
               category:
                 p.primaryTypeDisplayName?.text || "Estabelecimento Comercial",
               rating: p.rating,
+              source: "google",
               suggestedFunnel: inferFunnelFromQuery(
                 `${combinedQuery} ${p.primaryTypeDisplayName?.text || ""}`
               ),
@@ -467,17 +487,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Real Belo Horizonte data via OpenStreetMap (Overpass + Nominatim, 100% free)
+    // 3. Fallback: OpenStreetMap BH (Overpass + Nominatim, 100% free) merged with any Overture matches
     const osmResults = await searchOpenStreetMapBH(
       combinedQuery,
       rawNeighborhood
     );
 
-    if (osmResults.length > 0) {
+    const overturePartial = overture?.results ?? [];
+    if (overturePartial.length > 0 || osmResults.length > 0) {
+      const seenNames = new Set(
+        overturePartial.map((r) => normalizeSearch(r.name))
+      );
+      const merged: PlaceCandidate[] = [
+        ...overturePartial,
+        ...osmResults
+          .map((item) => ({ ...item, source: "osm" as const }))
+          .filter((item) => !seenNames.has(normalizeSearch(item.name))),
+      ].slice(0, 16);
+
       return NextResponse.json({
-        mode: "osm_free",
+        mode: overturePartial.length > 0 ? "overture_bh" : "osm_free",
+        release: overture?.release,
+        totalIndexed: overture?.totalIndexed,
         query: combinedQuery,
-        results: osmResults,
+        results: merged,
       });
     }
 
