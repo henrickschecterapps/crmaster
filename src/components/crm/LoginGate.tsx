@@ -88,7 +88,8 @@ export function LoginGate({
   };
 
   return (
-    <main className="cinema-grain relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-10">
+    <main className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 py-10">
+      <div className="cinema-grain" aria-hidden="true" />
       {/* Top Cinema Studio Status Strip */}
       <div className="mb-6 flex flex-wrap items-center justify-center gap-3 text-[11px] font-mono-num text-[var(--text-muted)]">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1">
