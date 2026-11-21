@@ -173,6 +173,8 @@ export interface StudioSettings {
   whatsappApiKey: string;
   whatsappInstance: string;
   adminEmail: string;
+  adminPasswordHash?: string;
+  adminPasswordSalt?: string;
   pixKey: string;
   pixRecipientName: string;
   pixCity: string;

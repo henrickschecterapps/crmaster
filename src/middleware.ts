@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  ADMIN_GUARD_COOKIE,
   ADMIN_SESSION_COOKIE,
   isAdminAuthEnabled,
   verifyAdminSessionToken,
 } from "@/lib/auth";
 
 export async function middleware(req: NextRequest) {
-  if (!isAdminAuthEnabled()) {
+  const guardCookieActive = req.cookies.get(ADMIN_GUARD_COOKIE)?.value === "1";
+  const authActive = isAdminAuthEnabled() || guardCookieActive;
+
+  if (!authActive) {
     return NextResponse.next();
   }
 
@@ -33,7 +37,7 @@ export async function middleware(req: NextRequest) {
   // Protect all private API endpoints
   if (pathname.startsWith("/api/")) {
     const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-    const valid = await verifyAdminSessionToken(token);
+    const valid = await verifyAdminSessionToken(token, null, authActive);
     if (!valid) {
       return NextResponse.json(
         { error: "Sessão administrativa necessária. Faça login no CRM." },

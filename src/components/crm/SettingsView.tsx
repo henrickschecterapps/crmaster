@@ -7,6 +7,8 @@ import {
   Bot,
   CheckCircle2,
   Clock,
+  Eye,
+  EyeOff,
   Lock,
   Mail,
   Play,
@@ -78,6 +80,8 @@ export function SettingsView({
     settings.pixRecipientName || "Ultimo Quadro"
   );
   const [pixCity, setPixCity] = useState(settings.pixCity || "BELO HORIZONTE");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [runningCron, setRunningCron] = useState(false);
@@ -145,9 +149,16 @@ export function SettingsView({
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (
+      newAdminPassword.trim().length > 0 &&
+      newAdminPassword.trim().length < 4
+    ) {
+      onNotify("A senha do CRM deve ter pelo menos 4 caracteres.", "error");
+      return;
+    }
     setSaving(true);
     try {
-      await onUpdateSettings({
+      const payload: Partial<StudioSettings> & { newAdminPassword?: string } = {
         whatsappProvider,
         whatsappApiUrl: whatsappApiUrl.trim(),
         whatsappApiKey: whatsappApiKey.trim(),
@@ -156,8 +167,35 @@ export function SettingsView({
         pixKey: pixKey.trim(),
         pixRecipientName: pixRecipientName.trim() || "Ultimo Quadro",
         pixCity: (pixCity.trim() || "BELO HORIZONTE").toUpperCase(),
-      });
-      onNotify("Configurações salvas com sucesso.", "success");
+      };
+      if (newAdminPassword.trim().length >= 4) {
+        payload.newAdminPassword = newAdminPassword.trim();
+      }
+      await onUpdateSettings(payload);
+      if (newAdminPassword.trim().length >= 4) {
+        setNewAdminPassword("");
+        onNotify(
+          "Configurações e nova senha criptografada (SHA-256) salvas.",
+          "success"
+        );
+      } else {
+        onNotify("Configurações salvas com sucesso.", "success");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClearPassword = async () => {
+    setSaving(true);
+    try {
+      await onUpdateSettings({
+        clearAdminPassword: true,
+      } as unknown as Partial<StudioSettings>);
+      onNotify(
+        "Senha personalizada do banco removida. (Se CRM_ADMIN_PASSWORD existir na Vercel, ela continuará ativa).",
+        "info"
+      );
     } finally {
       setSaving(false);
     }
@@ -280,50 +318,52 @@ export function SettingsView({
       </div>
 
       {/* Integration & Security Status Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="surface-card rounded-xl p-4 flex items-start gap-3">
-          <span
-            className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-              integrationStatus.adminAuthEnabled
-                ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
-                : "bg-[var(--status-warning-bg)] text-[var(--status-warning)]"
-            )}
-          >
-            <Lock className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <div className="text-xs space-y-1">
-            <p className="font-bold text-[var(--text-primary)]">
-              Proteção do Painel Administrativo (CRM_ADMIN_PASSWORD)
-            </p>
-            <p className="text-[var(--text-secondary)] leading-relaxed">
-              {integrationStatus.adminAuthEnabled
-                ? "Sessão assinada por cookie HttpOnly ativa. As propostas públicas (/proposta/[id]) permanecem liberadas para clientes."
-                : "Defina a variável CRM_ADMIN_PASSWORD na Vercel ou no .env.local para exigir senha no painel mantendo /proposta/[id] aberto aos clientes."}
-            </p>
+      <div className="double-bezel stagger-in">
+        <div className="double-bezel-core grid grid-cols-1 divide-y divide-[var(--border-hairline)] md:grid-cols-2 md:divide-y-0 md:divide-x">
+          <div className="p-4 flex items-start gap-3">
+            <span
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                integrationStatus.adminAuthEnabled
+                  ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
+                  : "bg-[var(--status-warning-bg)] text-[var(--status-warning)]"
+              )}
+            >
+              <Lock className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-[var(--text-primary)]">
+                Cofre Administrativo (HMAC-SHA256 + Anti-Brute-Force)
+              </p>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                {integrationStatus.adminAuthEnabled
+                  ? "Sessão assinada por cookie HttpOnly com expiração e limite de 5 tentativas por IP ativa. As propostas públicas (/proposta/[id]) permanecem liberadas para clientes."
+                  : "Cadastre uma senha no formulário abaixo (salva criptografada no Firebase) ou defina CRM_ADMIN_PASSWORD na Vercel para ativar o login."}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="surface-card rounded-xl p-4 flex items-start gap-3">
-          <span
-            className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-              integrationStatus.gmailLive || integrationStatus.resendLive
-                ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
-                : "bg-[var(--accent-soft)] text-[var(--accent-text)]"
-            )}
-          >
-            <BellRing className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <div className="text-xs space-y-1">
-            <p className="font-bold text-[var(--text-primary)]">
-              Provedor de E-mail Transacional (Gmail SMTP ou Resend)
-            </p>
-            <p className="text-[var(--text-secondary)] leading-relaxed">
-              {integrationStatus.gmailLive
-                ? "Gmail SMTP (Nodemailer) configurado e pronto para disparar propostas para qualquer cliente sem domínio pago."
-                : "Configure GMAIL_USER e GMAIL_APP_PASSWORD (Senha de App Google) para enviar e-mails gratuitos para qualquer cliente, ou use RESEND_API_KEY."}
-            </p>
+          <div className="p-4 flex items-start gap-3">
+            <span
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                integrationStatus.gmailLive || integrationStatus.resendLive
+                  ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
+                  : "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+              )}
+            >
+              <BellRing className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-[var(--text-primary)]">
+                Provedor de E-mail Transacional (Gmail SMTP ou Resend)
+              </p>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                {integrationStatus.gmailLive
+                  ? "Gmail SMTP (Nodemailer) configurado e pronto para disparar propostas para qualquer cliente sem domínio pago."
+                  : "Configure GMAIL_USER e GMAIL_APP_PASSWORD (Senha de App Google) para enviar e-mails gratuitos para qualquer cliente, ou use RESEND_API_KEY."}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -724,6 +764,97 @@ export function SettingsView({
                   placeholder="BELO HORIZONTE"
                   className="input-field min-h-[42px] w-full rounded-lg px-3.5 py-2.5 font-mono-num text-xs"
                 />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-[var(--border-hairline)] pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Lock
+                  className="h-4 w-4 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  Segurança &amp; Cofre de Login (HMAC-SHA256)
+                </h2>
+              </div>
+              <span
+                className={cn(
+                  "rounded-md px-2 py-0.5 font-mono-num text-[10px] font-bold uppercase",
+                  integrationStatus.adminAuthEnabled || settings.adminPasswordHash
+                    ? "badge-success"
+                    : "badge-warning"
+                )}
+              >
+                {integrationStatus.adminAuthEnabled || settings.adminPasswordHash
+                  ? "Login Protegido"
+                  : "Acesso Aberto"}
+              </span>
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)]">
+              Defina ou altere a senha de acesso ao CRM diretamente abaixo. Ela é
+              salva com <strong>hash HMAC-SHA256 + salt</strong> no banco de dados
+              e ativa automaticamente o bloqueio anti-força bruta (5 tentativas /
+              15 min).
+            </p>
+
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-12 items-end">
+              <div className="sm:col-span-8">
+                <label
+                  htmlFor="cfg-admin-password"
+                  className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                >
+                  {settings.adminPasswordHash
+                    ? "Substituir Senha Atual do CRM"
+                    : "Definir Nova Senha do CRM (mín. 4 caracteres)"}
+                </label>
+                <div className="relative">
+                  <Lock
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
+                  />
+                  <input
+                    id="cfg-admin-password"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    placeholder={
+                      settings.adminPasswordHash
+                        ? "Digite para trocar a senha criptografada..."
+                        : "Digite uma senha forte para ativar o Login..."
+                    }
+                    className="input-field min-h-[42px] w-full rounded-lg pl-9 pr-10 py-2.5 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    aria-label={
+                      showNewPassword ? "Ocultar nova senha" : "Mostrar nova senha"
+                    }
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="sm:col-span-4 flex items-center gap-2">
+                {settings.adminPasswordHash && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={handleClearPassword}
+                    className="btn-ghost min-h-[42px] w-full rounded-lg px-3 py-2 text-xs font-semibold text-[var(--status-danger)]"
+                  >
+                    Remover Senha do Banco
+                  </button>
+                )}
               </div>
             </div>
           </div>

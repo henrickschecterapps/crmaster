@@ -51,7 +51,7 @@ export function getIntegrationStatus(
     gmailLive: Boolean(
       process.env.GMAIL_USER?.trim() && process.env.GMAIL_APP_PASSWORD?.trim()
     ),
-    adminAuthEnabled: isAdminAuthEnabled(),
+    adminAuthEnabled: isAdminAuthEnabled(settings),
     whatsappApiLive: Boolean(waConfig),
     whatsappProvider:
       waConfig?.provider ?? settings?.whatsappProvider ?? "evolution",
