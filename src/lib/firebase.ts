@@ -1,5 +1,9 @@
 import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app";
-import { Firestore, getFirestore } from "firebase/firestore";
+import {
+  Firestore,
+  getFirestore,
+  initializeFirestore,
+} from "firebase/firestore";
 
 export function isFirebaseConfigured(): boolean {
   return Boolean(
@@ -39,7 +43,13 @@ export function getFirestoreDb(): Firestore | null {
   const app = getFirebaseApp();
   if (!app) return null;
 
-  cachedDb = getFirestore(app);
+  try {
+    cachedDb = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    });
+  } catch {
+    cachedDb = getFirestore(app);
+  }
   return cachedDb;
 }
 

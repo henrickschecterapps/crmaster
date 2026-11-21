@@ -231,7 +231,7 @@ async function readFirestoreStore(): Promise<CrmStoreData | null> {
 
   return hydrateStoreData({
     settings,
-    partners: partners.length > 0 ? partners : defaults.partners,
+    partners,
     leads,
     templates: templates.length > 0 ? templates : defaults.templates,
   });
@@ -428,8 +428,8 @@ export async function getStoreData(): Promise<CrmStoreData> {
         memoryFallback = firestoreData;
         return firestoreData;
       }
-    } catch {
-      // Fall through cleanly if Firestore rules/network temporarily fail
+    } catch (err) {
+      console.error("[CRM Repository] Firestore read failed:", err);
     }
   }
 

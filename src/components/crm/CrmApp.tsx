@@ -73,6 +73,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isRemoteLocalMode, setIsRemoteLocalMode] = useState(false);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -131,6 +132,14 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   }, []);
 
   useEffect(() => {
+    const host = window.location.hostname;
+    const isRemote = host !== "localhost" && host !== "127.0.0.1";
+    setIsRemoteLocalMode(isRemote && status.databaseMode === "local");
+  }, [status.databaseMode]);
+
+  useEffect(() => {
+    refreshStore(true);
+
     const onFocus = () => {
       refreshStore(true);
     };
@@ -636,6 +645,21 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             )}
           </div>
         </header>
+
+        {isRemoteLocalMode && (
+          <div
+            role="alert"
+            className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl badge-warning px-4 py-3 text-xs sm:mx-6 lg:mx-8"
+          >
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Banco em nuvem desconectado neste deploy: configure as variáveis{" "}
+              <code className="font-mono-num">NEXT_PUBLIC_FIREBASE_*</code> na
+              Vercel (e faça Redeploy) para que alterações não se percam ao
+              atualizar a página.
+            </span>
+          </div>
+        )}
 
         {syncError && (
           <div
