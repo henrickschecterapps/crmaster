@@ -164,102 +164,109 @@ export function KanbanView({
     [leads]
   );
 
+  const totalFilteredCount = Math.max(1, funnelLeads.length);
+
   return (
     <div className="space-y-5">
-      {/* Funnel Tabs Header: "Todas as Verticais" + 5 Official Ultimo Quadro Verticals */}
-      <div className="flex flex-col gap-4">
-        <div
-          className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6"
-          role="tablist"
-          aria-label="Frentes de serviço do Kanban"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={showAllFunnels}
-            onClick={() => setShowAllFunnels(true)}
-            className={cn(
-              "min-h-[60px] rounded-xl px-3.5 py-3 text-left transition-colors border",
-              showAllFunnels
-                ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
-                : "surface-card hover:border-[var(--border-strong)]"
-            )}
+      {/* Unified Vertical Dock Strip + Toolbar */}
+      <div className="flex flex-col gap-3.5">
+        <div className="double-bezel">
+          <div
+            className="double-bezel-core grid grid-cols-1 divide-y divide-[var(--border-hairline)] sm:grid-cols-2 sm:divide-y-0 sm:divide-x lg:grid-cols-6 overflow-hidden"
+            role="tablist"
+            aria-label="Frentes de serviço do Kanban"
           >
-            <div className="flex items-center justify-between gap-2">
-              <span
-                className={cn(
-                  "truncate text-xs font-bold tracking-tight",
-                  showAllFunnels
-                    ? "text-[var(--accent-text)]"
-                    : "text-[var(--text-primary)]"
-                )}
-              >
-                <span className="font-mono-num mr-1.5 opacity-75">00</span>
-                Todas as Verticais
-              </span>
-              <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 font-mono-num text-[11px] font-semibold text-[var(--text-secondary)]">
-                {leads.length}
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--text-muted)]">
-              <span className="truncate">Visão Geral 360°</span>
-              <span className="font-mono-num text-[var(--text-secondary)] shrink-0">
-                {formatCurrency(allLeadsTotal)}
-              </span>
-            </div>
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showAllFunnels}
+              onClick={() => setShowAllFunnels(true)}
+              className={cn(
+                "min-h-[58px] px-4 py-2.5 text-left transition-colors",
+                showAllFunnels
+                  ? "bg-[var(--accent-soft)]"
+                  : "hover:bg-[var(--bg-surface-hover)]"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={cn(
+                    "truncate text-xs font-bold tracking-tight",
+                    showAllFunnels
+                      ? "text-[var(--accent-text)]"
+                      : "text-[var(--text-primary)]"
+                  )}
+                >
+                  <span className="font-mono-num mr-1.5 opacity-75">00</span>
+                  Todas as Verticais
+                </span>
+                <span className="rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-num text-[10px] font-bold text-[var(--text-secondary)]">
+                  {leads.length}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--text-muted)]">
+                <span className="truncate">Visão Geral 360°</span>
+                <span className="font-mono-num text-[var(--text-secondary)] shrink-0">
+                  {formatCurrency(allLeadsTotal)}
+                </span>
+              </div>
+            </button>
 
-          {FUNNELS.map((funnel) => {
-            const fLeads = leads.filter((l) => l.funnel === funnel.id);
-            const total = fLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
-            const isActive = !showAllFunnels && activeFunnel === funnel.id;
-            return (
-              <button
-                key={funnel.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => {
-                  setShowAllFunnels(false);
-                  onChangeFunnel(funnel.id);
-                }}
-                className={cn(
-                  "min-h-[60px] rounded-xl px-3.5 py-3 text-left transition-colors border",
-                  isActive
-                    ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
-                    : "surface-card hover:border-[var(--border-strong)]"
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      "truncate text-xs font-bold tracking-tight",
-                      isActive
-                        ? "text-[var(--accent-text)]"
-                        : "text-[var(--text-primary)]"
-                    )}
-                  >
-                    <span className="font-mono-num mr-1.5 opacity-75">
-                      {funnel.index}
+            {FUNNELS.map((funnel) => {
+              const fLeads = leads.filter((l) => l.funnel === funnel.id);
+              const total = fLeads.reduce(
+                (sum, l) => sum + l.estimatedValue,
+                0
+              );
+              const isActive = !showAllFunnels && activeFunnel === funnel.id;
+              return (
+                <button
+                  key={funnel.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => {
+                    setShowAllFunnels(false);
+                    onChangeFunnel(funnel.id);
+                  }}
+                  className={cn(
+                    "min-h-[58px] px-4 py-2.5 text-left transition-colors",
+                    isActive
+                      ? "bg-[var(--accent-soft)]"
+                      : "hover:bg-[var(--bg-surface-hover)]"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        "truncate text-xs font-bold tracking-tight",
+                        isActive
+                          ? "text-[var(--accent-text)]"
+                          : "text-[var(--text-primary)]"
+                      )}
+                    >
+                      <span className="font-mono-num mr-1.5 opacity-75">
+                        {funnel.index}
+                      </span>
+                      {funnel.shortLabel}
                     </span>
-                    {funnel.shortLabel}
-                  </span>
-                  <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 font-mono-num text-[11px] font-semibold text-[var(--text-secondary)]">
-                    {fLeads.length}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--text-muted)]">
-                  <span className="truncate">{funnel.subtitle}</span>
-                  <span className="font-mono-num text-[var(--text-secondary)] shrink-0">
-                    {formatCurrency(total)}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+                    <span className="rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-num text-[10px] font-bold text-[var(--text-secondary)]">
+                      {fLeads.length}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--text-muted)]">
+                    <span className="truncate">{funnel.subtitle}</span>
+                    <span className="font-mono-num text-[var(--text-secondary)] shrink-0">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Search + View Toggle (Kanban / Lista) + Filters + Novo Lead */}
+        {/* Search + View Toggle (Kanban / Lista) + Filters + Button-in-Button Novo Lead */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2 flex-1 sm:flex-initial">
             <div className="relative flex-1 sm:flex-initial">
@@ -271,14 +278,14 @@ export function KanbanView({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar empresa, decisor..."
+                placeholder="Filtrar empresa, decisor, @instagram..."
                 aria-label="Buscar empresa, decisor, origem ou parceiro"
-                className="input-field min-h-[44px] w-full sm:w-64 rounded-lg py-2 pl-9 pr-3 text-xs"
+                className="input-field min-h-[40px] w-full sm:w-64 rounded-lg py-2 pl-9 pr-3 text-xs"
               />
             </div>
 
             <div
-              className="inline-flex rounded-lg p-1 surface-card"
+              className="dock-shell inline-flex items-center gap-1"
               role="group"
               aria-label="Modo de visualização"
             >
@@ -287,24 +294,24 @@ export function KanbanView({
                 onClick={() => setViewMode("kanban")}
                 aria-pressed={viewMode === "kanban"}
                 className={cn(
-                  "inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+                  "inline-flex min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
                   viewMode === "kanban"
-                    ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
                 )}
               >
                 <Kanban className="h-3.5 w-3.5" aria-hidden="true" />
-                Quadro
+                Trilhos
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
                 aria-pressed={viewMode === "list"}
                 className={cn(
-                  "inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+                  "inline-flex min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
                   viewMode === "list"
-                    ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
                 )}
               >
                 <List className="h-3.5 w-3.5" aria-hidden="true" />
@@ -319,10 +326,10 @@ export function KanbanView({
               onClick={() => setOnlyStagnant((prev) => !prev)}
               aria-pressed={onlyStagnant}
               className={cn(
-                "inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border transition-colors",
+                "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border transition-colors",
                 onlyStagnant
                   ? "badge-warning"
-                  : "btn-ghost text-[var(--text-secondary)]"
+                  : "btn-ghost text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
               )}
             >
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />
@@ -332,164 +339,176 @@ export function KanbanView({
             <button
               type="button"
               onClick={() => onOpenNewLead(activeFunnel)}
-              className="btn-accent inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold"
+              className="btn-accent group inline-flex min-h-[40px] items-center gap-2 rounded-lg pl-3.5 pr-2 py-1.5 text-xs font-bold"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              Novo Lead
+              <span>Novo Lead</span>
+              <span className="btn-icon-badge">
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* VIEW MODE 1: COMPACT TABLE / LIST VIEW */}
+      {/* VIEW MODE 1: COMPACT DOUBLE-BEZEL TABLE / LIST VIEW */}
       {viewMode === "list" ? (
-        <div className="surface-card overflow-x-auto rounded-xl">
-          <table className="w-full text-left text-xs">
-            <thead className="border-b border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-              <tr>
-                <th className="px-4 py-3">Empresa &amp; Decisor</th>
-                <th className="px-4 py-3">Vertical</th>
-                <th className="px-4 py-3">Etapa</th>
-                <th className="px-4 py-3">Valor</th>
-                <th className="px-4 py-3">Último Contato</th>
-                <th className="px-4 py-3 text-right">Ações 1-Clique</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-hairline)]">
-              {funnelLeads.length === 0 ? (
+        <div className="double-bezel stagger-in">
+          <div className="double-bezel-core overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-xs text-[var(--text-muted)]"
-                  >
-                    Nenhum lead encontrado neste filtro.
-                  </td>
+                  <th className="px-4 py-3">Empresa &amp; Decisor</th>
+                  <th className="px-4 py-3">Vertical</th>
+                  <th className="px-4 py-3">Etapa</th>
+                  <th className="px-4 py-3">Valor</th>
+                  <th className="px-4 py-3">Último Contato</th>
+                  <th className="px-4 py-3 text-right">Ações 1-Clique</th>
                 </tr>
-              ) : (
-                funnelLeads.map((lead) => {
-                  const stagnation = getLeadStagnation(lead);
-                  return (
-                    <tr
-                      key={lead.id}
-                      className="hover:bg-[var(--bg-subtle)] transition-colors"
+              </thead>
+              <tbody className="divide-y divide-[var(--border-hairline)]">
+                {funnelLeads.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-8 text-center text-xs text-[var(--text-muted)]"
                     >
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => onSelectLead(lead)}
-                          className="text-left"
-                        >
-                          <p className="font-bold text-[var(--text-primary)] hover:text-[var(--accent-text)]">
-                            {lead.companyName}
-                          </p>
-                          <p className="text-[11px] text-[var(--text-secondary)]">
-                            {lead.contactName} ·{" "}
-                            <span className="font-mono-num">{lead.phone}</span>
-                          </p>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
-                          {getFunnelLabel(lead.funnel)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={lead.stage}
-                          onChange={(e) =>
-                            onMoveStage(lead.id, e.target.value as StageId)
-                          }
-                          aria-label={`Mover etapa de ${lead.companyName}`}
-                          className="input-field min-h-[34px] rounded-md px-2 py-1 text-xs font-semibold"
-                        >
-                          {STAGES.map((st) => (
-                            <option key={st.id} value={st.id}>
-                              {st.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 font-mono-num font-bold text-[var(--text-primary)]">
-                        {formatCurrency(lead.estimatedValue)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono-num text-[11px] text-[var(--text-secondary)]">
-                            {formatRelativeTime(lead.ultimaInteracaoEm)}
-                          </span>
-                          {stagnation.level !== "none" && (
-                            <span
-                              className={cn(
-                                "rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
-                                stagnation.level === "critical"
-                                  ? "badge-danger"
-                                  : "badge-warning"
-                              )}
-                            >
-                              {stagnation.label}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex items-center justify-end gap-1.5">
+                      Nenhum lead encontrado neste filtro.
+                    </td>
+                  </tr>
+                ) : (
+                  funnelLeads.map((lead) => {
+                    const stagnation = getLeadStagnation(lead);
+                    return (
+                      <tr
+                        key={lead.id}
+                        className="hover:bg-[var(--bg-surface-hover)] transition-colors"
+                      >
+                        <td className="px-4 py-3">
                           <button
                             type="button"
-                            onClick={() => handleCopyProposalUrl(lead)}
-                            className="btn-ghost inline-flex h-8 w-8 items-center justify-center rounded-md"
-                            title="Copiar link da proposta"
-                            aria-label={`Copiar proposta de ${lead.companyName}`}
+                            onClick={() => onSelectLead(lead)}
+                            className="text-left"
                           >
-                            {copiedLeadId === lead.id ? (
-                              <Check
-                                className="h-3.5 w-3.5 text-[var(--status-success)]"
+                            <p className="font-bold text-[var(--text-primary)] hover:text-[var(--accent-text)]">
+                              {lead.companyName}
+                            </p>
+                            <p className="text-[11px] text-[var(--text-secondary)]">
+                              {lead.contactName} ·{" "}
+                              <span className="font-mono-num">
+                                {lead.phone}
+                              </span>
+                            </p>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                            {getFunnelLabel(lead.funnel)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={lead.stage}
+                            onChange={(e) =>
+                              onMoveStage(lead.id, e.target.value as StageId)
+                            }
+                            aria-label={`Mover etapa de ${lead.companyName}`}
+                            className="input-field min-h-[34px] rounded-md px-2 py-1 text-xs font-semibold"
+                          >
+                            {STAGES.map((st) => (
+                              <option key={st.id} value={st.id}>
+                                {st.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 font-mono-num font-bold text-[var(--text-primary)]">
+                          {formatCurrency(lead.estimatedValue)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-mono-num text-[11px] text-[var(--text-secondary)]">
+                              {formatRelativeTime(lead.ultimaInteracaoEm)}
+                            </span>
+                            {stagnation.level !== "none" && (
+                              <span
+                                className={cn(
+                                  "rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
+                                  stagnation.level === "critical"
+                                    ? "badge-danger"
+                                    : "badge-warning"
+                                )}
+                              >
+                                {stagnation.label}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyProposalUrl(lead)}
+                              className="btn-ghost inline-flex h-8 w-8 items-center justify-center rounded-md"
+                              title="Copiar link da proposta"
+                              aria-label={`Copiar proposta de ${lead.companyName}`}
+                            >
+                              {copiedLeadId === lead.id ? (
+                                <Check
+                                  className="h-3.5 w-3.5 text-[var(--status-success)]"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <Copy
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
+                            <a
+                              href={buildWhatsappUrl(
+                                lead.phone,
+                                `Olá ${lead.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO.`
+                              )}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="badge-success inline-flex h-8 w-8 items-center justify-center rounded-md"
+                              title="Abrir WhatsApp direto"
+                              aria-label={`Abrir WhatsApp de ${lead.companyName}`}
+                            >
+                              <MessageCircle
+                                className="h-3.5 w-3.5"
                                 aria-hidden="true"
                               />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                            )}
-                          </button>
-                          <a
-                            href={buildWhatsappUrl(
-                              lead.phone,
-                              `Olá ${lead.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO.`
-                            )}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="badge-success inline-flex h-8 w-8 items-center justify-center rounded-md"
-                            title="Abrir WhatsApp direto"
-                            aria-label={`Abrir WhatsApp de ${lead.companyName}`}
-                          >
-                            <MessageCircle
-                              className="h-3.5 w-3.5"
-                              aria-hidden="true"
-                            />
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => onQuickDispatch(lead)}
-                            className="btn-accent inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-bold"
-                          >
-                            <Send className="h-3 w-3" aria-hidden="true" />
-                            Disparar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => onQuickDispatch(lead)}
+                              className="btn-accent inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-bold"
+                            >
+                              <Send className="h-3 w-3" aria-hidden="true" />
+                              Disparar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
-        /* VIEW MODE 2: 6-COLUMN KANBAN BOARD */
-        <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-1 px-1">
-          {STAGES.map((stage) => {
+        /* VIEW MODE 2: MINIMALIST LINEAR-STYLE 6-COLUMN KANBAN RAILS (100% Width on Desktop) */
+        <div className="flex gap-3.5 overflow-x-auto pb-4 xl:grid xl:grid-cols-6 xl:overflow-visible">
+          {STAGES.map((stage, stageColIdx) => {
             const stageLeads = leadsByStage[stage.id];
             const stageSum = stageLeads.reduce(
               (sum, l) => sum + l.estimatedValue,
               0
+            );
+            const stageSharePct = Math.round(
+              (stageLeads.length / totalFilteredCount) * 100
             );
             const isDropTarget = dragOverStage === stage.id;
 
@@ -497,6 +516,7 @@ export function KanbanView({
               <section
                 key={stage.id}
                 aria-label={`Etapa ${stage.label}`}
+                style={{ ["--stagger" as string]: stageColIdx }}
                 onDragOver={(e) => {
                   e.preventDefault();
                   if (dragOverStage !== stage.id) setDragOverStage(stage.id);
@@ -509,45 +529,58 @@ export function KanbanView({
                   handleDrop(stage.id);
                 }}
                 className={cn(
-                  "flex min-h-[540px] w-[298px] shrink-0 flex-col rounded-xl p-3 transition-colors border",
-                  isDropTarget
-                    ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
-                    : "bg-[var(--bg-subtle)] border-[var(--border-hairline)]"
+                  "stagger-in flex min-h-[540px] w-[285px] shrink-0 flex-col rounded-xl px-1.5 py-2 transition-colors xl:w-auto",
+                  isDropTarget &&
+                    "bg-[var(--accent-soft)]/50 ring-1 ring-[var(--accent-border)]"
                 )}
               >
-                <div className="mb-3 flex items-center justify-between px-1 pt-0.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className={cn(
-                        "h-2.5 w-2.5 rounded-full shrink-0",
-                        stage.accentClass
-                      )}
-                      aria-hidden="true"
-                    />
-                    <h2 className="truncate text-xs font-bold text-[var(--text-primary)]">
-                      {stage.label}
-                    </h2>
-                    <span className="rounded-md bg-[var(--bg-surface-solid)] px-1.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-muted)]">
-                      {stageLeads.length}
+                {/* Minimalist Linear-Style Column Header + Proportional Progress Hairline */}
+                <div className="mb-3 px-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full shrink-0",
+                          stage.accentClass
+                        )}
+                        aria-hidden="true"
+                      />
+                      <h2 className="truncate text-xs font-bold tracking-tight text-[var(--text-primary)]">
+                        {stage.label}
+                      </h2>
+                      <span className="rounded-md bg-[var(--bg-subtle)] border border-[var(--border-hairline)] px-1.5 py-0.2 font-mono-num text-[10px] font-bold text-[var(--text-secondary)]">
+                        {stageLeads.length}
+                      </span>
+                    </div>
+                    <span className="font-mono-num text-[11px] font-semibold text-[var(--text-secondary)] shrink-0">
+                      {formatCurrency(stageSum)}
                     </span>
                   </div>
-                  <span className="font-mono-num text-[11px] font-semibold text-[var(--text-secondary)]">
-                    {formatCurrency(stageSum)}
-                  </span>
+
+                  {/* Thin Stage Progress Hairline */}
+                  <div className="mt-2 h-[2px] w-full overflow-hidden rounded-full bg-[var(--border-hairline)]">
+                    <div
+                      className={cn("h-full transition-all duration-300", stage.accentClass)}
+                      style={{
+                        width: `${stageLeads.length > 0 ? Math.max(12, stageSharePct) : 0}%`,
+                      }}
+                    />
+                  </div>
                 </div>
 
+                {/* Floating Cards Stack */}
                 <div className="flex flex-1 flex-col gap-2.5">
                   {stageLeads.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-hairline)] px-4 py-8 text-center">
                       <p className="text-[11px] text-[var(--text-muted)]">
-                        Arraste ou mova um card para{" "}
+                        Solte um card em{" "}
                         <span className="font-medium text-[var(--text-secondary)]">
                           {stage.shortLabel}
                         </span>
                       </p>
                     </div>
                   ) : (
-                    stageLeads.map((lead) => {
+                    stageLeads.map((lead, cardIdx) => {
                       const stagnation = getLeadStagnation(lead);
                       const partner = lead.partnerId
                         ? partnerMap.get(lead.partnerId)
@@ -563,6 +596,7 @@ export function KanbanView({
                         <article
                           key={lead.id}
                           draggable
+                          style={{ ["--stagger" as string]: cardIdx }}
                           onDragStart={(e) => {
                             setDraggingLeadId(lead.id);
                             e.dataTransfer.effectAllowed = "move";
@@ -573,7 +607,7 @@ export function KanbanView({
                             setDragOverStage(null);
                           }}
                           className={cn(
-                            "surface-card surface-card-hover group cursor-grab active:cursor-grabbing rounded-xl border-l-[3px] p-3.5",
+                            "surface-card surface-card-hover stagger-in group cursor-grab active:cursor-grabbing rounded-xl border-l-[3px] p-3.5",
                             STAGE_BORDER_COLORS[lead.stage],
                             isDragging && "opacity-45 scale-[0.98]"
                           )}
@@ -583,130 +617,90 @@ export function KanbanView({
                             onClick={() => onSelectLead(lead)}
                             className="block w-full text-left"
                           >
-                            {/* Badges Row */}
-                            {(showAllFunnels ||
-                              stagnation.level !== "none" ||
-                              (lead.tags ?? []).length > 0 ||
-                              lead.visualizadaEm ||
-                              lead.propostaAprovadaEm) && (
-                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                {showAllFunnels && (
-                                  <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent-text)]">
-                                    {getFunnelLabel(lead.funnel)}
+                            {/* Top Row: Value Spotlight + Critical Status Badges */}
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="font-mono-num text-xs font-extrabold text-[var(--accent-text)]">
+                                {formatCurrency(lead.estimatedValue)}
+                              </span>
+
+                              <div className="flex flex-wrap items-center gap-1">
+                                {lead.visualizadaEm && (
+                                  <span
+                                    title={`Proposta visualizada ${lead.visualizacoesProposta}x`}
+                                    className="badge-accent inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                  >
+                                    <Eye
+                                      className="h-2.5 w-2.5"
+                                      aria-hidden="true"
+                                    />
+                                    {lead.visualizacoesProposta}x
+                                  </span>
+                                )}
+                                {lead.propostaAprovadaEm && (
+                                  <span className="badge-success inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold">
+                                    <CheckCircle2
+                                      className="h-2.5 w-2.5"
+                                      aria-hidden="true"
+                                    />
+                                    OK
                                   </span>
                                 )}
                                 {stagnation.level === "critical" && (
-                                  <span className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                  <span className="badge-danger inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold">
                                     <AlertTriangle
-                                      className="h-3 w-3"
+                                      className="h-2.5 w-2.5"
                                       aria-hidden="true"
                                     />
                                     {stagnation.label}
                                   </span>
                                 )}
                                 {stagnation.level === "warning" && (
-                                  <span className="badge-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                  <span className="badge-warning inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold">
                                     <Clock
-                                      className="h-3 w-3"
+                                      className="h-2.5 w-2.5"
                                       aria-hidden="true"
                                     />
                                     {stagnation.label}
                                   </span>
                                 )}
-                                {(lead.tags ?? []).map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                                {lead.visualizadaEm && (
-                                  <span
-                                    title={`Proposta visualizada ${lead.visualizacoesProposta}x`}
-                                    className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold"
-                                  >
-                                    <Eye
-                                      className="h-3 w-3"
-                                      aria-hidden="true"
-                                    />
-                                    Vista
-                                    {lead.visualizacoesProposta > 1
-                                      ? ` ${lead.visualizacoesProposta}x`
-                                      : ""}
-                                  </span>
-                                )}
-                                {lead.propostaAprovadaEm && (
-                                  <span className="badge-success inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                                    <CheckCircle2
-                                      className="h-3 w-3"
-                                      aria-hidden="true"
-                                    />
-                                    Aprovada
-                                  </span>
-                                )}
                               </div>
-                            )}
+                            </div>
 
+                            {/* Company & Contact */}
                             <h3 className="text-sm font-bold leading-snug text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition-colors">
                               {lead.companyName}
                             </h3>
-                            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
                               {lead.contactName}
                               {lead.contactRole ? ` · ${lead.contactRole}` : ""}
                             </p>
 
-                            <div className="mt-2.5 flex items-center justify-between gap-2">
-                              <span className="font-mono-num text-sm font-extrabold text-[var(--text-primary)]">
-                                {formatCurrency(lead.estimatedValue)}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                {lead.automacaoAtiva &&
-                                  (lead.stage === "contatado" ||
-                                    lead.stage === "proposta_aberta") && (
-                                    <span
-                                      title="Cadência automática ativa"
-                                      className="inline-flex items-center gap-0.5 rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]"
-                                    >
-                                      <Bot
-                                        className="h-2.5 w-2.5 text-[var(--accent-text)]"
-                                        aria-hidden="true"
-                                      />
-                                      Auto
-                                    </span>
-                                  )}
-                                {lead.paymentStatus === "sinal_pago" && (
-                                  <span className="badge-success rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
-                                    50% Pago
-                                  </span>
-                                )}
-                                {lead.paymentStatus === "quitado" && (
-                                  <span className="badge-success rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
-                                    Quitado
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            {/* Compact Metadata Line */}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                              {showAllFunnels && (
+                                <span className="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 font-bold text-[var(--text-secondary)]">
+                                  {getFunnelLabel(lead.funnel)}
+                                </span>
+                              )}
 
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
                               {partner ? (
-                                <span className="inline-flex items-center gap-1 truncate rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+                                <span className="inline-flex items-center gap-1 truncate rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 font-medium text-[var(--text-secondary)]">
                                   <Handshake
-                                    className="h-3 w-3 text-[var(--accent-text)] shrink-0"
+                                    className="h-2.5 w-2.5 text-[var(--accent-text)] shrink-0"
                                     aria-hidden="true"
                                   />
                                   <span className="truncate">
-                                    {partner.name} ({partner.commissionRate}%)
+                                    {partner.name}
                                   </span>
                                 </span>
                               ) : (
-                                <span className="truncate rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px]">
+                                <span className="truncate rounded bg-[var(--bg-subtle)] px-1.5 py-0.5">
                                   {lead.origin}
                                 </span>
                               )}
 
                               {lead.instagram && (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
+                                <span className="inline-flex items-center gap-0.5 rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[var(--text-secondary)]">
                                   <Instagram
                                     className="h-2.5 w-2.5 text-[var(--accent-text)]"
                                     aria-hidden="true"
@@ -715,20 +709,44 @@ export function KanbanView({
                                 </span>
                               )}
 
+                              {lead.automacaoAtiva &&
+                                (lead.stage === "contatado" ||
+                                  lead.stage === "proposta_aberta") && (
+                                  <span
+                                    title="Cadência automática ativa"
+                                    className="inline-flex items-center gap-0.5 rounded bg-[var(--bg-subtle)] px-1.5 py-0.5"
+                                  >
+                                    <Bot
+                                      className="h-2.5 w-2.5 text-[var(--accent-text)]"
+                                      aria-hidden="true"
+                                    />
+                                    Auto
+                                  </span>
+                                )}
+
                               {checklist.length > 0 && (
-                                <span className="badge-success inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono-num text-[10px] font-semibold">
+                                <span className="badge-success inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono-num font-semibold">
                                   <ClipboardCheck
-                                    className="h-3 w-3"
+                                    className="h-2.5 w-2.5"
                                     aria-hidden="true"
                                   />
                                   {checklistDone}/{checklist.length}
                                 </span>
                               )}
+
+                              {(lead.tags ?? []).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="badge-danger rounded px-1.5 py-0.5 font-bold"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
                             </div>
                           </button>
 
-                          {/* 1-Click Stage Stepper + Action Bar */}
-                          <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-2.5">
+                          {/* Subtle Hover-Spotlight Quick Action Bar (100% accessible via keyboard/mobile) */}
+                          <div className="mt-3 space-y-1.5 border-t border-[var(--border-hairline)] pt-2.5 opacity-85 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
@@ -784,7 +802,7 @@ export function KanbanView({
                               </button>
                             </div>
 
-                            <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex items-center justify-between gap-1">
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
@@ -847,11 +865,11 @@ export function KanbanView({
                                 <button
                                   type="button"
                                   onClick={() => onQuickDispatch(lead)}
-                                  className="btn-accent inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[10px] font-bold"
+                                  className="btn-accent inline-flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-bold"
                                   title="Abrir no Disparador com script"
                                 >
                                   <Send
-                                    className="h-3 w-3"
+                                    className="h-2.5 w-2.5"
                                     aria-hidden="true"
                                   />
                                   Script

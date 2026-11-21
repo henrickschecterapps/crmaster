@@ -186,7 +186,7 @@ export function PartnersView({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)]">
+          <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
             Alianças Comerciais · 15% via Pix
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
@@ -197,214 +197,224 @@ export function PartnersView({
         <button
           type="button"
           onClick={openCreate}
-          className="btn-accent min-h-[44px] inline-flex items-center justify-center gap-2 self-start rounded-lg px-4 py-2.5 text-xs font-bold"
+          className="btn-accent group min-h-[40px] inline-flex items-center justify-center gap-2 self-start rounded-lg pl-4 pr-2 py-2 text-xs font-bold"
         >
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          Novo Parceiro
+          <span>Novo Parceiro</span>
+          <span className="btn-icon-badge">
+            <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+          </span>
         </button>
       </div>
 
-      {/* KPI Summary Strip */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="surface-card rounded-xl p-5">
-          <p className="text-xs font-medium text-[var(--text-secondary)]">
-            Parceiros Ativos
-          </p>
-          <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--text-primary)]">
-            {partners.length}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            {totals.referrals} indicações vinculadas
-          </p>
-        </div>
+      {/* KPI Summary Strip: Single Double-Bezel Bar with Hairline Dividers */}
+      <div className="double-bezel stagger-in">
+        <div className="double-bezel-core grid grid-cols-1 divide-y divide-[var(--border-hairline)] sm:grid-cols-2 sm:divide-y-0 sm:divide-x xl:grid-cols-4">
+          <div className="p-5">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">
+              Parceiros Ativos
+            </p>
+            <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--text-primary)]">
+              {partners.length}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              {totals.referrals} indicações vinculadas
+            </p>
+          </div>
 
-        <div className="surface-card rounded-xl p-5">
-          <p className="text-xs font-medium text-[var(--text-secondary)]">
-            Comissões a Pagar
-          </p>
-          <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--accent-text)]">
-            {formatCurrencyExact(totals.payable)}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Projetos com sinal pago ou fechados
-          </p>
-        </div>
+          <div className="p-5">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">
+              Comissões a Pagar
+            </p>
+            <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--accent-text)]">
+              {formatCurrencyExact(totals.payable)}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Projetos com sinal pago ou fechados
+            </p>
+          </div>
 
-        <div className="surface-card rounded-xl p-5">
-          <p className="text-xs font-medium text-[var(--text-secondary)]">
-            Comissões Pagas
-          </p>
-          <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--status-success)]">
-            {formatCurrencyExact(totals.paid)}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Total já repassado aos parceiros
-          </p>
-        </div>
+          <div className="p-5">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">
+              Comissões Pagas
+            </p>
+            <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--status-success)]">
+              {formatCurrencyExact(totals.paid)}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Total já repassado aos parceiros
+            </p>
+          </div>
 
-        <div className="surface-card rounded-xl p-5">
-          <p className="text-xs font-medium text-[var(--text-secondary)]">
-            Potencial em Pipeline
-          </p>
-          <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--text-primary)]">
-            {formatCurrencyExact(totals.potential)}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Indicações ainda em negociação
-          </p>
+          <div className="p-5">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">
+              Potencial em Pipeline
+            </p>
+            <p className="mt-2 font-mono-num text-2xl font-bold text-[var(--text-primary)]">
+              {formatCurrencyExact(totals.potential)}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Indicações ainda em negociação
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Create / Edit Partner Panel */}
       {formOpen && (
-        <form
-          onSubmit={handleSubmit}
-          className="surface-card rounded-xl p-5 space-y-4 border-[var(--accent-border)]"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[var(--text-primary)]">
-              {editingId ? "Editar Parceiro" : "Cadastrar Parceiro Indicador"}
-            </h2>
-            <button
-              type="button"
-              onClick={() => setFormOpen(false)}
-              aria-label="Fechar formulário de parceiro"
-              className="btn-ghost flex h-11 w-11 items-center justify-center rounded-lg"
-            >
-              <X aria-hidden="true" className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
-            <div>
-              <label
-                htmlFor="partner-name"
-                className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+        <div className="double-bezel stagger-in">
+          <form
+            onSubmit={handleSubmit}
+            className="double-bezel-core p-5 space-y-4 border-[var(--accent-border)]"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {editingId ? "Editar Parceiro" : "Cadastrar Parceiro Indicador"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                aria-label="Fechar formulário de parceiro"
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
               >
-                Nome *
-              </label>
-              <input
-                id="partner-name"
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nome do parceiro"
-                className="input-field w-full rounded-lg px-3 py-2 text-xs"
-              />
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
             </div>
 
-            <div>
-              <label
-                htmlFor="partner-role"
-                className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
-              >
-                Perfil
-              </label>
-              <select
-                id="partner-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as PartnerRole)}
-                className="input-field w-full rounded-lg px-3 py-2 text-xs"
-              >
-                <option value="modelo_provador">Modelo de Provador VIP</option>
-                <option value="gerente_espaco">
-                  Gerente de Espaço / Promoter
-                </option>
-                <option value="outro">Parceiro Comercial</option>
-              </select>
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <label
+                  htmlFor="partner-name"
+                  className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+                >
+                  Nome *
+                </label>
+                <input
+                  id="partner-name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nome do parceiro"
+                  className="input-field w-full rounded-lg px-3 py-2 text-xs"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="partner-role"
+                  className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+                >
+                  Perfil
+                </label>
+                <select
+                  id="partner-role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as PartnerRole)}
+                  className="input-field w-full rounded-lg px-3 py-2 text-xs"
+                >
+                  <option value="modelo_provador">
+                    Modelo de Provador VIP
+                  </option>
+                  <option value="gerente_espaco">
+                    Gerente de Espaço / Promoter
+                  </option>
+                  <option value="outro">Parceiro Comercial</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="partner-company"
+                  className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+                >
+                  Espaço / Região
+                </label>
+                <input
+                  id="partner-company"
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Ex: Barro Preto BH"
+                  className="input-field w-full rounded-lg px-3 py-2 text-xs"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="partner-phone"
+                  className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+                >
+                  WhatsApp
+                </label>
+                <input
+                  id="partner-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
+                  placeholder="(31) 99999-9999"
+                  className="input-field w-full rounded-lg px-3 py-2 font-mono-num text-xs"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="partner-rate"
+                  className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+                >
+                  Comissão (%)
+                </label>
+                <input
+                  id="partner-rate"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={commissionRate}
+                  onChange={(e) => setCommissionRate(e.target.value)}
+                  className="input-field w-full rounded-lg px-3 py-2 font-mono-num text-xs font-semibold"
+                />
+              </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="partner-company"
-                className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="btn-ghost min-h-[40px] rounded-lg px-4 py-2 text-xs font-semibold"
               >
-                Espaço / Região
-              </label>
-              <input
-                id="partner-company"
-                type="text"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Ex: Barro Preto BH"
-                className="input-field w-full rounded-lg px-3 py-2 text-xs"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="partner-phone"
-                className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-accent min-h-[40px] rounded-lg px-5 py-2 text-xs font-bold disabled:opacity-50"
               >
-                WhatsApp
-              </label>
-              <input
-                id="partner-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
-                placeholder="(31) 99999-9999"
-                className="input-field w-full rounded-lg px-3 py-2 font-mono-num text-xs"
-              />
+                {saving ? "Salvando..." : "Salvar Parceiro"}
+              </button>
             </div>
-
-            <div>
-              <label
-                htmlFor="partner-rate"
-                className="block text-xs font-semibold text-[var(--text-secondary)] mb-1"
-              >
-                Comissão (%)
-              </label>
-              <input
-                id="partner-rate"
-                type="number"
-                min={1}
-                max={50}
-                value={commissionRate}
-                onChange={(e) => setCommissionRate(e.target.value)}
-                className="input-field w-full rounded-lg px-3 py-2 font-mono-num text-xs font-semibold"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setFormOpen(false)}
-              className="btn-ghost min-h-[44px] rounded-lg px-4 py-2 text-xs font-semibold"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn-accent min-h-[44px] rounded-lg px-5 py-2 text-xs font-bold disabled:opacity-50"
-            >
-              {saving ? "Salvando..." : "Salvar Parceiro"}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
       {/* Partner Cards List */}
       {partnerSummaries.length === 0 ? (
-        <div className="surface-card rounded-xl p-10 text-center space-y-2">
-          <Users
-            aria-hidden="true"
-            className="mx-auto h-8 w-8 text-[var(--text-muted)]"
-          />
-          <p className="text-sm font-semibold text-[var(--text-primary)]">
-            Nenhum parceiro cadastrado ainda
-          </p>
-          <p className="text-xs text-[var(--text-secondary)]">
-            Cadastre modelos de provador VIP ou gerentes de espaços de eventos
-            para rastrear comissões de 15% automaticamente.
-          </p>
+        <div className="double-bezel">
+          <div className="double-bezel-core p-10 text-center space-y-2">
+            <Users
+              aria-hidden="true"
+              className="mx-auto h-8 w-8 text-[var(--text-muted)]"
+            />
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              Nenhum parceiro cadastrado ainda
+            </p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Cadastre modelos de provador VIP ou gerentes de espaços de eventos
+              para rastrear comissões de 15% automaticamente.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {partnerSummaries.map(({ partner, referred, payable, paid }) => {
+          {partnerSummaries.map(({ partner, referred, payable, paid }, idx) => {
             const waUrl = partner.phone
               ? buildWhatsappUrl(
                   partner.phone,
@@ -413,166 +423,171 @@ export function PartnersView({
               : null;
 
             return (
-              <section
+              <div
                 key={partner.id}
-                className="surface-card rounded-xl p-5 flex flex-col justify-between gap-4"
+                className="double-bezel stagger-in"
+                style={{ ["--stagger" as string]: idx }}
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold">
-                        <Handshake aria-hidden="true" className="h-3 w-3" />
-                        {PARTNER_ROLES[partner.role]} ({partner.commissionRate}
-                        %)
-                      </span>
-                      <h2 className="mt-2 text-base font-bold text-[var(--text-primary)]">
-                        {partner.name}
-                      </h2>
-                      <p className="text-xs text-[var(--text-secondary)]">
-                        {partner.company}
-                        {partner.phone ? ` · ${partner.phone}` : ""}
-                      </p>
-                    </div>
+                <section className="double-bezel-core h-full p-5 flex flex-col justify-between gap-4">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold">
+                          <Handshake aria-hidden="true" className="h-3 w-3" />
+                          {PARTNER_ROLES[partner.role]} (
+                          {partner.commissionRate}%)
+                        </span>
+                        <h2 className="mt-2 text-base font-bold text-[var(--text-primary)]">
+                          {partner.name}
+                        </h2>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          {partner.company}
+                          {partner.phone ? ` · ${partner.phone}` : ""}
+                        </p>
+                      </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      {waUrl && (
-                        <a
-                          href={waUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={`Abrir WhatsApp de ${partner.name}`}
-                          className="btn-ghost flex h-11 w-11 items-center justify-center rounded-lg"
-                        >
-                          <MessageCircle
-                            aria-hidden="true"
-                            className="h-4 w-4 text-[var(--status-success)]"
-                          />
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => openEdit(partner)}
-                        aria-label={`Editar parceiro ${partner.name}`}
-                        className="btn-ghost flex h-11 w-11 items-center justify-center rounded-lg"
-                      >
-                        <Edit3 aria-hidden="true" className="h-4 w-4" />
-                      </button>
-                      {confirmDeleteId === partner.id ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await onDeletePartner(partner.id);
-                            setConfirmDeleteId(null);
-                          }}
-                          className="badge-danger min-h-[44px] rounded-lg px-2.5 text-xs font-bold"
-                        >
-                          Confirmar
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(partner.id)}
-                          aria-label={`Excluir parceiro ${partner.name}`}
-                          className="btn-ghost flex h-11 w-11 items-center justify-center rounded-lg text-[var(--status-danger)]"
-                        >
-                          <Trash2 aria-hidden="true" className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Commission totals for this partner */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="rounded-lg bg-[var(--bg-subtle)] p-3">
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        A pagar
-                      </p>
-                      <p className="mt-0.5 font-mono-num text-sm font-bold text-[var(--accent-text)]">
-                        {formatCurrencyExact(payable)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-[var(--bg-subtle)] p-3">
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        Já pago
-                      </p>
-                      <p className="mt-0.5 font-mono-num text-sm font-bold text-[var(--status-success)]">
-                        {formatCurrencyExact(paid)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Referred Leads List */}
-                  <div className="space-y-2 border-t border-[var(--border-hairline)] pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                      Indicações ({referred.length})
-                    </p>
-                    {referred.length === 0 ? (
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Nenhuma indicação vinculada até o momento.
-                      </p>
-                    ) : (
-                      referred.map((lead) => {
-                        const comm = getPartnerCommission(lead, partners);
-                        return (
-                          <div
-                            key={lead.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--bg-subtle)] px-3 py-2 text-xs"
+                      <div className="flex items-center gap-1 shrink-0">
+                        {waUrl && (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Abrir WhatsApp de ${partner.name}`}
+                            className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
                           >
-                            <button
-                              type="button"
-                              onClick={() => onSelectLead(lead)}
-                              className="min-w-0 flex-1 text-left hover:text-[var(--accent-text)]"
-                            >
-                              <p className="truncate font-semibold text-[var(--text-primary)]">
-                                {lead.companyName}
-                              </p>
-                              <p className="text-[11px] text-[var(--text-muted)]">
-                                {getStageLabel(lead.stage)} · Projeto{" "}
-                                {formatCurrency(lead.estimatedValue)}
-                              </p>
-                            </button>
+                            <MessageCircle
+                              aria-hidden="true"
+                              className="h-4 w-4 text-[var(--status-success)]"
+                            />
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openEdit(partner)}
+                          aria-label={`Editar parceiro ${partner.name}`}
+                          className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                        >
+                          <Edit3 aria-hidden="true" className="h-4 w-4" />
+                        </button>
+                        {confirmDeleteId === partner.id ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await onDeletePartner(partner.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="badge-danger min-h-[40px] rounded-lg px-2.5 text-xs font-bold"
+                          >
+                            Confirmar
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(partner.id)}
+                            aria-label={`Excluir parceiro ${partner.name}`}
+                            className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg text-[var(--status-danger)]"
+                          >
+                            <Trash2 aria-hidden="true" className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="font-mono-num font-bold text-[var(--text-primary)]">
-                                {formatCurrencyExact(comm)}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleToggleCommissionPaid(lead, partner)
-                                }
-                                className={
-                                  lead.commissionPaid
-                                    ? "badge-success min-h-[36px] inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold"
-                                    : "btn-ghost min-h-[36px] inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold"
-                                }
+                    {/* Hairline Divided Commission Summary */}
+                    <div className="grid grid-cols-2 divide-x divide-[var(--border-hairline)] border-y border-[var(--border-hairline)] py-3">
+                      <div className="pr-3">
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          A pagar
+                        </p>
+                        <p className="mt-0.5 font-mono-num text-sm font-bold text-[var(--accent-text)]">
+                          {formatCurrencyExact(payable)}
+                        </p>
+                      </div>
+                      <div className="pl-3">
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Já pago
+                        </p>
+                        <p className="mt-0.5 font-mono-num text-sm font-bold text-[var(--status-success)]">
+                          {formatCurrencyExact(paid)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Referred Leads Hairline List */}
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                        Indicações ({referred.length})
+                      </p>
+                      {referred.length === 0 ? (
+                        <p className="py-2 text-xs text-[var(--text-muted)]">
+                          Nenhuma indicação vinculada até o momento.
+                        </p>
+                      ) : (
+                        <div className="divide-y divide-[var(--border-hairline)]">
+                          {referred.map((lead) => {
+                            const comm = getPartnerCommission(lead, partners);
+                            return (
+                              <div
+                                key={lead.id}
+                                className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-xs"
                               >
-                                {lead.commissionPaid ? (
-                                  <>
-                                    <CheckCircle2
-                                      aria-hidden="true"
-                                      className="h-3.5 w-3.5"
-                                    />
-                                    Paga
-                                  </>
-                                ) : (
-                                  <>
-                                    <Check
-                                      aria-hidden="true"
-                                      className="h-3.5 w-3.5"
-                                    />
-                                    Quitar
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectLead(lead)}
+                                  className="min-w-0 flex-1 text-left hover:text-[var(--accent-text)]"
+                                >
+                                  <p className="truncate font-semibold text-[var(--text-primary)]">
+                                    {lead.companyName}
+                                  </p>
+                                  <p className="text-[11px] text-[var(--text-muted)]">
+                                    {getStageLabel(lead.stage)} · Projeto{" "}
+                                    {formatCurrency(lead.estimatedValue)}
+                                  </p>
+                                </button>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-mono-num font-bold text-[var(--text-primary)]">
+                                    {formatCurrencyExact(comm)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleToggleCommissionPaid(lead, partner)
+                                    }
+                                    className={
+                                      lead.commissionPaid
+                                        ? "badge-success min-h-[32px] inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold"
+                                        : "btn-ghost min-h-[32px] inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold"
+                                    }
+                                  >
+                                    {lead.commissionPaid ? (
+                                      <>
+                                        <CheckCircle2
+                                          aria-hidden="true"
+                                          className="h-3.5 w-3.5"
+                                        />
+                                        Paga
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Check
+                                          aria-hidden="true"
+                                          className="h-3.5 w-3.5"
+                                        />
+                                        Quitar
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              </div>
             );
           })}
         </div>

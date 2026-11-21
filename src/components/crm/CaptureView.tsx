@@ -602,7 +602,7 @@ export function CaptureView({
         </div>
 
         <div
-          className="flex flex-wrap items-center gap-1.5 rounded-xl p-1.5 surface-card"
+          className="dock-shell flex flex-wrap items-center gap-1"
           role="tablist"
           aria-label="Modos de captação de leads"
         >
@@ -612,10 +612,10 @@ export function CaptureView({
             aria-selected={subTab === "places"}
             onClick={() => setSubTab("places")}
             className={cn(
-              "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
+              "inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all",
               subTab === "places"
-                ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
             )}
           >
             <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
@@ -627,10 +627,10 @@ export function CaptureView({
             aria-selected={subTab === "manual"}
             onClick={() => setSubTab("manual")}
             className={cn(
-              "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
+              "inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all",
               subTab === "manual"
-                ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
             )}
           >
             <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -642,10 +642,10 @@ export function CaptureView({
             aria-selected={subTab === "csv"}
             onClick={() => setSubTab("csv")}
             className={cn(
-              "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
+              "inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all",
               subTab === "csv"
-                ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
             )}
           >
             <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />
@@ -657,7 +657,8 @@ export function CaptureView({
       {/* TAB 1: OVERTURE MAPS BH + OSM FALLBACK */}
       {subTab === "places" && (
         <div className="space-y-5">
-          <div className="surface-card rounded-xl p-6 space-y-4">
+          <div className="double-bezel stagger-in">
+            <div className="double-bezel-core p-6 space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
@@ -741,6 +742,7 @@ export function CaptureView({
                   {preset}
                 </button>
               ))}
+            </div>
             </div>
           </div>
 

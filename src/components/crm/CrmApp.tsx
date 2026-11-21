@@ -11,8 +11,6 @@ import {
   LayoutDashboard,
   LogOut,
   Moon,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
   RefreshCw,
   Search,
@@ -21,7 +19,7 @@ import {
   Sun,
   UserPlus,
 } from "lucide-react";
-import { BrandMark, UltimoQuadroIcon } from "@/components/BrandMark";
+import { BrandMark } from "@/components/BrandMark";
 import {
   CrmStoreData,
   FunnelId,
@@ -80,7 +78,6 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const [quickNewLeadFunnel, setQuickNewLeadFunnel] =
     useState<FunnelId>("corporativo");
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -112,7 +109,6 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     }
   }, [store]);
 
-  // Global Ctrl+K / Cmd+K shortcut for Command Palette
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -502,7 +498,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     {
       id: "kanban",
       code: "02",
-      label: "CRM Kanban",
+      label: "Kanban",
       shortLabel: "Kanban",
       icon: Kanban,
       badge: store.leads.length,
@@ -517,14 +513,14 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     {
       id: "dispatcher",
       code: "04",
-      label: "Disparador & Scripts",
+      label: "Disparador",
       shortLabel: "Disparo",
       icon: Send,
     },
     {
       id: "partners",
       code: "05",
-      label: "Parceiros (15%)",
+      label: "Parceiros",
       shortLabel: "Parceiros",
       icon: Handshake,
       badge: store.partners.length,
@@ -532,7 +528,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     {
       id: "settings",
       code: "06",
-      label: "Automações & Config",
+      label: "Config",
       shortLabel: "Config",
       icon: Settings,
     },
@@ -542,46 +538,56 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     navItems.find((n) => n.id === activeModule) ?? navItems[0];
 
   return (
-    <div className="min-h-[100dvh] flex flex-col lg:flex-row">
+    <div className="min-h-[100dvh] flex flex-col">
       {/* Subtle fixed 35mm cinema grain overlay */}
       <div className="cinema-grain" aria-hidden="true" />
 
-      {/* Collapsible Left Navigation Sidebar (Desktop) */}
-      <aside
-        className={cn(
-          "hidden lg:flex lg:shrink-0 lg:flex-col lg:justify-between border-r border-[var(--border-hairline)] bg-[var(--bg-subtle)] py-5 transition-all",
-          sidebarCollapsed ? "lg:w-20 px-2.5" : "lg:w-64 px-4"
-        )}
-      >
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-2 px-1">
-            {sidebarCollapsed ? (
-              <div className="mx-auto flex h-10 w-14 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-1.5">
-                <UltimoQuadroIcon className="w-full h-auto" />
-              </div>
-            ) : (
-              <BrandMark />
-            )}
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed((prev) => !prev)}
-              className="btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              aria-label={
-                sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"
-              }
+      {/* UNIFIED TOP DOCK HEADER (100% full horizontal width, no left sidebar) */}
+      <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
+        <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+          {/* Left: Studio Identity + Cloud Persistence Status Pill */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="lg:hidden">
+              <BrandMark compact />
+            </div>
+            <div className="hidden lg:block">
+              <BrandMark compact />
+            </div>
+
+            <div
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
               title={
-                sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"
+                status.databaseMode === "firebase"
+                  ? `Cloud Firestore ativo (${status.firebaseProjectId || "ultimo-quadro"})`
+                  : status.databaseMode === "supabase"
+                  ? "Supabase conectado"
+                  : "Modo Local (.data + localStorage)"
               }
             >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-              )}
-            </button>
+              <Database
+                className={cn(
+                  "h-3 w-3",
+                  status.databaseMode === "firebase"
+                    ? "text-[var(--status-success)]"
+                    : "text-[var(--accent-text)]"
+                )}
+                aria-hidden="true"
+              />
+              <span className="font-mono-num text-[10px] font-semibold">
+                {status.databaseMode === "firebase"
+                  ? "FIRESTORE"
+                  : status.databaseMode === "supabase"
+                  ? "SUPABASE"
+                  : "LOCAL"}
+              </span>
+            </div>
           </div>
 
-          <nav className="space-y-1.5" aria-label="Navegação Principal">
+          {/* Center: Unified macOS/Vercel-style Module Dock (Desktop) */}
+          <nav
+            aria-label="Navegação Principal"
+            className="dock-shell hidden lg:flex items-center gap-1"
+          >
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = activeModule === item.id;
@@ -591,23 +597,32 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                   type="button"
                   onClick={() => setActiveModule(item.id)}
                   aria-current={active ? "page" : undefined}
-                  title={sidebarCollapsed ? item.label : undefined}
                   className={cn(
-                    "flex w-full min-h-[42px] items-center rounded-lg py-2.5 text-xs font-semibold transition-colors border",
-                    sidebarCollapsed
-                      ? "justify-center px-2"
-                      : "justify-between px-3.5",
+                    "inline-flex min-h-[36px] items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
                     active
-                      ? "bg-[var(--accent-soft)] text-[var(--accent-text)] border-[var(--accent-border)]"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] border-transparent"
+                      ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
+                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] border border-transparent"
                   )}
                 >
-                  <span className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {!sidebarCollapsed && <span>{item.label}</span>}
-                  </span>
-                  {!sidebarCollapsed && item.badge !== undefined && (
-                    <span className="rounded-md bg-[var(--bg-surface-solid)] px-2 py-0.5 font-mono-num text-[10px] text-[var(--text-secondary)]">
+                  <Icon
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      active
+                        ? "text-[var(--accent-text)]"
+                        : "text-[var(--text-muted)]"
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span>{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span
+                      className={cn(
+                        "rounded-md px-1.5 py-0.2 font-mono-num text-[10px] font-bold",
+                        active
+                          ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                          : "bg-[var(--bg-subtle)] text-[var(--text-muted)]"
+                      )}
+                    >
                       {item.badge}
                     </span>
                   )}
@@ -615,119 +630,49 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               );
             })}
           </nav>
-        </div>
 
-        <div className="space-y-3 border-t border-[var(--border-hairline)] pt-4">
-          {sidebarCollapsed ? (
-            <div
-              className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)]"
-              title={
-                status.databaseMode === "firebase"
-                  ? `Firebase Conectado (${status.firebaseProjectId || "Firebase"})`
-                  : "Modo Local + Fallback"
-              }
-            >
-              <Database
-                className="h-4 w-4 text-[var(--accent-text)]"
-                aria-hidden="true"
-              />
-            </div>
-          ) : (
-            <div className="rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)] p-3 text-[11px]">
-              <div className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
-                <Database
-                  className="h-3.5 w-3.5 text-[var(--accent-text)]"
-                  aria-hidden="true"
-                />
-                {status.databaseMode === "firebase"
-                  ? "Firebase Conectado"
-                  : status.databaseMode === "supabase"
-                  ? "Supabase Conectado"
-                  : "Modo Local + Fallback"}
-              </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
-                {status.databaseMode === "firebase"
-                  ? `Cloud Firestore ativo (${status.firebaseProjectId || "Firebase"}).`
-                  : status.databaseMode === "supabase"
-                  ? "Persistência sincronizada em nuvem."
-                  : "Dados salvos localmente (.data + localStorage)."}
-              </p>
-            </div>
-          )}
-        </div>
-      </aside>
+          {/* Right: Alerts + Command Search (Ctrl+K) + Sync + Button-in-Button CTA + Theme */}
+          <div className="flex items-center gap-2 shrink-0">
+            {headerAlertCounts.stagnant > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveModule("dashboard")}
+                className="badge-warning hidden xl:inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hover:opacity-85"
+                title="Ver leads parados há mais de 48h"
+              >
+                <Clock className="h-3 w-3" aria-hidden="true" />
+                <span className="font-mono-num">
+                  {headerAlertCounts.stagnant}
+                </span>
+                <span>&gt;48h</span>
+              </button>
+            )}
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Sticky Topbar with Timecode Context Breadcrumb, Alert Pills & Command Palette Trigger */}
-        <header className="glass-bar sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="lg:hidden">
-              <BrandMark compact />
-            </div>
+            {headerAlertCounts.viewed > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowCommandPalette(true)}
+                className="badge-accent hidden 2xl:inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hover:opacity-85"
+                title="Propostas visualizadas por clientes"
+              >
+                <Eye className="h-3 w-3" aria-hidden="true" />
+                <span className="font-mono-num">{headerAlertCounts.viewed}</span>
+                <span>vistas</span>
+              </button>
+            )}
 
-            {/* Timecode Context Breadcrumb */}
-            <div className="hidden lg:flex items-center gap-2 text-xs">
-              <span className="rounded-md bg-[var(--accent-soft)] border border-[var(--accent-border)] px-2 py-0.5 font-mono-num text-[11px] font-bold text-[var(--accent-text)]">
-                {activeNav.code} / {activeNav.label.toUpperCase()}
-              </span>
-              {activeModule === "kanban" && (
-                <>
-                  <span className="text-[var(--text-muted)]" aria-hidden="true">
-                    ·
-                  </span>
-                  <span className="font-semibold text-[var(--text-secondary)]">
-                    {getFunnelLabel(activeFunnel)}
-                  </span>
-                </>
-              )}
-              <span className="text-[var(--text-muted)]" aria-hidden="true">
-                ·
-              </span>
-              <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
-                24FPS · BH &amp; NOVA LIMA
-              </span>
-            </div>
-
-            {/* Quick Clickable Alert Pills */}
-            <div className="hidden xl:flex items-center gap-1.5 ml-2">
-              {headerAlertCounts.stagnant > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setActiveModule("dashboard")}
-                  className="badge-warning inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold hover:opacity-85"
-                  title="Ver leads parados há mais de 48h"
-                >
-                  <Clock className="h-3 w-3" aria-hidden="true" />
-                  {headerAlertCounts.stagnant} parados &gt;48h
-                </button>
-              )}
-              {headerAlertCounts.viewed > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowCommandPalette(true)}
-                  className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold hover:opacity-85"
-                  title="Propostas visualizadas por clientes"
-                >
-                  <Eye className="h-3 w-3" aria-hidden="true" />
-                  {headerAlertCounts.viewed} propostas vistas
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
             {/* Global Search / Command Palette Trigger (Ctrl+K) */}
             <button
               type="button"
               onClick={() => setShowCommandPalette(true)}
-              className="btn-ghost inline-flex min-h-[40px] items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
+              className="btn-ghost inline-flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
               title="Busca global de leads e comandos (Ctrl+K)"
             >
               <Search
                 className="h-3.5 w-3.5 text-[var(--accent-text)]"
                 aria-hidden="true"
               />
-              <span className="hidden md:inline">Buscar lead...</span>
+              <span className="hidden md:inline">Buscar...</span>
               <kbd className="hidden sm:inline-block rounded border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-muted)]">
                 Ctrl K
               </kbd>
@@ -737,7 +682,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               type="button"
               onClick={() => refreshStore(false)}
               disabled={syncing}
-              className="btn-ghost inline-flex min-h-[40px] min-w-[40px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
+              className="btn-ghost inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg text-xs font-semibold"
               title="Sincronizar aberturas de proposta e leads"
               aria-label="Sincronizar dados do CRM"
             >
@@ -745,22 +690,24 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                 className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
                 aria-hidden="true"
               />
-              <span className="hidden sm:inline">Sincronizar</span>
             </button>
 
+            {/* Button-in-Button Primary CTA */}
             <button
               type="button"
               onClick={() => openQuickNewLead(activeFunnel)}
-              className="btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold"
+              className="btn-accent group inline-flex min-h-[38px] items-center gap-2 rounded-lg pl-3.5 pr-2 py-1.5 text-xs font-bold"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Novo Lead</span>
+              <span className="btn-icon-badge">
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
             </button>
 
             <button
               type="button"
               onClick={toggleTheme}
-              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+              className="btn-ghost flex h-[38px] w-[38px] items-center justify-center rounded-lg"
               aria-label={
                 theme === "dark"
                   ? "Mudar para modo claro"
@@ -790,7 +737,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                className="btn-ghost flex h-[38px] w-[38px] items-center justify-center rounded-lg"
                 aria-label="Encerrar sessão administrativa"
                 title="Sair do CRM"
               >
@@ -798,13 +745,43 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               </button>
             )}
           </div>
-        </header>
+        </div>
 
-        {isRemoteLocalMode && (
-          <div
-            role="alert"
-            className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl badge-warning px-4 py-3 text-xs sm:mx-6 lg:mx-8"
-          >
+        {/* Sub-strip: Timecode Breadcrumb & Active Context */}
+        <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-subtle)]/75">
+          <div className="mx-auto flex max-w-[1720px] items-center justify-between px-4 py-1.5 text-[11px] sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2 text-[var(--text-muted)]">
+              <span className="font-mono-num font-bold text-[var(--accent-text)]">
+                TC 00:{activeNav.code}:24:00
+              </span>
+              <span aria-hidden="true">·</span>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {activeNav.label}
+              </span>
+              {activeModule === "kanban" && (
+                <>
+                  <span aria-hidden="true">/</span>
+                  <span className="text-[var(--text-secondary)]">
+                    {getFunnelLabel(activeFunnel)}
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="hidden sm:flex items-center gap-3 font-mono-num text-[10px] text-[var(--text-muted)]">
+              <span>A HISTÓRIA TERMINA. A IMAGEM FICA.</span>
+              <span aria-hidden="true">·</span>
+              <span>BELO HORIZONTE &amp; NOVA LIMA</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {isRemoteLocalMode && (
+        <div
+          role="alert"
+          className="mx-auto mt-4 w-full max-w-[1720px] px-4 sm:px-6 lg:px-8"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl badge-warning px-4 py-3 text-xs">
             <span className="inline-flex items-center gap-2 font-semibold">
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
               Banco em nuvem desconectado neste deploy: configure as variáveis{" "}
@@ -813,13 +790,15 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               atualizar a página.
             </span>
           </div>
-        )}
+        </div>
+      )}
 
-        {syncError && (
-          <div
-            role="alert"
-            className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl badge-danger px-4 py-3 text-xs sm:mx-6 lg:mx-8"
-          >
+      {syncError && (
+        <div
+          role="alert"
+          className="mx-auto mt-4 w-full max-w-[1720px] px-4 sm:px-6 lg:px-8"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl badge-danger px-4 py-3 text-xs">
             <span className="inline-flex items-center gap-2 font-semibold">
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
               {syncError}
@@ -832,105 +811,106 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               Tentar novamente
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Full-Width Workspace Container */}
+      <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-10 max-w-[1720px] w-full mx-auto">
+        {activeModule === "dashboard" && (
+          <DashboardView
+            leads={store.leads}
+            partners={store.partners}
+            settings={store.settings}
+            onUpdateMonthlyGoal={handleUpdateMonthlyGoal}
+            onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+            onJumpToFunnel={(funnel) => {
+              setActiveFunnel(funnel);
+              setActiveModule("kanban");
+            }}
+          />
         )}
 
-        <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8 max-w-[1600px] w-full mx-auto">
-          {activeModule === "dashboard" && (
-            <DashboardView
-              leads={store.leads}
-              partners={store.partners}
-              settings={store.settings}
-              onUpdateMonthlyGoal={handleUpdateMonthlyGoal}
-              onSelectLead={(lead) => setSelectedLeadId(lead.id)}
-              onJumpToFunnel={(funnel) => {
-                setActiveFunnel(funnel);
-                setActiveModule("kanban");
-              }}
-            />
-          )}
+        {activeModule === "kanban" && (
+          <KanbanView
+            leads={store.leads}
+            partners={store.partners}
+            activeFunnel={activeFunnel}
+            onChangeFunnel={setActiveFunnel}
+            onMoveStage={handleMoveStage}
+            onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+            onQuickDispatch={(lead) => {
+              setDispatchLeadId(lead.id);
+              setActiveModule("dispatcher");
+            }}
+            onOpenNewLead={(funnel) => openQuickNewLead(funnel)}
+            onNotify={notify}
+          />
+        )}
 
-          {activeModule === "kanban" && (
-            <KanbanView
-              leads={store.leads}
-              partners={store.partners}
-              activeFunnel={activeFunnel}
-              onChangeFunnel={setActiveFunnel}
-              onMoveStage={handleMoveStage}
-              onSelectLead={(lead) => setSelectedLeadId(lead.id)}
-              onQuickDispatch={(lead) => {
-                setDispatchLeadId(lead.id);
-                setActiveModule("dispatcher");
-              }}
-              onOpenNewLead={(funnel) => openQuickNewLead(funnel)}
-              onNotify={notify}
-            />
-          )}
+        {activeModule === "capture" && (
+          <CaptureView
+            leads={store.leads}
+            partners={store.partners}
+            integrationStatus={status}
+            initialSubTab={captureSubTab}
+            defaultFunnel={activeFunnel}
+            onCreateLead={handleCreateLead}
+            onCreateLeadsBulk={handleCreateLeadsBulk}
+            onNotify={notify}
+          />
+        )}
 
-          {activeModule === "capture" && (
-            <CaptureView
-              leads={store.leads}
-              partners={store.partners}
-              integrationStatus={status}
-              initialSubTab={captureSubTab}
-              defaultFunnel={activeFunnel}
-              onCreateLead={handleCreateLead}
-              onCreateLeadsBulk={handleCreateLeadsBulk}
-              onNotify={notify}
-            />
-          )}
+        {activeModule === "dispatcher" && (
+          <DispatcherView
+            leads={store.leads}
+            templates={store.templates}
+            settings={store.settings}
+            integrationStatus={status}
+            initialLeadId={dispatchLeadId}
+            onUpdateLead={async (leadId, patch, interaction, touch) => {
+              await handleUpdateLead(leadId, patch, interaction, touch);
+            }}
+            onSyncLead={(updatedLead) =>
+              setStore((prev) => ({
+                ...prev,
+                leads: prev.leads.map((l) =>
+                  l.id === updatedLead.id ? updatedLead : l
+                ),
+              }))
+            }
+            onSaveTemplate={handleSaveTemplate}
+            onDeleteTemplate={handleDeleteTemplate}
+            onUpdateNextDate={handleUpdateNextDate}
+            onNotify={notify}
+          />
+        )}
 
-          {activeModule === "dispatcher" && (
-            <DispatcherView
-              leads={store.leads}
-              templates={store.templates}
-              settings={store.settings}
-              integrationStatus={status}
-              initialLeadId={dispatchLeadId}
-              onUpdateLead={async (leadId, patch, interaction, touch) => {
-                await handleUpdateLead(leadId, patch, interaction, touch);
-              }}
-              onSyncLead={(updatedLead) =>
-                setStore((prev) => ({
-                  ...prev,
-                  leads: prev.leads.map((l) =>
-                    l.id === updatedLead.id ? updatedLead : l
-                  ),
-                }))
-              }
-              onSaveTemplate={handleSaveTemplate}
-              onDeleteTemplate={handleDeleteTemplate}
-              onUpdateNextDate={handleUpdateNextDate}
-              onNotify={notify}
-            />
-          )}
+        {activeModule === "partners" && (
+          <PartnersView
+            partners={store.partners}
+            leads={store.leads}
+            onCreatePartner={handleCreatePartner}
+            onUpdatePartner={handleUpdatePartner}
+            onDeletePartner={handleDeletePartner}
+            onUpdateLead={async (leadId, patch, interaction, touch) => {
+              await handleUpdateLead(leadId, patch, interaction, touch);
+            }}
+            onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+            onNotify={notify}
+          />
+        )}
 
-          {activeModule === "partners" && (
-            <PartnersView
-              partners={store.partners}
-              leads={store.leads}
-              onCreatePartner={handleCreatePartner}
-              onUpdatePartner={handleUpdatePartner}
-              onDeletePartner={handleDeletePartner}
-              onUpdateLead={async (leadId, patch, interaction, touch) => {
-                await handleUpdateLead(leadId, patch, interaction, touch);
-              }}
-              onSelectLead={(lead) => setSelectedLeadId(lead.id)}
-              onNotify={notify}
-            />
-          )}
-
-          {activeModule === "settings" && (
-            <SettingsView
-              settings={store.settings}
-              leads={store.leads}
-              integrationStatus={status}
-              onUpdateSettings={handleUpdateSettings}
-              onRefreshStore={() => refreshStore(false)}
-              onNotify={notify}
-            />
-          )}
-        </main>
-      </div>
+        {activeModule === "settings" && (
+          <SettingsView
+            settings={store.settings}
+            leads={store.leads}
+            integrationStatus={status}
+            onUpdateSettings={handleUpdateSettings}
+            onRefreshStore={() => refreshStore(false)}
+            onNotify={notify}
+          />
+        )}
+      </main>
 
       {/* Fixed Mobile Bottom Navigation Bar */}
       <nav

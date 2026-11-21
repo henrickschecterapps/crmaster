@@ -331,7 +331,11 @@ export function SettingsView({
       {/* Bento Grid */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         {/* Card 1: Motor de Follow-up Automático */}
-        <section className="surface-card rounded-xl p-6 xl:col-span-12 space-y-5">
+        <div
+          className="double-bezel stagger-in xl:col-span-12"
+          style={{ ["--stagger" as string]: 0 }}
+        >
+          <section className="double-bezel-core p-6 space-y-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
@@ -494,11 +498,11 @@ export function SettingsView({
                 aguarde o agendamento diário às 09:00 BRT.
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <div className="divide-y divide-[var(--border-hairline)]">
                 {cronHistory.map((log) => (
                   <div
                     key={log.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3.5 py-2.5 text-xs"
+                    className="flex items-center justify-between gap-3 py-2.5 text-xs"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -524,13 +528,18 @@ export function SettingsView({
               </div>
             )}
           </div>
-        </section>
+          </section>
+        </div>
 
         {/* Card 2: Settings Form */}
-        <form
-          onSubmit={handleSaveSettings}
-          className="surface-card rounded-xl p-6 xl:col-span-7 space-y-6"
+        <div
+          className="double-bezel stagger-in xl:col-span-7"
+          style={{ ["--stagger" as string]: 1 }}
         >
+          <form
+            onSubmit={handleSaveSettings}
+            className="double-bezel-core h-full p-6 space-y-6"
+          >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -723,110 +732,120 @@ export function SettingsView({
             <button
               type="submit"
               disabled={saving}
-              className="btn-accent inline-flex min-h-[44px] items-center gap-2 rounded-lg px-6 py-3 text-xs font-bold disabled:opacity-60"
+              className="btn-accent inline-flex min-h-[44px] items-center gap-2 rounded-lg pl-5 pr-2 py-1.5 text-xs font-bold disabled:opacity-60"
             >
-              <Save className="h-4 w-4" aria-hidden="true" />
-              {saving ? "Salvando..." : "Salvar Configurações"}
+              <span>{saving ? "Salvando..." : "Salvar Configurações"}</span>
+              <span className="btn-icon-badge">
+                <Save className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
             </button>
           </div>
-        </form>
+          </form>
+        </div>
 
         {/* Card 3: Persisted Anti-Ban WhatsApp Queue Monitor */}
-        <section className="surface-card rounded-xl p-6 xl:col-span-5 flex flex-col space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Clock
-                className="h-4 w-4 text-[var(--accent-text)]"
-                aria-hidden="true"
-              />
-              <div>
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Fila Anti-Ban de WhatsApp
-                </h2>
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  Persistida no banco · intervalos de 3 a 6 minutos.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={loadQueue}
-              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
-              aria-label="Atualizar fila de WhatsApp"
-              title="Atualizar fila"
-            >
-              <RefreshCw
-                className={cn("h-3.5 w-3.5", loadingQueue && "animate-spin")}
-                aria-hidden="true"
-              />
-            </button>
-          </div>
-
-          {pendingQueueCount > 0 && (
-            <button
-              type="button"
-              onClick={handleProcessQueueNow}
-              disabled={processingQueue}
-              className="btn-accent inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
-            >
-              <Play className="h-3.5 w-3.5" aria-hidden="true" />
-              {processingQueue
-                ? "Processando fila..."
-                : `Processar Fila Pendente Agora (${pendingQueueCount})`}
-            </button>
-          )}
-
-          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[380px] pr-1">
-            {queueJobs.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[var(--border-hairline)] p-6 text-center">
-                <CheckCircle2
-                  className="mx-auto h-6 w-6 text-[var(--text-muted)]"
+        <div
+          className="double-bezel stagger-in xl:col-span-5"
+          style={{ ["--stagger" as string]: 2 }}
+        >
+          <section className="double-bezel-core h-full p-6 flex flex-col space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Clock
+                  className="h-4 w-4 text-[var(--accent-text)]"
                   aria-hidden="true"
                 />
-                <p className="mt-2 text-xs font-semibold text-[var(--text-secondary)]">
-                  Nenhum disparo na fila no momento
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                  Use o Disparador em Lote ou a Régua Automática para enfileirar
-                  mensagens com espaçamento seguro de 3 a 6 min.
-                </p>
-              </div>
-            ) : (
-              queueJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-hairline)] p-3.5 text-xs space-y-1.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-[var(--text-primary)] truncate">
-                      {job.companyName}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase",
-                        job.status === "enviado" && "badge-success",
-                        job.status === "pendente" && "badge-warning",
-                        job.status === "enviando" && "badge-info",
-                        job.status === "simulado" && "badge-accent",
-                        job.status === "erro" && "badge-danger"
-                      )}
-                    >
-                      {job.status}
-                    </span>
-                  </div>
-                  <p className="font-mono-num text-[11px] text-[var(--text-secondary)]">
-                    {job.phone} · Previsto: {formatDateTimeBr(job.scheduledFor)}
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Fila Anti-Ban de WhatsApp
+                  </h2>
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Persistida no banco · intervalos de 3 a 6 minutos.
                   </p>
-                  {job.error && (
-                    <p className="text-[11px] text-[var(--status-danger)]">
-                      {job.error}
-                    </p>
-                  )}
                 </div>
-              ))
+              </div>
+              <button
+                type="button"
+                onClick={loadQueue}
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                aria-label="Atualizar fila de WhatsApp"
+                title="Atualizar fila"
+              >
+                <RefreshCw
+                  className={cn("h-3.5 w-3.5", loadingQueue && "animate-spin")}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            {pendingQueueCount > 0 && (
+              <button
+                type="button"
+                onClick={handleProcessQueueNow}
+                disabled={processingQueue}
+                className="btn-accent inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
+              >
+                <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                {processingQueue
+                  ? "Processando fila..."
+                  : `Processar Fila Pendente Agora (${pendingQueueCount})`}
+              </button>
             )}
-          </div>
-        </section>
+
+            <div className="flex-1 overflow-y-auto max-h-[380px] pr-1">
+              {queueJobs.length === 0 ? (
+                <div className="border-t border-[var(--border-hairline)] py-6 text-center">
+                  <CheckCircle2
+                    className="mx-auto h-6 w-6 text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
+                  <p className="mt-2 text-xs font-semibold text-[var(--text-secondary)]">
+                    Nenhum disparo na fila no momento
+                  </p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                    Use o Disparador em Lote ou a Régua Automática para enfileirar
+                    mensagens com espaçamento seguro de 3 a 6 min.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[var(--border-hairline)] border-t border-[var(--border-hairline)]">
+                  {queueJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="py-3 text-xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-[var(--text-primary)] truncate">
+                          {job.companyName}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase",
+                            job.status === "enviado" && "badge-success",
+                            job.status === "pendente" && "badge-warning",
+                            job.status === "enviando" && "badge-info",
+                            job.status === "simulado" && "badge-accent",
+                            job.status === "erro" && "badge-danger"
+                          )}
+                        >
+                          {job.status}
+                        </span>
+                      </div>
+                      <p className="font-mono-num text-[11px] text-[var(--text-secondary)]">
+                        {job.phone} · Previsto: {formatDateTimeBr(job.scheduledFor)}
+                      </p>
+                      {job.error && (
+                        <p className="text-[11px] text-[var(--status-danger)]">
+                          {job.error}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

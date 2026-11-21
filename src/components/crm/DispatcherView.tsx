@@ -380,16 +380,22 @@ export function DispatcherView({
               body: "Olá {{nome_contato}}, tudo bem?\n\nPreparei uma proposta personalizada da ÚLTIMO QUADRO para a {{nome_empresa}}: {{link_proposta}}\n\nTenho agenda em {{proxima_data_livre}}.",
             })
           }
-          className="btn-accent inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-lg px-4 py-2.5 text-xs font-bold"
+          className="btn-accent group inline-flex min-h-[40px] items-center gap-2 self-start rounded-lg pl-4 pr-2 py-2 text-xs font-bold"
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Novo Script
+          <span>Novo Script</span>
+          <span className="btn-icon-badge">
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         {/* LEFT PANE: SMART DISPATCHER */}
-        <section className="surface-card rounded-xl p-6 xl:col-span-7 space-y-5">
+        <div
+          className="double-bezel stagger-in xl:col-span-7"
+          style={{ ["--stagger" as string]: 0 }}
+        >
+          <section className="double-bezel-core h-full p-6 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
@@ -669,139 +675,145 @@ export function DispatcherView({
               </button>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
 
         {/* RIGHT PANE: SCRIPT LIBRARY */}
-        <section className="surface-card rounded-xl p-6 xl:col-span-5 flex flex-col space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--accent-text)]">
-                <BookOpen className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <div>
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Biblioteca de Scripts
-                </h2>
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  {templates.length} templates ativos por funil
-                </p>
+        <div
+          className="double-bezel stagger-in xl:col-span-5"
+          style={{ ["--stagger" as string]: 1 }}
+        >
+          <section className="double-bezel-core h-full p-6 flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--accent-text)]">
+                  <BookOpen className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Biblioteca de Scripts
+                  </h2>
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    {templates.length} templates ativos por funil
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-1.5 rounded-lg bg-[var(--bg-subtle)] p-3">
-            {TEMPLATE_VARIABLES.map((v) => (
-              <span
-                key={v.token}
-                className="rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-2 py-1 font-mono-num text-[10px] text-[var(--accent-text)]"
-              >
-                {v.token}
-              </span>
-            ))}
-          </div>
-
-          <div className="space-y-3 flex-1 overflow-y-auto pr-1">
-            {templates.map((tpl) => {
-              const isSelected = selectedTemplate?.id === tpl.id;
-              const isConfirmingDelete = deletingTemplateId === tpl.id;
-
-              return (
-                <div
-                  key={tpl.id}
-                  className={cn(
-                    "rounded-xl border p-4 transition-colors",
-                    isSelected
-                      ? "border-[var(--accent-border)] bg-[var(--accent-soft)]"
-                      : "border-[var(--border-hairline)] bg-[var(--bg-subtle)] hover:border-[var(--border-strong)]"
-                  )}
+            <div className="flex flex-wrap gap-1.5 rounded-lg bg-[var(--bg-subtle)] p-3">
+              {TEMPLATE_VARIABLES.map((v) => (
+                <span
+                  key={v.token}
+                  className="rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-2 py-1 font-mono-num text-[10px] text-[var(--accent-text)]"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTemplateId(tpl.id)}
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-solid)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
-                        <FileText
-                          className="h-2.5 w-2.5 text-[var(--accent-text)]"
-                          aria-hidden="true"
-                        />
-                        {getTemplateFunnelLabel(tpl.funnel)}
-                      </span>
-                      <h3 className="mt-1.5 text-xs font-bold text-[var(--text-primary)]">
-                        {tpl.name}
-                      </h3>
-                      <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-                        {tpl.body}
-                      </p>
-                    </button>
+                  {v.token}
+                </span>
+              ))}
+            </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+            <div className="divide-y divide-[var(--border-hairline)] border-t border-[var(--border-hairline)] flex-1 overflow-y-auto pr-1">
+              {templates.map((tpl) => {
+                const isSelected = selectedTemplate?.id === tpl.id;
+                const isConfirmingDelete = deletingTemplateId === tpl.id;
+
+                return (
+                  <div
+                    key={tpl.id}
+                    className={cn(
+                      "py-3.5 px-3 -mx-1 rounded-lg transition-colors",
+                      isSelected
+                        ? "bg-[var(--accent-soft)]"
+                        : "hover:bg-[var(--bg-surface-hover)]"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
                       <button
                         type="button"
-                        onClick={() =>
-                          setEditingTemplate({
-                            id: tpl.id,
-                            name: tpl.name,
-                            funnel: tpl.funnel,
-                            channel: tpl.channel,
-                            subject: tpl.subject,
-                            body: tpl.body,
-                          })
-                        }
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-surface-solid)] hover:text-[var(--text-primary)]"
-                        aria-label={`Editar script ${tpl.name}`}
-                        title="Editar script"
+                        onClick={() => setSelectedTemplateId(tpl.id)}
+                        className="min-w-0 flex-1 text-left"
                       >
-                        <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-solid)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
+                          <FileText
+                            className="h-2.5 w-2.5 text-[var(--accent-text)]"
+                            aria-hidden="true"
+                          />
+                          {getTemplateFunnelLabel(tpl.funnel)}
+                        </span>
+                        <h3 className="mt-1.5 text-xs font-bold text-[var(--text-primary)]">
+                          {tpl.name}
+                        </h3>
+                        <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                          {tpl.body}
+                        </p>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setDeletingTemplateId(
-                            isConfirmingDelete ? null : tpl.id
-                          )
-                        }
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger)]"
-                        aria-label={`Excluir script ${tpl.name}`}
-                        title="Excluir script"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
 
-                  {isConfirmingDelete && (
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg badge-danger p-2.5 text-[11px]">
-                      <span className="font-semibold">
-                        Remover este template?
-                      </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
-                          onClick={async () => {
-                            await onDeleteTemplate(tpl.id);
-                            setDeletingTemplateId(null);
-                          }}
-                          className="rounded-md bg-[var(--status-danger)] px-2.5 py-1 font-bold text-white"
+                          onClick={() =>
+                            setEditingTemplate({
+                              id: tpl.id,
+                              name: tpl.name,
+                              funnel: tpl.funnel,
+                              channel: tpl.channel,
+                              subject: tpl.subject,
+                              body: tpl.body,
+                            })
+                          }
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-surface-solid)] hover:text-[var(--text-primary)]"
+                          aria-label={`Editar script ${tpl.name}`}
+                          title="Editar script"
                         >
-                          Confirmar
+                          <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => setDeletingTemplateId(null)}
-                          className="rounded-md border border-current px-2.5 py-1 font-semibold"
+                          onClick={() =>
+                            setDeletingTemplateId(
+                              isConfirmingDelete ? null : tpl.id
+                            )
+                          }
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger)]"
+                          aria-label={`Excluir script ${tpl.name}`}
+                          title="Excluir script"
                         >
-                          Cancelar
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
+
+                    {isConfirmingDelete && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg badge-danger p-2.5 text-[11px]">
+                        <span className="font-semibold">
+                          Remover este template?
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await onDeleteTemplate(tpl.id);
+                              setDeletingTemplateId(null);
+                            }}
+                            className="rounded-md bg-[var(--status-danger)] px-2.5 py-1 font-bold text-white"
+                          >
+                            Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingTemplateId(null)}
+                            className="rounded-md border border-current px-2.5 py-1 font-semibold"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
       </div>
 
       {/* Template Create/Edit Modal */}
