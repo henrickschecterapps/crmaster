@@ -38,7 +38,7 @@ export const BRAND_DEFAULTS = {
   name: "ÚLTIMO QUADRO",
   subtitle: "Fotografia Autoral & Produção Audiovisual",
   tagline: "A história termina. A imagem fica.",
-  location: "Belo Horizonte & Nova Lima — MG",
+  location: "Belo Horizonte e Nova Lima, MG",
   whatsappNumber: "5531983997195",
   whatsappDisplay: "(31) 98399-7195",
   email: "ultimoquadrofilmes@gmail.com",
@@ -205,11 +205,35 @@ export interface IntegrationStatus {
   firebaseProjectId?: string;
   googlePlacesLive: boolean;
   resendLive: boolean;
+  gmailLive: boolean;
+  adminAuthEnabled: boolean;
   whatsappApiLive: boolean;
   whatsappProvider: "evolution" | "zapi";
   whatsappNumber: string;
   adminEmail: string;
   pixKey: string;
+}
+
+export interface CronExecutionAction {
+  leadId: string;
+  companyName: string;
+  contactName: string;
+  step: "dia_2" | "dia_5";
+  hoursSinceInteraction: number;
+  emailStatus: string;
+  whatsappStatus: string;
+  tagAdded?: string;
+}
+
+export interface CronExecutionLog {
+  id: string;
+  executedAt: string;
+  dryRun: boolean;
+  scannedEligible: number;
+  triggeredCount: number;
+  whatsappQueueScheduled: number;
+  queueProcessed?: number;
+  actions: CronExecutionAction[];
 }
 
 export interface WhatsappQueueJob {
@@ -490,12 +514,12 @@ export const SERVICES_CATALOG: ServiceVerticalSpec[] = [
         id: "moda_express",
         tier: "FOTOGRAFIA",
         name: "Drop & Provador Express",
-        format: "Sessão ágil de até 2h — 10 a 15 looks",
+        format: "Sessão ágil de até 2h (10 a 15 looks)",
         price: 690,
         badge: null,
         featured: false,
         features: [
-          "Até 2h de sessão (loja, showroom ou externa) — 10 a 15 looks",
+          "Até 2h de sessão (loja, showroom ou externa) para 10 a 15 looks",
           "Direção completa de poses, caimento e detalhes de tecido",
           "Spoiler Express: 10 fotos editadas no mesmo dia (até 6h após a sessão)",
           "Entrega Final: 45 fotos tratadas em até 2 dias úteis",
@@ -505,14 +529,14 @@ export const SERVICES_CATALOG: ServiceVerticalSpec[] = [
         id: "moda_prime",
         tier: "FOTO + FASHION REELS 4K",
         name: "Campanha & Lookbook Prime",
-        format: "Produção completa de até 4h — 20 a 30 looks",
+        format: "Produção completa de até 4h (20 a 30 looks)",
         price: 1290,
         badge: "MAIS ESCOLHIDO",
         featured: true,
         features: [
-          "Até 4h de produção — 20 a 30 looks (permite combinar loja + externa)",
+          "Até 4h de produção para 20 a 30 looks (permite combinar loja + externa)",
           "90 fotos tratadas + 15 prévias entregues no mesmo dia",
-          "3 Fashion Reels Verticais (15–30s) em 4K entregues em até 48h",
+          "3 Fashion Reels Verticais (15 a 30s) em 4K entregues em até 48h",
           "Galeria online privada de luxo em alta resolução",
         ],
       },
@@ -543,7 +567,7 @@ export const SERVICES_CATALOG: ServiceVerticalSpec[] = [
     kicker: "RESTAURANTES, BARES, HAMBURGUERIAS & CAFETERIAS",
     title: "Gastronomia, Bares & Delivery",
     subheadline:
-      "Fotografia de apetite e Food Reels 4K/ASMR com estúdio de iluminação portátil no local — pronto para cardápios de alta conversão no iFood e redes sociais.",
+      "Fotografia de apetite e Food Reels 4K/ASMR com estúdio de iluminação portátil no local, pronto para cardápios de alta conversão no iFood e redes sociais.",
     defaultValue: 1490,
     deliverySummary: "Prévia de 10 fotos no dia seguinte · Galeria Alta Res + iFood em 3 dias úteis",
     pillars: [
@@ -557,7 +581,7 @@ export const SERVICES_CATALOG: ServiceVerticalSpec[] = [
         id: "gastro_essencial",
         tier: "FOTOGRAFIA GASTRONÔMICA",
         name: "Menu & Delivery Essencial",
-        format: "Sessão de até 3h com estúdio portátil — 15 a 20 itens",
+        format: "Sessão de até 3h com estúdio portátil (15 a 20 itens)",
         price: 890,
         badge: null,
         featured: false,
@@ -572,14 +596,14 @@ export const SERVICES_CATALOG: ServiceVerticalSpec[] = [
         id: "gastro_prime",
         tier: "FOTO + FOOD REELS 4K",
         name: "Chef's Table & Reels Prime",
-        format: "Produção integrada de até 4h — 20 a 25 itens",
+        format: "Produção integrada de até 4h (20 a 25 itens)",
         price: 1490,
         badge: "MAIS ESCOLHIDO",
         featured: true,
         features: [
           "Até 4h de produção integrada (Foto Full-Frame + Vídeo 4K)",
           "20 a 25 itens + ambiente, fachada e retratos do Chef/Equipe (80 fotos + prévia dia seguinte)",
-          "3 Food Reels Verticais (15–30s em 4K/ASMR) entregues em até 48h",
+          "3 Food Reels Verticais (15 a 30s em 4K/ASMR) entregues em até 48h",
           "Direção de cena dedicada junto ao chef ou bartender",
         ],
       },
@@ -604,14 +628,14 @@ export const SERVICES_CATALOG: ServiceVerticalSpec[] = [
 ];
 
 /**
- * Projeto Impulso Moda BH — Cota Social 65% Subsidiada (3 vagas/mês)
+ * Projeto Impulso Moda BH: Cota Social 65% Subsidiada (3 vagas/mês)
  */
 export const SOCIAL_MODA_PACKAGES: ServicePackageOption[] = [
   {
     id: "social_moda_start",
     tier: "PROJETO IMPULSO MODA BH · 65% OFF",
     name: "Social Start (Pocket)",
-    format: "Sessão focada de até 1h — 5 a 8 looks",
+    format: "Sessão focada de até 1h (5 a 8 looks)",
     price: 240,
     originalPrice: 690,
     badge: "3 VAGAS/MÊS",
@@ -627,7 +651,7 @@ export const SOCIAL_MODA_PACKAGES: ServicePackageOption[] = [
     id: "social_moda_prime",
     tier: "PROJETO IMPULSO MODA BH · 65% OFF",
     name: "Social Impulso Prime",
-    format: "Foto + 2 Fashion Reels 4K — até 12 looks",
+    format: "Foto + 2 Fashion Reels 4K (até 12 looks)",
     price: 450,
     originalPrice: 1290,
     badge: "COTA SOCIAL",

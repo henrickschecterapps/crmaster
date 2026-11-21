@@ -24,7 +24,6 @@ import {
   Save,
   Search,
   Send,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -43,10 +42,13 @@ import {
 import {
   buildPostSaleChecklist,
   cn,
+  formatCnpj,
+  formatCpf,
   formatCurrency,
   formatCurrencyExact,
   formatDateBr,
   formatDateTimeBr,
+  formatPhoneBr,
   getLeadStagnation,
 } from "@/lib/utils";
 
@@ -114,6 +116,8 @@ export function LeadDetailModal({
   const [addingNote, setAddingNote] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [showNewPartner, setShowNewPartner] = useState(false);
   const [newPartnerName, setNewPartnerName] = useState("");
@@ -121,6 +125,14 @@ export function LeadDetailModal({
     useState<PartnerRole>("gerente_espaco");
   const [newPartnerCompany, setNewPartnerCompany] = useState("");
   const [newPartnerPhone, setNewPartnerPhone] = useState("");
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     setCompanyName(lead.companyName);
@@ -145,6 +157,7 @@ export function LeadDetailModal({
     setAutomacaoAtiva(lead.automacaoAtiva);
     setRespondeu(lead.respondeu);
     setChecklist(lead.postSaleChecklist ?? []);
+    setConfirmingDelete(false);
   }, [lead]);
 
   const numericValue = Number(estimatedValue) || 0;
@@ -168,7 +181,7 @@ export function LeadDetailModal({
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {
-      // Ignore
+      // Ignore clipboard failure
     }
   };
 
@@ -228,7 +241,7 @@ export function LeadDetailModal({
       true
     );
     onNotify(
-      "Lead marcado como Respondeu — régua automática desativada.",
+      "Lead marcado como Respondeu. Régua automática desativada.",
       "success"
     );
   };
@@ -263,6 +276,10 @@ export function LeadDetailModal({
   };
 
   const handleSave = async () => {
+    if (!companyName.trim()) {
+      onNotify("Informe o nome da empresa ou cliente.", "error");
+      return;
+    }
     setSaving(true);
     try {
       const paymentChanged = paymentStatus !== lead.paymentStatus;
@@ -298,11 +315,11 @@ export function LeadDetailModal({
       await onUpdateLead(
         lead.id,
         {
-          companyName,
-          contactName,
-          contactRole,
-          phone,
-          email,
+          companyName: companyName.trim(),
+          contactName: contactName.trim(),
+          contactRole: contactRole.trim() || undefined,
+          phone: phone.trim(),
+          email: email.trim(),
           website: website.trim() || undefined,
           instagram: instagram.trim() || undefined,
           funnel,
@@ -368,27 +385,82 @@ export function LeadDetailModal({
     setNewPartnerPhone("");
   };
 
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await onDeleteLead(lead.id);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getInteractionIcon = (type: InteractionType) => {
     switch (type) {
       case "whatsapp":
-        return <MessageCircle className="h-3.5 w-3.5 text-emerald-400" />;
+        return (
+          <MessageCircle
+            className="h-3.5 w-3.5 text-[var(--status-success)]"
+            aria-hidden="true"
+          />
+        );
       case "email":
-        return <Mail className="h-3.5 w-3.5 text-sky-400" />;
+        return (
+          <Mail
+            className="h-3.5 w-3.5 text-[var(--status-info)]"
+            aria-hidden="true"
+          />
+        );
       case "proposta_vista":
       case "radar":
-        return <Eye className="h-3.5 w-3.5 text-[var(--accent)]" />;
+        return (
+          <Eye
+            className="h-3.5 w-3.5 text-[var(--accent-text)]"
+            aria-hidden="true"
+          />
+        );
       case "proposta_aprovada":
-        return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />;
+        return (
+          <CheckCircle2
+            className="h-3.5 w-3.5 text-[var(--status-success)]"
+            aria-hidden="true"
+          />
+        );
       case "pagamento":
-        return <CreditCard className="h-3.5 w-3.5 text-emerald-400" />;
+        return (
+          <CreditCard
+            className="h-3.5 w-3.5 text-[var(--status-success)]"
+            aria-hidden="true"
+          />
+        );
       case "followup_auto":
-        return <Bot className="h-3.5 w-3.5 text-[var(--accent)]" />;
+        return (
+          <Bot
+            className="h-3.5 w-3.5 text-[var(--accent-text)]"
+            aria-hidden="true"
+          />
+        );
       case "pos_venda":
-        return <ClipboardCheck className="h-3.5 w-3.5 text-emerald-400" />;
+        return (
+          <ClipboardCheck
+            className="h-3.5 w-3.5 text-[var(--status-success)]"
+            aria-hidden="true"
+          />
+        );
       case "enriquecimento":
-        return <Sparkles className="h-3.5 w-3.5 text-sky-400" />;
+        return (
+          <Globe
+            className="h-3.5 w-3.5 text-[var(--status-info)]"
+            aria-hidden="true"
+          />
+        );
       default:
-        return <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
+        return (
+          <Clock
+            className="h-3.5 w-3.5 text-[var(--text-muted)]"
+            aria-hidden="true"
+          />
+        );
     }
   };
 
@@ -396,48 +468,54 @@ export function LeadDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="lead-detail-title"
     >
       <div
-        className="relative flex h-full w-full max-w-3xl flex-col bg-[var(--bg-surface-solid)] border-l border-[var(--border-hairline)] shadow-2xl overflow-hidden"
+        className="modal-surface relative flex h-full w-full max-w-3xl flex-col overflow-hidden border-l border-[var(--border-hairline)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-hairline)] px-6 py-5">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-hairline)] px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-text)]">
                 Detalhes do Lead
               </span>
               {stagnation.level === "critical" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
-                  <AlertTriangle className="h-3 w-3" />
+                <span className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                  <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                   {stagnation.label}
                 </span>
               )}
               {stagnation.level === "warning" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
-                  <Clock className="h-3 w-3" />
+                <span className="badge-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                  <Clock className="h-3 w-3" aria-hidden="true" />
                   {stagnation.label}
                 </span>
               )}
               {lead.visualizadaEm && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
-                  <Eye className="h-3 w-3" />
+                <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                  <Eye className="h-3 w-3" aria-hidden="true" />
                   Visualizada {lead.visualizacoesProposta}x
                 </span>
               )}
               {(lead.tags ?? []).map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold text-rose-400"
+                  className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold"
                 >
                   {tag}
                 </span>
               ))}
             </div>
-            <h2 className="mt-1 truncate text-xl font-bold text-[var(--text-primary)]">
+            <h2
+              id="lead-detail-title"
+              className="mt-1 truncate text-xl font-bold text-[var(--text-primary)]"
+            >
               {lead.companyName}
             </h2>
           </div>
@@ -446,36 +524,36 @@ export function LeadDetailModal({
             <button
               type="button"
               onClick={() => onOpenDispatcher(lead)}
-              className="btn-accent inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold cursor-pointer"
+              className="btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold"
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-3.5 w-3.5" aria-hidden="true" />
               Disparar Msg
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="btn-ghost flex h-9 w-9 items-center justify-center rounded-xl cursor-pointer"
-              aria-label="Fechar"
+              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+              aria-label="Fechar detalhes do lead"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-          {/* Phase 2: Follow-up Automation & Safety Lock Strip */}
-          <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/65 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 space-y-6">
+          {/* Follow-up Automation & Safety Lock Strip */}
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
                   automacaoAtiva
-                    ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                    ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
                     : "bg-[var(--bg-surface-solid)] text-[var(--text-muted)]"
                 )}
               >
-                <Bot className="h-4.5 w-4.5" />
+                <Bot className="h-4.5 w-4.5" aria-hidden="true" />
               </span>
               <div>
                 <p className="text-xs font-bold text-[var(--text-primary)]">
@@ -483,7 +561,7 @@ export function LeadDetailModal({
                 </p>
                 <p className="text-[11px] text-[var(--text-muted)]">
                   {respondeu
-                    ? "Cliente respondeu — trava de segurança desativou a cadência."
+                    ? "Cliente respondeu. Trava de segurança desativou a cadência."
                     : automacaoAtiva
                     ? `Ativa (etapa atual: ${
                         lead.followupStep === 0
@@ -498,8 +576,12 @@ export function LeadDetailModal({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <label className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] cursor-pointer">
+              <label
+                htmlFor="lead-automacao-toggle"
+                className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]"
+              >
                 <input
+                  id="lead-automacao-toggle"
                   type="checkbox"
                   checked={automacaoAtiva}
                   onChange={(e) => {
@@ -507,7 +589,7 @@ export function LeadDetailModal({
                     setAutomacaoAtiva(next);
                     if (next) setRespondeu(false);
                   }}
-                  className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
+                  className="h-4 w-4 rounded accent-[var(--accent)]"
                 />
                 Automação
               </label>
@@ -516,23 +598,23 @@ export function LeadDetailModal({
                 <button
                   type="button"
                   onClick={handleMarkResponded}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/25 transition-colors cursor-pointer"
+                  className="badge-success inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold hover:opacity-85"
                 >
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
                   Marcar como Respondeu
                 </button>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                <span className="badge-success inline-flex min-h-[38px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                   Respondeu
                 </span>
               )}
             </div>
           </div>
 
-          {/* Trackable Proposal Banner + PDF Contract Reference */}
+          {/* Trackable Proposal Banner + PDF Contract Box */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-            <div className="sm:col-span-7 rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-soft)]/50 p-4 flex flex-col justify-between gap-3">
+            <div className="sm:col-span-7 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4 flex flex-col justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-bold text-[var(--text-primary)]">
                   Proposta Web Rastreável + Radar
@@ -541,7 +623,7 @@ export function LeadDetailModal({
                   {fullProposalUrl}
                 </p>
                 {lead.visualizadaEm ? (
-                  <p className="mt-1 text-[11px] text-[var(--accent)]">
+                  <p className="mt-1 text-[11px] text-[var(--accent-text)]">
                     Aberta {lead.visualizacoesProposta}x · primeira em{" "}
                     {formatDateTimeBr(lead.visualizadaEm)}
                   </p>
@@ -552,20 +634,23 @@ export function LeadDetailModal({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleCopyProposal}
-                  className="btn-ghost inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer bg-[var(--bg-surface-solid)]"
+                  className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-[var(--bg-surface-solid)]"
                 >
                   {copiedLink ? (
                     <>
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <Check
+                        className="h-3.5 w-3.5 text-[var(--status-success)]"
+                        aria-hidden="true"
+                      />
                       Copiado
                     </>
                   ) : (
                     <>
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                       Copiar Link
                     </>
                   )}
@@ -574,23 +659,25 @@ export function LeadDetailModal({
                   href={proposalPath}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn-accent inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold"
+                  className="btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold"
                 >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   Abrir Proposta
                 </a>
               </div>
             </div>
 
-            {/* Phase 2: Contract / Image Release PDF Box */}
-            <div className="sm:col-span-5 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/65 p-4 flex flex-col justify-between gap-3">
+            <div className="sm:col-span-5 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 flex flex-col justify-between gap-3">
               <div>
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]">
-                  <FileText className="h-4 w-4 text-[var(--accent)]" />
+                  <FileText
+                    className="h-4 w-4 text-[var(--accent-text)]"
+                    aria-hidden="true"
+                  />
                   {isPortrait ? "Termo de Imagem (PDF)" : "Contrato PDF"}
                 </div>
                 {lead.contractDocument ? (
-                  <p className="mt-1 truncate font-mono-num text-[11px] text-emerald-400">
+                  <p className="mt-1 truncate font-mono-num text-[11px] text-[var(--status-success)]">
                     {lead.contractDocument.fileName}
                   </p>
                 ) : (
@@ -602,9 +689,12 @@ export function LeadDetailModal({
               <a
                 href={`/api/proposals/${lead.id}/pdf`}
                 download
-                className="btn-ghost inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold bg-[var(--bg-surface-solid)]"
+                className="btn-ghost inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold bg-[var(--bg-surface-solid)]"
               >
-                <Download className="h-3.5 w-3.5 text-[var(--accent)]" />
+                <Download
+                  className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
                 Baixar PDF Agora
               </a>
             </div>
@@ -613,106 +703,143 @@ export function LeadDetailModal({
           {/* Core Editable Fields + Website Enricher */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-company"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Empresa / Cliente
               </label>
               <input
+                id="lead-company"
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2 text-sm"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-contact"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Decisor / Contato
               </label>
               <input
+                id="lead-contact"
                 type="text"
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2 text-sm"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-phone"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 WhatsApp / Telefone
               </label>
               <input
-                type="text"
+                id="lead-phone"
+                type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2 font-mono-num text-sm"
+                onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
+                placeholder="(31) 99999-9999"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-email"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 E-mail Comercial
               </label>
               <input
+                id="lead-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2 text-sm"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
 
-            {/* Phase 2: Website + Enricher Trigger */}
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-website"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Website
               </label>
               <div className="flex gap-1.5">
                 <div className="relative flex-1">
-                  <Globe className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <Globe
+                    className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
                   <input
+                    id="lead-website"
                     type="text"
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                     placeholder="https://empresa.com.br"
-                    className="input-field w-full rounded-xl py-2 pl-8 pr-3 text-xs"
+                    className="input-field min-h-[42px] w-full rounded-lg py-2 pl-8 pr-3 text-xs"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleEnrichWebsite}
                   disabled={enriching}
-                  className="btn-ghost shrink-0 inline-flex items-center gap-1 rounded-xl px-2.5 py-2 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                  className="btn-ghost shrink-0 inline-flex min-h-[42px] items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-semibold disabled:opacity-50"
                   title="Buscar e-mail corporativo e Instagram no site"
                 >
-                  <Search className="h-3.5 w-3.5 text-[var(--accent)]" />
+                  <Search
+                    className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                    aria-hidden="true"
+                  />
                   {enriching ? "..." : "Enriquecer"}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-instagram"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Instagram
               </label>
               <div className="relative">
-                <Instagram className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
+                <Instagram
+                  className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden="true"
+                />
                 <input
+                  id="lead-instagram"
                   type="text"
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
                   placeholder="@empresa"
-                  className="input-field w-full rounded-xl py-2 pl-8 pr-3 text-xs"
+                  className="input-field min-h-[42px] w-full rounded-lg py-2 pl-8 pr-3 text-xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-funnel"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Funil
               </label>
               <select
+                id="lead-funnel"
                 value={funnel}
                 onChange={(e) => setFunnel(e.target.value as Lead["funnel"])}
-                className="input-field w-full rounded-xl px-3 py-2 text-sm"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
               >
                 {FUNNELS.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -723,13 +850,17 @@ export function LeadDetailModal({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-stage"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Etapa do Kanban
               </label>
               <select
+                id="lead-stage"
                 value={stage}
                 onChange={(e) => setStage(e.target.value as StageId)}
-                className="input-field w-full rounded-xl px-3 py-2 text-sm"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
               >
                 {STAGES.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -740,38 +871,53 @@ export function LeadDetailModal({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-value"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Valor Estimado (R$)
               </label>
               <input
+                id="lead-value"
                 type="number"
+                min={0}
                 value={estimatedValue}
                 onChange={(e) => setEstimatedValue(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2 font-mono-num text-sm font-semibold"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm font-semibold"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-event-date"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Data do Evento / Ensaio
               </label>
               <div className="relative">
-                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <Calendar
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden="true"
+                />
                 <input
+                  id="lead-event-date"
                   type="date"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="input-field w-full rounded-xl py-2 pl-9 pr-3 font-mono-num text-sm"
+                  className="input-field min-h-[42px] w-full rounded-lg py-2 pl-9 pr-3 font-mono-num text-sm"
                 />
               </div>
             </div>
           </div>
 
           {/* Payment Status (50% Sinal / 50% Final) */}
-          <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/55 p-4 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-emerald-400" />
+                <CreditCard
+                  className="h-4 w-4 text-[var(--status-success)]"
+                  aria-hidden="true"
+                />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
                   Status Financeiro (50% Sinal / 50% Quitação)
                 </h3>
@@ -781,7 +927,7 @@ export function LeadDetailModal({
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {(
                 [
                   { id: "pendente", label: "Pendente", sub: "R$ 0 recebido" },
@@ -801,15 +947,16 @@ export function LeadDetailModal({
                   key={opt.id}
                   type="button"
                   onClick={() => setPaymentStatus(opt.id)}
+                  aria-pressed={paymentStatus === opt.id}
                   className={cn(
-                    "rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer",
+                    "min-h-[54px] rounded-lg border px-3 py-2.5 text-left transition-colors",
                     paymentStatus === opt.id
-                      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                      ? "badge-success"
                       : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
                   )}
                 >
                   <p className="text-xs font-bold">{opt.label}</p>
-                  <p className="mt-0.5 font-mono-num text-[11px] opacity-80">
+                  <p className="mt-0.5 font-mono-num text-[11px] opacity-85">
                     {opt.sub}
                   </p>
                 </button>
@@ -817,24 +964,27 @@ export function LeadDetailModal({
             </div>
           </div>
 
-          {/* Phase 2: Automatic Post-Sale & Recurrence Checklist */}
-          <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/55 p-4 space-y-3">
+          {/* Automatic Post-Sale & Recurrence Checklist */}
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <ClipboardCheck className="h-4 w-4 text-emerald-400" />
+                <ClipboardCheck
+                  className="h-4 w-4 text-[var(--status-success)]"
+                  aria-hidden="true"
+                />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
                   Checklist de Pós-Venda &amp; Recorrência
                 </h3>
               </div>
               {checklist.length > 0 ? (
-                <span className="font-mono-num text-xs font-semibold text-emerald-400">
+                <span className="font-mono-num text-xs font-semibold text-[var(--status-success)]">
                   {completedChecklist}/{checklist.length} concluídas
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={handleGenerateChecklistNow}
-                  className="text-xs font-semibold text-[var(--accent)] hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-[var(--accent-text)] hover:underline"
                 >
                   + Gerar Checklist Agora
                 </button>
@@ -853,9 +1003,9 @@ export function LeadDetailModal({
                   <label
                     key={item.id}
                     className={cn(
-                      "flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs transition-all",
+                      "flex min-h-[42px] cursor-pointer items-center justify-between gap-3 rounded-lg border px-3.5 py-2 text-xs transition-colors",
                       item.completed
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-[var(--text-muted)] line-through"
+                        ? "border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--text-muted)] line-through"
                         : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-primary)]"
                     )}
                   >
@@ -864,7 +1014,7 @@ export function LeadDetailModal({
                         type="checkbox"
                         checked={item.completed}
                         onChange={() => handleToggleChecklistItem(item.id)}
-                        className="h-4 w-4 rounded accent-emerald-500 shrink-0"
+                        className="h-4 w-4 rounded accent-[var(--accent)] shrink-0"
                       />
                       <span className="truncate font-medium">{item.title}</span>
                     </span>
@@ -878,10 +1028,13 @@ export function LeadDetailModal({
           </div>
 
           {/* Partner Linking & Automatic 15% Commission */}
-          <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/55 p-4 space-y-3">
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Handshake className="h-4 w-4 text-[var(--accent)]" />
+                <Handshake
+                  className="h-4 w-4 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
                   Parceiro Indicador &amp; Comissão Automática (15%)
                 </h3>
@@ -889,9 +1042,9 @@ export function LeadDetailModal({
               <button
                 type="button"
                 onClick={() => setShowNewPartner((prev) => !prev)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-text)] hover:underline"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                 Novo Parceiro
               </button>
             </div>
@@ -902,16 +1055,18 @@ export function LeadDetailModal({
                   <input
                     type="text"
                     placeholder="Nome do parceiro"
+                    aria-label="Nome do novo parceiro"
                     value={newPartnerName}
                     onChange={(e) => setNewPartnerName(e.target.value)}
-                    className="input-field rounded-lg px-2.5 py-1.5 text-xs"
+                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
                   />
                   <select
+                    aria-label="Perfil do novo parceiro"
                     value={newPartnerRole}
                     onChange={(e) =>
                       setNewPartnerRole(e.target.value as PartnerRole)
                     }
-                    className="input-field rounded-lg px-2.5 py-1.5 text-xs"
+                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
                   >
                     <option value="gerente_espaco">
                       Gerente de Espaço de Eventos (15%)
@@ -924,30 +1079,34 @@ export function LeadDetailModal({
                   <input
                     type="text"
                     placeholder="Espaço / Agência / Região"
+                    aria-label="Espaço ou agência do novo parceiro"
                     value={newPartnerCompany}
                     onChange={(e) => setNewPartnerCompany(e.target.value)}
-                    className="input-field rounded-lg px-2.5 py-1.5 text-xs"
+                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
                   />
                   <input
-                    type="text"
+                    type="tel"
                     placeholder="WhatsApp (31) 9..."
+                    aria-label="WhatsApp do novo parceiro"
                     value={newPartnerPhone}
-                    onChange={(e) => setNewPartnerPhone(e.target.value)}
-                    className="input-field rounded-lg px-2.5 py-1.5 text-xs"
+                    onChange={(e) =>
+                      setNewPartnerPhone(formatPhoneBr(e.target.value))
+                    }
+                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 font-mono-num text-xs"
                   />
                 </div>
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setShowNewPartner(false)}
-                    className="btn-ghost rounded-lg px-3 py-1.5 text-xs cursor-pointer"
+                    className="btn-ghost min-h-[38px] rounded-lg px-3 py-1.5 text-xs"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={handleCreatePartnerInline}
-                    className="btn-accent rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer"
+                    className="btn-accent min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-bold"
                   >
                     Cadastrar &amp; Vincular
                   </button>
@@ -957,32 +1116,40 @@ export function LeadDetailModal({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-center">
               <div className="sm:col-span-7">
+                <label htmlFor="lead-partner-select" className="sr-only">
+                  Parceiro indicador
+                </label>
                 <select
+                  id="lead-partner-select"
                   value={partnerId}
                   onChange={(e) => setPartnerId(e.target.value)}
-                  className="input-field w-full rounded-xl px-3 py-2 text-xs"
+                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-xs"
                 >
                   <option value="">Sem parceiro indicador (venda direta)</option>
                   {partners.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} — {PARTNER_ROLES[p.role]} ({p.commissionRate}%)
+                      {p.name} ({PARTNER_ROLES[p.role]} · {p.commissionRate}%)
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="sm:col-span-5 flex items-center justify-between rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)] px-3.5 py-2">
+              <div className="sm:col-span-5 flex items-center justify-between rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)] px-3.5 py-2">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                     Comissão ({commissionRate}%)
                   </p>
-                  <p className="font-mono-num text-sm font-bold text-[var(--accent)]">
+                  <p className="font-mono-num text-sm font-bold text-[var(--accent-text)]">
                     {formatCurrencyExact(commissionAmount)}
                   </p>
                 </div>
                 {partnerId && (
-                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] cursor-pointer">
+                  <label
+                    htmlFor="lead-commission-paid"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]"
+                  >
                     <input
+                      id="lead-commission-paid"
                       type="checkbox"
                       checked={commissionPaid}
                       onChange={(e) => setCommissionPaid(e.target.checked)}
@@ -998,52 +1165,67 @@ export function LeadDetailModal({
           {/* Billing / Contract Info */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                {isPortrait ? "CPF (p/ Termo de Imagem)" : "CNPJ (p/ Contrato / NFS-e)"}
+              <label
+                htmlFor="lead-doc"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
+                {isPortrait
+                  ? "CPF (p/ Termo de Imagem)"
+                  : "CNPJ (p/ Contrato / NFS-e)"}
               </label>
               {isPortrait ? (
                 <input
+                  id="lead-doc"
                   type="text"
                   value={cpf}
-                  onChange={(e) => setCpf(e.target.value)}
+                  onChange={(e) => setCpf(formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
-                  className="input-field w-full rounded-xl px-3 py-2 font-mono-num text-sm"
+                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
                 />
               ) : (
                 <input
+                  id="lead-doc"
                   type="text"
                   value={cnpj}
-                  onChange={(e) => setCnpj(e.target.value)}
+                  onChange={(e) => setCnpj(formatCnpj(e.target.value))}
                   placeholder="00.000.000/0001-00"
-                  className="input-field w-full rounded-xl px-3 py-2 font-mono-num text-sm"
+                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
                 />
               )}
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="lead-razao"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 {isPortrait ? "Nome Completo no Termo" : "Razão Social"}
               </label>
               <input
+                id="lead-razao"
                 type="text"
                 value={razaoSocial}
                 onChange={(e) => setRazaoSocial(e.target.value)}
                 placeholder={isPortrait ? "Nome completo" : "Razão Social Ltda"}
-                className="input-field w-full rounded-xl px-3 py-2 text-sm"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           {/* General Notes */}
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+            <label
+              htmlFor="lead-notes"
+              className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+            >
               Anotações Estratégicas do Projeto
             </label>
             <textarea
+              id="lead-notes"
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Briefing do evento, expectativas de entrega, restrições de horário..."
-              className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm leading-relaxed"
+              className="input-field w-full rounded-lg px-3.5 py-2.5 text-sm leading-relaxed"
             />
           </div>
 
@@ -1054,17 +1236,21 @@ export function LeadDetailModal({
             </h3>
 
             <form onSubmit={handleAddInteraction} className="flex gap-2">
+              <label htmlFor="lead-new-note" className="sr-only">
+                Nova anotação ou interação
+              </label>
               <input
+                id="lead-new-note"
                 type="text"
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Registrar ligação, follow-up ou observação (zera o alerta de 48h)..."
-                className="input-field flex-1 rounded-xl px-3.5 py-2 text-xs"
+                className="input-field min-h-[42px] flex-1 rounded-lg px-3.5 py-2 text-xs"
               />
               <button
                 type="submit"
                 disabled={addingNote || !newNote.trim()}
-                className="btn-accent rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50 cursor-pointer"
+                className="btn-accent min-h-[42px] rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
               >
                 Registrar
               </button>
@@ -1074,9 +1260,9 @@ export function LeadDetailModal({
               {lead.interactions.map((item) => (
                 <div
                   key={item.id}
-                  className="flex gap-3 rounded-2xl bg-[var(--bg-subtle)]/65 p-3.5 border border-[var(--border-hairline)]"
+                  className="flex gap-3 rounded-xl bg-[var(--bg-subtle)] p-3.5 border border-[var(--border-hairline)]"
                 >
-                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)]">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)]">
                     {getInteractionIcon(item.type)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1100,31 +1286,45 @@ export function LeadDetailModal({
           </div>
         </div>
 
-        {/* Sticky Footer Actions */}
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-6 py-4">
-          <button
-            type="button"
-            onClick={async () => {
-              if (
-                window.confirm(
-                  `Deseja realmente remover "${lead.companyName}" do CRM?`
-                )
-              ) {
-                await onDeleteLead(lead.id);
-                onClose();
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Excluir
-          </button>
+        {/* Sticky Footer Actions with Inline Delete Confirmation */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-5 py-4 sm:px-6">
+          {confirmingDelete ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-[var(--status-danger)]">
+                Confirmar exclusão?
+              </span>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleConfirmDelete}
+                className="badge-danger min-h-[40px] rounded-lg px-3 py-1.5 text-xs font-bold"
+              >
+                {deleting ? "Removendo..." : "Sim, excluir"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                className="btn-ghost min-h-[40px] rounded-lg px-3 py-1.5 text-xs font-semibold"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Excluir
+            </button>
+          )}
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="btn-ghost rounded-xl px-4 py-2 text-xs font-semibold cursor-pointer"
+              className="btn-ghost min-h-[42px] rounded-lg px-4 py-2 text-xs font-semibold"
             >
               Fechar
             </button>
@@ -1132,9 +1332,9 @@ export function LeadDetailModal({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="btn-accent inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-60 cursor-pointer"
+              className="btn-accent inline-flex min-h-[42px] items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-60"
             >
-              <Save className="h-3.5 w-3.5" />
+              <Save className="h-3.5 w-3.5" aria-hidden="true" />
               {saving ? "Salvando..." : "Salvar Alterações"}
             </button>
           </div>

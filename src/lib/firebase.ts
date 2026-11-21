@@ -67,4 +67,6 @@ export const FIRESTORE_COLLECTIONS = {
   partners: "crm_partners",
   leads: "crm_leads",
   templates: "crm_templates",
+  whatsappQueue: "crm_whatsapp_queue",
+  cronLogs: "crm_cron_logs",
 } as const;

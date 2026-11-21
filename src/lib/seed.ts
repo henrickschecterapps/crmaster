@@ -14,11 +14,11 @@ export function createPhase2FollowupTemplates(): ScriptTemplate[] {
   return [
     {
       id: "tpl-followup-dia2",
-      name: "Follow-up Automático — Dia 2 (Retomada Suave)",
+      name: "Follow-up Automático: Dia 2 (Retomada Suave)",
       funnel: "geral",
       channel: "ambos",
       subject:
-        "Re: Proposta Fotografia & Audiovisual 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
+        "Re: Proposta Fotografia & Audiovisual 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
       body: `Olá {{nome_contato}}, tudo bem?
 
 Passando rapidamente pela ÚLTIMO QUADRO para saber se você conseguiu abrir a proposta personalizada que preparei para a {{nome_empresa}}.
@@ -34,11 +34,11 @@ Me avise se fizer sentido alinharmos essa semana!`,
     },
     {
       id: "tpl-followup-dia5",
-      name: "Follow-up Automático — Dia 5 (Último Toque / Escassez)",
+      name: "Follow-up Automático: Dia 5 (Último Toque / Escassez)",
       funnel: "geral",
       channel: "ambos",
       subject:
-        "Última verificação de agenda ({{proxima_data_livre}}) — {{nome_empresa}} | ÚLTIMO QUADRO",
+        "Última verificação de agenda ({{proxima_data_livre}}) | {{nome_empresa}} | ÚLTIMO QUADRO",
       body: `Olá {{nome_contato}}, tudo bem?
 
 Estou fechando as últimas datas de produção da ÚLTIMO QUADRO em Belo Horizonte e Nova Lima perto de {{proxima_data_livre}} e não queria deixar a {{nome_empresa}} sem retorno antes de liberar a agenda.
@@ -46,7 +46,7 @@ Estou fechando as últimas datas de produção da ÚLTIMO QUADRO em Belo Horizon
 Se a produção ainda estiver nos planos, você pode selecionar o pacote e reservar diretamente pelo link abaixo:
 {{link_proposta}}
 
-Se preferir deixar para o próximo ciclo, sem problemas — seguimos à disposição!`,
+Se preferir deixar para o próximo ciclo, sem problemas. Seguimos à disposição!`,
       createdAt: hoursAgo(280),
       updatedAt: hoursAgo(280),
     },
@@ -109,12 +109,12 @@ export function createInitialSeedData(): CrmStoreData {
         email: "mariana.alvarenga@verticeeng.com.br",
         instagram: "@verticeengenharia",
         neighborhood: "Funcionários",
-        address: "Av. Getúlio Vargas, 1420 — Funcionários, Belo Horizonte",
+        address: "Av. Getúlio Vargas, 1420, Funcionários, Belo Horizonte",
         website: "https://verticeeng.com.br",
         funnel: "corporativo",
         stage: "contatado",
         estimatedValue: 1950,
-        origin: "Indicação — Espaço de Eventos",
+        origin: "Indicação: Espaço de Eventos",
         partnerId: "partner-01",
         commissionPaid: false,
         paymentStatus: "pendente",
@@ -164,12 +164,12 @@ export function createInitialSeedData(): CrmStoreData {
         email: "eduardo@casasavassi.adv.br",
         instagram: "@casasavassi.adv",
         neighborhood: "Savassi",
-        address: "Rua Pernambuco, 1080 — Savassi, Belo Horizonte",
+        address: "Rua Pernambuco, 1080, Savassi, Belo Horizonte",
         website: "https://casasavassi.adv.br",
         funnel: "corporativo",
         stage: "sinal_pago",
         estimatedValue: 2550,
-        origin: "Indicação — Espaço de Eventos",
+        origin: "Indicação: Espaço de Eventos",
         partnerId: "partner-01",
         commissionPaid: false,
         paymentStatus: "sinal_pago",
@@ -235,12 +235,12 @@ export function createInitialSeedData(): CrmStoreData {
         email: "camila@atelieserena.com.br",
         instagram: "@atelieserenabh",
         neighborhood: "Barro Preto",
-        address: "Rua Mato Grosso, 539 — Barro Preto, Belo Horizonte",
+        address: "Rua Mato Grosso, 539, Barro Preto, Belo Horizonte",
         website: "https://atelieserena.com.br",
         funnel: "moda",
         stage: "proposta_aberta",
         estimatedValue: 1290,
-        origin: "Parceria VIP — Modelo de Provador",
+        origin: "Parceria VIP: Modelo de Provador",
         partnerId: "partner-02",
         commissionPaid: false,
         paymentStatus: "pendente",
@@ -289,7 +289,7 @@ export function createInitialSeedData(): CrmStoreData {
         email: "thiago@osteriabrasabh.com.br",
         instagram: "@osteriabrasalourdes",
         neighborhood: "Lourdes",
-        address: "Rua Curitiba, 2244 — Lourdes, Belo Horizonte",
+        address: "Rua Curitiba, 2244, Lourdes, Belo Horizonte",
         website: "https://osteriabrasabh.com.br",
         funnel: "gastronomia",
         stage: "fechado",
@@ -331,14 +331,14 @@ export function createInitialSeedData(): CrmStoreData {
       },
       {
         id: "lead-bh-05",
-        companyName: "Dra. Letícia Vasconcelos — Dermatologia & Estética",
+        companyName: "Dra. Letícia Vasconcelos | Dermatologia & Estética",
         contactName: "Letícia Vasconcelos",
         contactRole: "Médica Dermatologista",
         phone: "(31) 99473-5029",
         email: "contato@draleticiavasconcelos.com.br",
         instagram: "@draleticiavasconcelos",
         neighborhood: "Lourdes",
-        address: "Rua São Paulo, 2110 — Lourdes, Belo Horizonte",
+        address: "Rua São Paulo, 2110, Lourdes, Belo Horizonte",
         website: "https://draleticiavasconcelos.com.br",
         funnel: "estetica",
         stage: "captado",
@@ -378,14 +378,14 @@ export function createInitialSeedData(): CrmStoreData {
     templates: [
       {
         id: "tpl-rh-endomarketing",
-        name: "Corporativo — RH & Eventos B2B (Cobertura 360°)",
+        name: "Corporativo: RH & Eventos B2B (Cobertura 360°)",
         funnel: "corporativo",
         channel: "ambos",
         subject:
-          "Cobertura Corporativa 360° & Reels 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
+          "Cobertura Corporativa 360° & Reels 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
-Aqui é o Henrique, diretor da ÚLTIMO QUADRO — produtora de fotografia autoral e audiovisual 4K em Belo Horizonte e Nova Lima.
+Aqui é o Henrique, diretor da ÚLTIMO QUADRO, produtora de fotografia autoral e audiovisual 4K em Belo Horizonte e Nova Lima.
 
 Acompanhei o momento da {{nome_empresa}} e sei o peso que um evento corporativo bem documentado tem para Employer Branding, endomarketing e LinkedIn.
 
@@ -400,11 +400,11 @@ Podemos alinhar os detalhes em 5 minutos?`,
       },
       {
         id: "tpl-estetica-ads",
-        name: "Estética & Wellness — Performance & Criativos Meta Ads 4K",
+        name: "Estética & Wellness: Performance & Criativos Meta Ads 4K",
         funnel: "estetica",
         channel: "ambos",
         subject:
-          "Retratos Clean Skin + Criativos 4K para Meta Ads — {{nome_empresa}} | ÚLTIMO QUADRO",
+          "Retratos Clean Skin + Criativos 4K para Meta Ads | {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
 Sou o Henrique da ÚLTIMO QUADRO (Fotografia Autoral & Audiovisual 4K em BH e Nova Lima).
@@ -414,17 +414,17 @@ Produzimos acervos fotográficos com iluminação Clean Skin + vídeos criativos
 Preparei uma proposta interativa sob medida para a {{nome_empresa}} com os pacotes Glow & Posicionamento e Performance & Ads Prime:
 {{link_proposta}}
 
-Tenho agenda aberta perto de {{proxima_data_livre}} — faz sentido conversarmos rapidamente?`,
+Tenho agenda aberta perto de {{proxima_data_livre}}. Faz sentido conversarmos rapidamente?`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
         id: "tpl-parceria-modelos",
-        name: "Moda & Provador — Parceria VIP Modelos (15% Pix)",
+        name: "Moda & Provador: Parceria VIP Modelos (15% Pix)",
         funnel: "moda",
         channel: "whatsapp",
         subject:
-          "Parceria VIP Modelos de Provador BH (15% Pix) — ÚLTIMO QUADRO",
+          "Parceria VIP Modelos de Provador BH (15% Pix) | ÚLTIMO QUADRO",
         body: `Oi {{nome_contato}}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO aqui em BH!
 
 Curti muito seu trabalho como modelo de provador e queria te apresentar nossa Parceria VIP para marcas e atacados de moda em BH e Barro Preto:
@@ -440,11 +440,11 @@ Podemos conversar perto de {{proxima_data_livre}} para te incluir no nosso casti
       },
       {
         id: "tpl-gastronomia-ifood",
-        name: "Gastronomia & iFood — Estúdio Portátil + Food Reels 4K",
+        name: "Gastronomia & iFood: Estúdio Portátil + Food Reels 4K",
         funnel: "gastronomia",
         channel: "ambos",
         subject:
-          "Fotografia Gastronômica (iFood) & Food Reels 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
+          "Fotografia Gastronômica (iFood) & Food Reels 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
 Aqui é o Henrique, da ÚLTIMO QUADRO (BH & Nova Lima). Levamos um estúdio de iluminação portátil direto para o salão da {{nome_empresa}} para produzir fotos de apetite (Alta Res + otimizadas para iFood) e Food Reels 4K/ASMR.
@@ -458,14 +458,14 @@ Tenho janela livre em {{proxima_data_livre}} para fazermos a produção fora do 
       },
       {
         id: "tpl-nightlife-promoters",
-        name: "Festas & Nightlife — Low-Light & Aftermovie 4K",
+        name: "Festas & Nightlife: Low-Light & Aftermovie 4K",
         funnel: "nightlife",
         channel: "whatsapp",
         subject:
-          "Cobertura Noturna & Aftermovie 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
+          "Cobertura Noturna & Aftermovie 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Fala {{nome_contato}}, tudo certo? Aqui é o Henrique da ÚLTIMO QUADRO (BH).
 
-Cobrimos bares, clubs e labels com equipamento Full-Frame Low-Light, flash criativo (shutter drag) e Aftermovies Verticais 4K editados no beat em até 48h — com prévia de 15 fotos já às 14h do dia seguinte pra manter o hype da casa no topo.
+Cobrimos bares, clubs e labels com equipamento Full-Frame Low-Light, flash criativo (shutter drag) e Aftermovies Verticais 4K editados no beat em até 48h, com prévia de 15 fotos já às 14h do dia seguinte pra manter o hype da casa no topo.
 
 Deixei a proposta interativa da {{nome_empresa}} pronta aqui:
 {{link_proposta}}
@@ -484,7 +484,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-01",
     name: "Osteria Lourdes Eventos & Gastronomia",
     phone: "(31) 3291-4820",
-    address: "Rua Curitiba, 2244 — Lourdes, Belo Horizonte - MG",
+    address: "Rua Curitiba, 2244, Lourdes, Belo Horizonte - MG",
     neighborhood: "Lourdes",
     website: "https://osterialourdes.com.br",
     category: "Restaurante & Gastronomia",
@@ -495,7 +495,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-02",
     name: "Casa Marília Rooftop & Lounge",
     phone: "(31) 99318-7740",
-    address: "Rua Marília de Dirceu, 189 — Lourdes, Belo Horizonte - MG",
+    address: "Rua Marília de Dirceu, 189, Lourdes, Belo Horizonte - MG",
     neighborhood: "Lourdes",
     website: "https://casamariliaeventos.com.br",
     category: "Lounge & Nightlife",
@@ -506,7 +506,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-03",
     name: "Fio Nobre Confecções Atacado",
     phone: "(31) 3295-6110",
-    address: "Rua Guajajaras, 1520 — Barro Preto, Belo Horizonte - MG",
+    address: "Rua Guajajaras, 1520, Barro Preto, Belo Horizonte - MG",
     neighborhood: "Barro Preto",
     website: "https://fionobremoda.com.br",
     category: "Moda & Confecção",
@@ -517,7 +517,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-04",
     name: "Maison Verbena Tricot & Alfaiataria",
     phone: "(31) 98412-3095",
-    address: "Rua Uberaba, 412 — Barro Preto, Belo Horizonte - MG",
+    address: "Rua Uberaba, 412, Barro Preto, Belo Horizonte - MG",
     neighborhood: "Barro Preto",
     website: "https://maisonverbena.com.br",
     category: "Moda Feminina Atacado",
@@ -528,7 +528,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-05",
     name: "Villa Pampulha Centro de Convenções",
     phone: "(31) 3491-9050",
-    address: "Av. Otacílio Negrão de Lima, 4120 — Pampulha, Belo Horizonte - MG",
+    address: "Av. Otacílio Negrão de Lima, 4120, Pampulha, Belo Horizonte - MG",
     neighborhood: "Pampulha",
     website: "https://villapampulhaeventos.com.br",
     category: "Espaço de Eventos Corporativos",
@@ -539,7 +539,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-06",
     name: "Savassi Executive Hotel & Auditório",
     phone: "(31) 3261-8800",
-    address: "Rua Antônio de Albuquerque, 790 — Savassi, Belo Horizonte - MG",
+    address: "Rua Antônio de Albuquerque, 790, Savassi, Belo Horizonte - MG",
     neighborhood: "Savassi",
     website: "https://savassiexecutive.com.br",
     category: "Hotel Corporativo",
@@ -550,7 +550,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-07",
     name: "Instituto Aura Estética Avançada",
     phone: "(31) 99514-6280",
-    address: "Av. do Contorno, 6594 — Funcionários, Belo Horizonte - MG",
+    address: "Av. do Contorno, 6594, Funcionários, Belo Horizonte - MG",
     neighborhood: "Funcionários",
     website: "https://institutoaurabh.com.br",
     category: "Clínica de Estética & Wellness",
@@ -561,7 +561,7 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     placeId: "bh-place-08",
     name: "Mirante Vila da Serra Corporativo",
     phone: "(31) 3286-7410",
-    address: "Alameda Oscar Niemeyer, 950 — Vila da Serra, Nova Lima - MG",
+    address: "Alameda Oscar Niemeyer, 950, Vila da Serra, Nova Lima - MG",
     neighborhood: "Vila da Serra",
     website: "https://miranteviladaserra.com.br",
     category: "Espaço Corporativo",

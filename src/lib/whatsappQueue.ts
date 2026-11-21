@@ -1,5 +1,10 @@
 import { StudioSettings, WhatsappQueueJob } from "@/types/crm";
 import { formatWhatsappNumber, generateId } from "@/lib/utils";
+import {
+  getPersistedWhatsappQueue,
+  saveWhatsappQueueJob,
+  updateLead,
+} from "@/lib/repository";
 
 export interface WhatsappApiConfig {
   provider: "evolution" | "zapi";
@@ -81,7 +86,7 @@ export async function sendWhatsappViaApi(params: {
       return { ok: true, mode: "live" };
     }
 
-    // Evolution API v1/v2 standard endpoint
+    // Evolution API v1/v2 endpoint
     const endpoint = `${apiUrl}/message/sendText/${encodeURIComponent(
       instance
     )}`;
@@ -117,29 +122,15 @@ export async function sendWhatsappViaApi(params: {
   }
 }
 
-/**
- * Anti-ban random delay between 3 and 6 minutes (180s to 360s)
- */
+// Anti-ban randomized delay between 3 and 6 minutes (180s to 360s)
 export function getRandomAntiBanDelayMs(): number {
-  const minMs = 3 * 60 * 1000; // 180_000 ms (3 min)
-  const maxMs = 6 * 60 * 1000; // 360_000 ms (6 min)
+  const minMs = 3 * 60 * 1000;
+  const maxMs = 6 * 60 * 1000;
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
-// Persistent global queue across Next.js route hot-reloads in dev
-const globalQueueState = globalThis as unknown as {
-  __crmasterWhatsappQueue?: WhatsappQueueJob[];
-  __crmasterWhatsappProcessing?: boolean;
-};
-
-if (!globalQueueState.__crmasterWhatsappQueue) {
-  globalQueueState.__crmasterWhatsappQueue = [];
-}
-
-export function getWhatsappQueueJobs(): WhatsappQueueJob[] {
-  return [...(globalQueueState.__crmasterWhatsappQueue ?? [])].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+export async function getWhatsappQueueJobs(): Promise<WhatsappQueueJob[]> {
+  return getPersistedWhatsappQueue();
 }
 
 export interface EnqueueWhatsappInput {
@@ -149,26 +140,78 @@ export interface EnqueueWhatsappInput {
   message: string;
 }
 
+async function executeSingleJob(
+  job: WhatsappQueueJob,
+  config: WhatsappApiConfig | null
+): Promise<WhatsappQueueJob> {
+  const sending: WhatsappQueueJob = { ...job, status: "enviando" };
+  await saveWhatsappQueueJob(sending);
+
+  let finished: WhatsappQueueJob;
+  if (!config) {
+    finished = {
+      ...sending,
+      status: "simulado",
+      sentAt: new Date().toISOString(),
+    };
+  } else {
+    const res = await sendWhatsappViaApi({
+      phone: job.phone,
+      message: job.message,
+      config,
+    });
+    finished = res.ok
+      ? { ...sending, status: "enviado", sentAt: new Date().toISOString() }
+      : {
+          ...sending,
+          status: "erro",
+          error: res.error || "Falha no disparo",
+        };
+  }
+
+  await saveWhatsappQueueJob(finished);
+
+  await updateLead(
+    finished.leadId,
+    {},
+    {
+      type: "whatsapp",
+      title:
+        finished.status === "enviado"
+          ? "WhatsApp automático entregue (Fila Anti-Ban)"
+          : finished.status === "simulado"
+          ? "WhatsApp automático simulado (API não configurada)"
+          : "Falha no disparo automático de WhatsApp",
+      description: finished.error
+        ? finished.error
+        : `Disparo processado com intervalo seguro (${Math.round(
+            finished.delaySeconds / 60
+          )} min).`,
+    },
+    false
+  );
+
+  return finished;
+}
+
 /**
- * Schedules a batch of WhatsApp messages with 3–6 minute randomized anti-ban intervals.
- * Executes in background when running on a stateful Node runtime; returns schedule immediately.
+ * Persists a batch of WhatsApp jobs into Firestore/local store with randomized 3-6 min intervals.
+ * Executes the first immediately when the queue is idle; subsequent jobs are processed by cron or manual trigger.
  */
-export function enqueueWhatsappBatch(params: {
+export async function enqueueWhatsappBatch(params: {
   items: EnqueueWhatsappInput[];
   config: WhatsappApiConfig | null;
-  onJobCompleted?: (job: WhatsappQueueJob) => Promise<void>;
-}): WhatsappQueueJob[] {
-  const queue = globalQueueState.__crmasterWhatsappQueue!;
-  const createdJobs: WhatsappQueueJob[] = [];
+}): Promise<WhatsappQueueJob[]> {
+  const existing = await getPersistedWhatsappQueue();
+  const hasActivePending = existing.some(
+    (j) => j.status === "pendente" || j.status === "enviando"
+  );
 
+  const createdJobs: WhatsappQueueJob[] = [];
   let cumulativeDelayMs = 0;
 
   for (let i = 0; i < params.items.length; i++) {
     const item = params.items[i];
-    // First message starts shortly (or after 3–6 min if queue already has pending jobs)
-    const hasActivePending = queue.some(
-      (j) => j.status === "pendente" || j.status === "enviando"
-    );
     const stepDelayMs =
       i === 0 && !hasActivePending ? 0 : getRandomAntiBanDelayMs();
     cumulativeDelayMs += stepDelayMs;
@@ -186,45 +229,44 @@ export function enqueueWhatsappBatch(params: {
       createdAt: new Date(now).toISOString(),
     };
 
-    queue.push(job);
+    await saveWhatsappQueueJob(job);
     createdJobs.push(job);
+  }
 
-    // Trim history to last 50 jobs
-    if (queue.length > 50) {
-      queue.splice(0, queue.length - 50);
-    }
-
-    const capturedConfig = params.config;
-    const capturedCallback = params.onJobCompleted;
-
-    setTimeout(async () => {
-      job.status = "enviando";
-      if (!capturedConfig) {
-        job.status = "simulado";
-        job.sentAt = new Date().toISOString();
-      } else {
-        const res = await sendWhatsappViaApi({
-          phone: job.phone,
-          message: job.message,
-          config: capturedConfig,
-        });
-        if (res.ok) {
-          job.status = "enviado";
-          job.sentAt = new Date().toISOString();
-        } else {
-          job.status = "erro";
-          job.error = res.error || "Falha no disparo";
-        }
-      }
-      if (capturedCallback) {
-        try {
-          await capturedCallback(job);
-        } catch {
-          // Ignore callback error
-        }
-      }
-    }, cumulativeDelayMs);
+  // Execute the first job right away if its scheduled time is now (delay 0)
+  if (createdJobs[0] && createdJobs[0].delaySeconds === 0) {
+    createdJobs[0] = await executeSingleJob(createdJobs[0], params.config);
   }
 
   return createdJobs;
+}
+
+/**
+ * Processes all pending persisted jobs whose scheduledFor timestamp has arrived (or all pending when force=true).
+ */
+export async function processDueWhatsappQueue(params: {
+  config: WhatsappApiConfig | null;
+  forceAll?: boolean;
+}): Promise<{ processed: WhatsappQueueJob[] }> {
+  const jobs = await getPersistedWhatsappQueue();
+  const nowMs = Date.now();
+
+  const due = jobs
+    .filter((j) => {
+      if (j.status !== "pendente") return false;
+      if (params.forceAll) return true;
+      return new Date(j.scheduledFor).getTime() <= nowMs;
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
+    );
+
+  const processed: WhatsappQueueJob[] = [];
+  for (const job of due) {
+    const done = await executeSingleJob(job, params.config);
+    processed.push(done);
+  }
+
+  return { processed };
 }

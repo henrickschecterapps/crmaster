@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { getLeadById, updateLead } from "@/lib/repository";
 
 export const dynamic = "force-dynamic";
@@ -29,26 +30,57 @@ function buildEmailHtml(params: {
 
   return `
     <div style="background:#0C0C0C;padding:36px 20px;font-family:'Montserrat',Arial,sans-serif;">
-      <div style="max-width:600px;margin:0 auto;background:#121212;border:1px solid rgba(245,245,245,0.1);border-radius:16px;padding:32px;">
-        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#CC551E;margin-bottom:8px;font-weight:800;">
+      <div style="max-width:600px;margin:0 auto;background:#121212;border:1px solid rgba(245,245,245,0.1);border-radius:12px;padding:32px;">
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#EA7845;margin-bottom:8px;font-weight:800;">
           ÚLTIMO QUADRO · Fotografia Autoral &amp; Audiovisual 4K
         </div>
         <h2 style="margin:0 0 20px;color:#F5F5F5;font-size:20px;font-weight:700;">
-          Proposta Exclusiva — ${escapeHtml(params.companyName)}
+          Proposta Exclusiva: ${escapeHtml(params.companyName)}
         </h2>
         ${paragraphs}
         <div style="margin-top:26px;">
-          <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;background:#CC551E;color:#F5F5F5;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;padding:13px 24px;border-radius:10px;">
+          <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;background:#B54512;color:#F5F5F5;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;padding:13px 24px;border-radius:8px;">
             Abrir Proposta Interativa
           </a>
         </div>
         <hr style="border:none;border-top:1px solid rgba(245,245,245,0.08);margin:28px 0 18px;" />
-        <p style="margin:0;color:#787878;font-size:11px;">
-          ÚLTIMO QUADRO · A história termina. A imagem fica. · Belo Horizonte &amp; Nova Lima, MG · (31) 98399-7195
+        <p style="margin:0;color:#969696;font-size:11px;">
+          ÚLTIMO QUADRO · A história termina. A imagem fica. · Belo Horizonte e Nova Lima, MG · (31) 98399-7195
         </p>
       </div>
     </div>
   `;
+}
+
+async function sendViaGmailSmtp(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const user = process.env.GMAIL_USER?.trim();
+  const pass = process.env.GMAIL_APP_PASSWORD?.trim();
+  if (!user || !pass) return { ok: false, error: "Gmail SMTP não configurado." };
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user, pass },
+    });
+    const info = await transporter.sendMail({
+      from: `ÚLTIMO QUADRO <${user}>`,
+      to: params.to,
+      subject: params.subject,
+      text: params.text,
+      html: params.html,
+    });
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Erro ao enviar via Gmail SMTP.",
+    };
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -76,49 +108,94 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL ||
-      "ÚLTIMO QUADRO <onboarding@resend.dev>";
+    const html = buildEmailHtml({
+      companyName: lead.companyName,
+      body: body.message,
+      proposalUrl: body.proposalUrl,
+    });
 
-    let mode: "live" | "simulated" = "simulated";
+    const gmailConfigured = Boolean(
+      process.env.GMAIL_USER?.trim() && process.env.GMAIL_APP_PASSWORD?.trim()
+    );
+    const resendKey = process.env.RESEND_API_KEY?.trim();
+    const fromEmail =
+      process.env.RESEND_FROM_EMAIL || "ÚLTIMO QUADRO <onboarding@resend.dev>";
+
+    let mode: "resend" | "gmail" | "simulated" = "simulated";
     let providerId: string | undefined;
 
-    if (apiKey) {
-      const resend = new Resend(apiKey);
+    // Prefer Gmail SMTP when configured and Resend is still using sandbox sender
+    const usingResendSandbox = fromEmail.includes("onboarding@resend.dev");
+
+    if (gmailConfigured && (!resendKey || usingResendSandbox)) {
+      const gmailRes = await sendViaGmailSmtp({
+        to: body.to,
+        subject: body.subject,
+        text: body.message,
+        html,
+      });
+      if (!gmailRes.ok) {
+        return NextResponse.json(
+          { error: `Falha no envio via Gmail SMTP: ${gmailRes.error}` },
+          { status: 502 }
+        );
+      }
+      mode = "gmail";
+      providerId = gmailRes.messageId;
+    } else if (resendKey) {
+      const resend = new Resend(resendKey);
       const { data, error } = await resend.emails.send({
         from: fromEmail,
         to: [body.to],
         subject: body.subject,
         text: body.message,
-        html: buildEmailHtml({
-          companyName: lead.companyName,
-          body: body.message,
-          proposalUrl: body.proposalUrl,
-        }),
+        html,
       });
 
       if (error) {
-        return NextResponse.json(
-          { error: `Falha no envio via Resend: ${error.message}` },
-          { status: 502 }
-        );
+        // Automatic fallback to Gmail SMTP if Resend sandbox rejected an external recipient
+        if (gmailConfigured) {
+          const gmailRes = await sendViaGmailSmtp({
+            to: body.to,
+            subject: body.subject,
+            text: body.message,
+            html,
+          });
+          if (gmailRes.ok) {
+            mode = "gmail";
+            providerId = gmailRes.messageId;
+          } else {
+            return NextResponse.json(
+              { error: `Falha no envio: ${error.message}` },
+              { status: 502 }
+            );
+          }
+        } else {
+          return NextResponse.json(
+            { error: `Falha no envio via Resend: ${error.message}` },
+            { status: 502 }
+          );
+        }
+      } else {
+        mode = "resend";
+        providerId = data?.id;
       }
-
-      mode = "live";
-      providerId = data?.id;
     }
 
     const nextStage = lead.stage === "captado" ? "contatado" : lead.stage;
+    const providerLabel =
+      mode === "gmail"
+        ? "Gmail SMTP"
+        : mode === "resend"
+        ? "Resend API"
+        : "Modo Simulação";
+
     const updatedLead = await updateLead(
       lead.id,
       { stage: nextStage },
       {
         type: "email",
-        title:
-          mode === "live"
-            ? `E-mail enviado via Resend (${body.to})`
-            : `E-mail disparado em modo simulação (${body.to})`,
+        title: `E-mail enviado via ${providerLabel} (${body.to})`,
         description: `Assunto: ${body.subject}. Link rastreável incluído: ${body.proposalUrl}`,
       },
       true

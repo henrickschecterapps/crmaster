@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { BRAND_DEFAULTS, IntegrationStatus, StudioSettings } from "@/types/crm";
 import { resolveWhatsappConfig } from "@/lib/whatsappQueue";
 import { getFirebaseProjectId, isFirebaseConfigured } from "@/lib/firebase";
+import { isAdminAuthEnabled } from "@/lib/auth";
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -47,6 +48,10 @@ export function getIntegrationStatus(
     firebaseProjectId: getFirebaseProjectId(),
     googlePlacesLive: Boolean(process.env.GOOGLE_PLACES_API_KEY),
     resendLive: Boolean(process.env.RESEND_API_KEY),
+    gmailLive: Boolean(
+      process.env.GMAIL_USER?.trim() && process.env.GMAIL_APP_PASSWORD?.trim()
+    ),
+    adminAuthEnabled: isAdminAuthEnabled(),
     whatsappApiLive: Boolean(waConfig),
     whatsappProvider:
       waConfig?.provider ?? settings?.whatsappProvider ?? "evolution",

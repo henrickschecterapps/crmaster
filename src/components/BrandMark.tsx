@@ -16,7 +16,7 @@ export function UltimoQuadroIcon({ className }: { className?: string }) {
       viewBox="0 0 380 104"
       fill="none"
       role="img"
-      aria-label="Último Quadro — Ícone Oficial"
+      aria-label="Último Quadro | Ícone Oficial"
       className={className}
     >
       <g transform="translate(10, 10)">

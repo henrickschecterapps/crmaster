@@ -105,9 +105,13 @@ export function KanbanView({
 
   return (
     <div className="space-y-5">
-      {/* Funnel Tabs Header — 5 Official Último Quadro Verticals */}
+      {/* Funnel Tabs Header: 5 Official Ultimo Quadro Verticals */}
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div
+          className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5"
+          role="tablist"
+          aria-label="Frentes de serviço do Kanban"
+        >
           {FUNNELS.map((funnel) => {
             const fLeads = leads.filter((l) => l.funnel === funnel.id);
             const total = fLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
@@ -116,12 +120,14 @@ export function KanbanView({
               <button
                 key={funnel.id}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => onChangeFunnel(funnel.id)}
                 className={cn(
-                  "rounded-2xl px-3.5 py-3 text-left transition-all cursor-pointer border",
+                  "min-h-[60px] rounded-xl px-3.5 py-3 text-left transition-colors border",
                   isActive
-                    ? "bg-[var(--accent-soft)] border-[var(--accent-border)] shadow-sm"
-                    : "glass-panel hover:border-[var(--border-strong)]"
+                    ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
+                    : "surface-card hover:border-[var(--border-strong)]"
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -129,20 +135,20 @@ export function KanbanView({
                     className={cn(
                       "truncate text-xs font-bold tracking-tight",
                       isActive
-                        ? "text-[var(--accent)]"
+                        ? "text-[var(--accent-text)]"
                         : "text-[var(--text-primary)]"
                     )}
                   >
-                    <span className="font-mono-num mr-1.5 opacity-65">
+                    <span className="font-mono-num mr-1.5 opacity-75">
                       {funnel.index}
                     </span>
                     {funnel.shortLabel}
                   </span>
-                  <span className="rounded-full bg-[var(--bg-subtle)] px-2 py-0.5 font-mono-num text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 font-mono-num text-[11px] font-semibold text-[var(--text-secondary)]">
                     {fLeads.length}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-1 text-[10px] text-[var(--text-muted)]">
+                <div className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--text-muted)]">
                   <span className="truncate">{funnel.subtitle}</span>
                   <span className="font-mono-num text-[var(--text-secondary)] shrink-0">
                     {formatCurrency(total)}
@@ -155,38 +161,45 @@ export function KanbanView({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+              aria-hidden="true"
+            />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar empresa, decisor..."
-              className="input-field w-full sm:w-56 rounded-xl py-2 pl-9 pr-3 text-xs"
+              aria-label="Buscar empresa, decisor, origem ou parceiro"
+              className="input-field min-h-[44px] w-full sm:w-64 rounded-lg py-2 pl-9 pr-3 text-xs"
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setOnlyStagnant((prev) => !prev)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold border transition-all cursor-pointer",
-              onlyStagnant
-                ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
-                : "btn-ghost text-[var(--text-secondary)]"
-            )}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Parados &gt;48h
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOnlyStagnant((prev) => !prev)}
+              aria-pressed={onlyStagnant}
+              className={cn(
+                "inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border transition-colors",
+                onlyStagnant
+                  ? "badge-warning"
+                  : "btn-ghost text-[var(--text-secondary)]"
+              )}
+            >
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+              Parados &gt;48h
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenNewLead(activeFunnel)}
-            className="btn-accent inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Novo Lead
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenNewLead(activeFunnel)}
+              className="btn-accent inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              Novo Lead
+            </button>
+          </div>
         </div>
       </div>
 
@@ -201,8 +214,9 @@ export function KanbanView({
           const isDropTarget = dragOverStage === stage.id;
 
           return (
-            <div
+            <section
               key={stage.id}
+              aria-label={`Etapa ${stage.label}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 if (dragOverStage !== stage.id) setDragOverStage(stage.id);
@@ -215,25 +229,25 @@ export function KanbanView({
                 handleDrop(stage.id);
               }}
               className={cn(
-                "flex min-h-[540px] w-[292px] shrink-0 flex-col rounded-3xl p-3 transition-colors border",
+                "flex min-h-[540px] w-[296px] shrink-0 flex-col rounded-xl p-3 transition-colors border",
                 isDropTarget
-                  ? "bg-[var(--accent-soft)]/60 border-[var(--accent-border)]"
-                  : "bg-[var(--bg-subtle)]/55 border-[var(--border-hairline)]"
+                  ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
+                  : "bg-[var(--bg-subtle)] border-[var(--border-hairline)]"
               )}
             >
-              {/* Column Header */}
-              <div className="mb-3 flex items-center justify-between px-1.5 pt-1">
+              <div className="mb-3 flex items-center justify-between px-1 pt-0.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
                     className={cn(
                       "h-2 w-2 rounded-full shrink-0",
                       stage.accentClass
                     )}
+                    aria-hidden="true"
                   />
-                  <h3 className="truncate text-xs font-bold text-[var(--text-primary)]">
+                  <h2 className="truncate text-xs font-bold text-[var(--text-primary)]">
                     {stage.label}
-                  </h3>
-                  <span className="rounded-full bg-[var(--bg-surface-solid)] px-1.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-muted)]">
+                  </h2>
+                  <span className="rounded-md bg-[var(--bg-surface-solid)] px-1.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-muted)]">
                     {stageLeads.length}
                   </span>
                 </div>
@@ -242,12 +256,11 @@ export function KanbanView({
                 </span>
               </div>
 
-              {/* Cards Stack */}
               <div className="flex flex-1 flex-col gap-2.5">
                 {stageLeads.length === 0 ? (
-                  <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-hairline)] px-4 py-8 text-center">
+                  <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-hairline)] px-4 py-8 text-center">
                     <p className="text-[11px] text-[var(--text-muted)]">
-                      Arraste um card para{" "}
+                      Arraste ou mova um card para{" "}
                       <span className="font-medium text-[var(--text-secondary)]">
                         {stage.shortLabel}
                       </span>
@@ -278,153 +291,192 @@ export function KanbanView({
                           setDraggingLeadId(null);
                           setDragOverStage(null);
                         }}
-                        onClick={() => onSelectLead(lead)}
                         className={cn(
-                          "glass-panel glass-panel-hover group cursor-grab active:cursor-grabbing rounded-2xl p-3.5",
+                          "surface-card surface-card-hover group cursor-grab active:cursor-grabbing rounded-xl p-3.5",
                           isDragging && "opacity-45 scale-[0.98]"
                         )}
                       >
-                        {/* Badges Row: Stagnation + Proposal Viewed / Approved + Phase 2 Tags */}
-                        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                          {stagnation.level === "critical" && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
-                              <AlertTriangle className="h-3 w-3" />
-                              {stagnation.label}
-                            </span>
-                          )}
-                          {stagnation.level === "warning" && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
-                              <Clock className="h-3 w-3" />
-                              {stagnation.label}
-                            </span>
-                          )}
-                          {(lead.tags ?? []).map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {lead.visualizadaEm && (
-                            <span
-                              title={`Proposta visualizada ${lead.visualizacoesProposta}x`}
-                              className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]"
-                            >
-                              <Eye className="h-3 w-3" />
-                              Proposta Visualizada
-                              {lead.visualizacoesProposta > 1
-                                ? ` (${lead.visualizacoesProposta}x)`
-                                : ""}
-                            </span>
-                          )}
-                          {lead.propostaAprovadaEm && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Aprovada
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Company & Decision Maker */}
-                        <h4 className="text-sm font-bold leading-snug text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
-                          {lead.companyName}
-                        </h4>
-                        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                          {lead.contactName}
-                          {lead.contactRole ? ` · ${lead.contactRole}` : ""}
-                        </p>
-
-                        {/* Value & Status */}
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                          <span className="font-mono-num text-sm font-bold text-[var(--text-primary)]">
-                            {formatCurrency(lead.estimatedValue)}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {lead.automacaoAtiva &&
-                              (lead.stage === "contatado" ||
-                                lead.stage === "proposta_aberta") && (
-                                <span
-                                  title="Cadência automática ativa"
-                                  className="inline-flex items-center gap-0.5 rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]"
-                                >
-                                  <Bot className="h-2.5 w-2.5 text-[var(--accent)]" />
-                                  Auto
+                        <button
+                          type="button"
+                          onClick={() => onSelectLead(lead)}
+                          className="block w-full text-left"
+                        >
+                          {/* Badges Row */}
+                          {(stagnation.level !== "none" ||
+                            (lead.tags ?? []).length > 0 ||
+                            lead.visualizadaEm ||
+                            lead.propostaAprovadaEm) && (
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                              {stagnation.level === "critical" && (
+                                <span className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                  <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                                  {stagnation.label}
                                 </span>
                               )}
-                            {lead.paymentStatus === "sinal_pago" && (
-                              <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                                50% Pago
+                              {stagnation.level === "warning" && (
+                                <span className="badge-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                  <Clock className="h-3 w-3" aria-hidden="true" />
+                                  {stagnation.label}
+                                </span>
+                              )}
+                              {(lead.tags ?? []).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {lead.visualizadaEm && (
+                                <span
+                                  title={`Proposta visualizada ${lead.visualizacoesProposta}x`}
+                                  className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold"
+                                >
+                                  <Eye className="h-3 w-3" aria-hidden="true" />
+                                  Visualizada
+                                  {lead.visualizacoesProposta > 1
+                                    ? ` (${lead.visualizacoesProposta}x)`
+                                    : ""}
+                                </span>
+                              )}
+                              {lead.propostaAprovadaEm && (
+                                <span className="badge-success inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                                  Aprovada
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <h3 className="text-sm font-bold leading-snug text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition-colors">
+                            {lead.companyName}
+                          </h3>
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                            {lead.contactName}
+                            {lead.contactRole ? ` · ${lead.contactRole}` : ""}
+                          </p>
+
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="font-mono-num text-sm font-bold text-[var(--text-primary)]">
+                              {formatCurrency(lead.estimatedValue)}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {lead.automacaoAtiva &&
+                                (lead.stage === "contatado" ||
+                                  lead.stage === "proposta_aberta") && (
+                                  <span
+                                    title="Cadência automática ativa"
+                                    className="inline-flex items-center gap-0.5 rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]"
+                                  >
+                                    <Bot
+                                      className="h-2.5 w-2.5 text-[var(--accent-text)]"
+                                      aria-hidden="true"
+                                    />
+                                    Auto
+                                  </span>
+                                )}
+                              {lead.paymentStatus === "sinal_pago" && (
+                                <span className="badge-success rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                                  50% Pago
+                                </span>
+                              )}
+                              {lead.paymentStatus === "quitado" && (
+                                <span className="badge-success rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                                  Quitado
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+                            {partner ? (
+                              <span className="inline-flex items-center gap-1 truncate rounded-md bg-[var(--bg-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
+                                <Handshake
+                                  className="h-3 w-3 text-[var(--accent-text)] shrink-0"
+                                  aria-hidden="true"
+                                />
+                                <span className="truncate">
+                                  {partner.name} ({partner.commissionRate}%)
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="truncate rounded-md bg-[var(--bg-subtle)] px-2 py-1 text-[10px]">
+                                {lead.origin}
                               </span>
                             )}
-                            {lead.paymentStatus === "quitado" && (
-                              <span className="rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                                Quitado
+
+                            {lead.instagram && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+                                <Instagram
+                                  className="h-2.5 w-2.5 text-[var(--accent-text)]"
+                                  aria-hidden="true"
+                                />
+                                {lead.instagram}
+                              </span>
+                            )}
+
+                            {checklist.length > 0 && (
+                              <span className="badge-success inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono-num text-[10px] font-semibold">
+                                <ClipboardCheck className="h-3 w-3" aria-hidden="true" />
+                                {checklistDone}/{checklist.length} Pós-venda
                               </span>
                             )}
                           </div>
-                        </div>
+                        </button>
 
-                        {/* Origin / Partner / Instagram / Post-sale Checklist */}
-                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-                          {partner ? (
-                            <span className="inline-flex items-center gap-1 truncate rounded-lg bg-[var(--bg-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
-                              <Handshake className="h-3 w-3 text-[var(--accent)] shrink-0" />
-                              <span className="truncate">
-                                {partner.name} ({partner.commissionRate}%)
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="truncate rounded-lg bg-[var(--bg-subtle)] px-2 py-1 text-[10px]">
-                              {lead.origin}
-                            </span>
-                          )}
+                        {/* Touch & Keyboard Stage Mover + Quick Card Actions */}
+                        <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <label
+                              htmlFor={`move-stage-${lead.id}`}
+                              className="sr-only"
+                            >
+                              Mover etapa de {lead.companyName}
+                            </label>
+                            <select
+                              id={`move-stage-${lead.id}`}
+                              value={lead.stage}
+                              onChange={(e) =>
+                                onMoveStage(lead.id, e.target.value as StageId)
+                              }
+                              aria-label={`Mover etapa de ${lead.companyName}`}
+                              className="input-field min-h-[34px] w-full rounded-md px-2 py-1 text-[11px] font-medium"
+                            >
+                              {STAGES.map((st) => (
+                                <option key={st.id} value={st.id}>
+                                  Etapa: {st.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                          {lead.instagram && (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--bg-subtle)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
-                              <Instagram className="h-2.5 w-2.5 text-[var(--accent)]" />
-                              {lead.instagram}
-                            </span>
-                          )}
+                          <div className="flex items-center justify-between gap-2">
+                            <a
+                              href={`/proposta/${lead.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex min-h-[34px] items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-text)] transition-colors"
+                            >
+                              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                              Proposta
+                            </a>
 
-                          {checklist.length > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/12 px-2 py-1 font-mono-num text-[10px] font-semibold text-emerald-400">
-                              <ClipboardCheck className="h-3 w-3" />
-                              {checklistDone}/{checklist.length} Pós-venda
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Quick Card Actions */}
-                        <div
-                          className="mt-3 flex items-center justify-between border-t border-[var(--border-hairline)] pt-2.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <a
-                            href={`/proposta/${lead.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            Proposta
-                          </a>
-
-                          <button
-                            type="button"
-                            onClick={() => onQuickDispatch(lead)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/12 px-2 py-1 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
-                          >
-                            <MessageCircle className="h-3 w-3" />
-                            Disparar
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => onQuickDispatch(lead)}
+                              className="badge-success inline-flex min-h-[34px] items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:opacity-85 transition-opacity"
+                            >
+                              <MessageCircle className="h-3 w-3" aria-hidden="true" />
+                              Disparar
+                            </button>
+                          </div>
                         </div>
                       </article>
                     );
                   })
                 )}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>

@@ -66,6 +66,73 @@ export function formatCpf(value: string): string {
     .replace(/\.(\d{3})(\d)/, ".$1-$2");
 }
 
+export function formatPhoneBr(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  }
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+export function exportLeadsToCsv(leads: Lead[], partners: Partner[]): string {
+  const partnerMap = new Map(partners.map((p) => [p.id, p]));
+  const escape = (val: string | number | boolean | null | undefined) => {
+    const str = String(val ?? "").replaceAll('"', '""');
+    return `"${str}"`;
+  };
+
+  const headers = [
+    "ID",
+    "Empresa",
+    "Contato",
+    "Telefone",
+    "Email",
+    "Instagram",
+    "Vertical",
+    "Etapa",
+    "Valor Estimado (R$)",
+    "Faturamento Confirmado (R$)",
+    "Status Pagamento",
+    "Parceiro",
+    "Comissao 15% (R$)",
+    "Comissao Paga",
+    "Data Evento",
+    "Criado Em",
+  ];
+
+  const rows = leads.map((lead) => {
+    const partner = lead.partnerId ? partnerMap.get(lead.partnerId) : undefined;
+    const confirmed = getConfirmedRevenue(lead);
+    const commission = getPartnerCommission(lead, partners);
+    return [
+      lead.id,
+      lead.companyName,
+      lead.contactName,
+      lead.phone,
+      lead.email,
+      lead.instagram || "",
+      getFunnelLabel(lead.funnel),
+      getStageLabel(lead.stage),
+      lead.estimatedValue.toFixed(2).replace(".", ","),
+      confirmed.toFixed(2).replace(".", ","),
+      lead.paymentStatus,
+      partner ? partner.name : "",
+      commission.toFixed(2).replace(".", ","),
+      lead.commissionPaid ? "Sim" : "Nao",
+      lead.eventDate || "",
+      formatDateBr(lead.createdAt),
+    ]
+      .map(escape)
+      .join(";");
+  });
+
+  return `\uFEFF${[headers.map(escape).join(";"), ...rows].join("\n")}`;
+}
+
 export function normalizeName(name: string): string {
   return name
     .normalize("NFD")
@@ -343,7 +410,7 @@ export function buildPostSaleChecklist(
       },
       {
         id: generateId("chk"),
-        title: "Alerta de Recorrência — Novo Cardápio / Assinatura Mensal (+60 dias)",
+        title: "Alerta de Recorrência: Novo Cardápio / Assinatura Mensal (+60 dias)",
         dueDate: addDaysYmd(base, 60),
         completed: false,
         category: "recorrencia",

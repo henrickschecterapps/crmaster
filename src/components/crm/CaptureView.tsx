@@ -13,7 +13,6 @@ import {
   Phone,
   Plus,
   Search,
-  Sparkles,
   Star,
   Upload,
   UserPlus,
@@ -26,7 +25,12 @@ import {
   Partner,
   PlaceCandidate,
 } from "@/types/crm";
-import { cn, normalizeName, normalizePhone } from "@/lib/utils";
+import {
+  cn,
+  formatPhoneBr,
+  normalizeName,
+  normalizePhone,
+} from "@/lib/utils";
 import type { CreateLeadInput } from "@/lib/repository";
 
 interface CaptureViewProps {
@@ -86,7 +90,6 @@ export function CaptureView({
     setMFunnel(defaultFunnel);
   }, [defaultFunnel]);
 
-  // Google Places BH state
   const [placesQuery, setPlacesQuery] = useState("confecção Barro Preto");
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesMode, setPlacesMode] = useState<
@@ -100,7 +103,6 @@ export function CaptureView({
   const [sendingPlaceId, setSendingPlaceId] = useState<string | null>(null);
   const [enrichingPlaceId, setEnrichingPlaceId] = useState<string | null>(null);
 
-  // Manual form state
   const [mCompany, setMCompany] = useState("");
   const [mContact, setMContact] = useState("");
   const [mRole, setMRole] = useState("");
@@ -112,16 +114,15 @@ export function CaptureView({
   const [mOrigin, setMOrigin] = useState("Prospecção Direta");
   const [mPartnerId, setMPartnerId] = useState("");
   const [mNotes, setMNotes] = useState("");
+  const [manualError, setManualError] = useState("");
   const [submittingManual, setSubmittingManual] = useState(false);
 
-  // CSV importer state
   const [csvRows, setCsvRows] = useState<ParsedCsvRow[]>([]);
   const [csvFileName, setCsvFileName] = useState("");
   const [csvTargetFunnel, setCsvTargetFunnel] =
     useState<FunnelId>("corporativo");
   const [importingCsv, setImportingCsv] = useState(false);
 
-  // Anti-duplicity lookup sets
   const existingSignatures = useMemo(() => {
     const phones = new Set<string>();
     const names = new Set<string>();
@@ -169,7 +170,7 @@ export function CaptureView({
       }
       setPlaceFunnels(funnelDefaults);
     } catch {
-      onNotify("Falha de rede ao consultar Google Places BH.", "error");
+      onNotify("Falha de rede ao consultar empresas em BH.", "error");
     } finally {
       setPlacesLoading(false);
     }
@@ -247,14 +248,19 @@ export function CaptureView({
         website: candidate.website,
         funnel: chosenFunnel,
         estimatedValue: defaultVal,
-        origin: "Google Places BH",
-        notes: `Captado via Google Places BH (${candidate.category}). Endereço: ${candidate.address}.`,
+        origin:
+          placesMode === "google_live"
+            ? "Google Places BH"
+            : "OpenStreetMap BH",
+        notes: `Captado em BH (${candidate.category}). Endereço: ${candidate.address}.`,
       });
       if (res.duplicate) {
-        onNotify("Duplicidade detectada — empresa já existe no CRM.", "info");
+        onNotify("Duplicidade detectada: empresa já existe no CRM.", "info");
       } else {
         onNotify(`"${candidate.name}" enviado para o CRM (Captado).`, "success");
       }
+    } catch {
+      onNotify("Erro ao enviar empresa para o CRM.", "error");
     } finally {
       setSendingPlaceId(null);
     }
@@ -262,8 +268,18 @@ export function CaptureView({
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mCompany.trim() || !mPhone.trim()) {
-      onNotify("Preencha nome da empresa e WhatsApp/telefone.", "error");
+    setManualError("");
+
+    if (!mCompany.trim()) {
+      setManualError("Informe o nome da empresa ou cliente.");
+      return;
+    }
+    if (mPhone.replace(/\D/g, "").length < 10) {
+      setManualError("Informe um WhatsApp ou telefone válido com DDD.");
+      return;
+    }
+    if (mEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mEmail.trim())) {
+      setManualError("Informe um endereço de e-mail válido.");
       return;
     }
 
@@ -283,13 +299,12 @@ export function CaptureView({
         notes: mNotes.trim(),
       });
       if (res.duplicate) {
-        onNotify(
-          "Já existe um lead com este telefone ou nome de empresa no CRM.",
-          "error"
+        setManualError(
+          "Já existe um lead com este telefone ou nome de empresa no CRM."
         );
         return;
       }
-      onNotify(`Lead "${res.lead.companyName}" cadastrado com sucesso!`, "success");
+      onNotify(`Lead "${res.lead.companyName}" cadastrado com sucesso.`, "success");
       setMCompany("");
       setMContact("");
       setMRole("");
@@ -297,6 +312,8 @@ export function CaptureView({
       setMEmail("");
       setMNeighborhood("");
       setMNotes("");
+    } catch {
+      setManualError("Erro ao salvar lead. Verifique sua conexão e tente novamente.");
     } finally {
       setSubmittingManual(false);
     }
@@ -316,7 +333,10 @@ export function CaptureView({
         .filter(Boolean);
 
       if (lines.length < 2) {
-        onNotify("O CSV precisa ter cabeçalho e ao menos 1 linha de lead.", "error");
+        onNotify(
+          "O CSV precisa ter cabeçalho e ao menos 1 linha de lead.",
+          "error"
+        );
         return;
       }
 
@@ -328,9 +348,26 @@ export function CaptureView({
       const findIdx = (candidates: string[]) =>
         headers.findIndex((h) => candidates.some((c) => h.includes(c)));
 
-      const idxCompany = findIdx(["empresa", "company", "cliente", "loja", "nome"]);
-      const idxContact = findIdx(["contato", "decisor", "responsavel", "contact"]);
-      const idxPhone = findIdx(["telefone", "whatsapp", "celular", "phone", "fone"]);
+      const idxCompany = findIdx([
+        "empresa",
+        "company",
+        "cliente",
+        "loja",
+        "nome",
+      ]);
+      const idxContact = findIdx([
+        "contato",
+        "decisor",
+        "responsavel",
+        "contact",
+      ]);
+      const idxPhone = findIdx([
+        "telefone",
+        "whatsapp",
+        "celular",
+        "phone",
+        "fone",
+      ]);
       const idxEmail = findIdx(["email", "mail"]);
       const idxValue = findIdx(["valor", "ticket", "value", "estimado"]);
       const idxOrigin = findIdx(["origem", "origin", "canal"]);
@@ -385,7 +422,7 @@ export function CaptureView({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "modelo-leads-crmaster-bh.csv";
+    a.download = "modelo-leads-ultimo-quadro-bh.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -411,11 +448,13 @@ export function CaptureView({
         }))
       );
       onNotify(
-        `${res.imported.length} leads importados! (${res.skippedDuplicates} duplicados ignorados)`,
+        `${res.imported.length} leads importados (${res.skippedDuplicates} duplicados ignorados).`,
         "success"
       );
       setCsvRows([]);
       setCsvFileName("");
+    } catch {
+      onNotify("Erro ao importar leads do CSV.", "error");
     } finally {
       setImportingCsv(false);
     }
@@ -423,68 +462,77 @@ export function CaptureView({
 
   return (
     <div className="space-y-6">
-      {/* Header + Sub-tabs */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-            Máquina de Prospecção · Belo Horizonte
+          <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+            Máquina de Prospecção · Belo Horizonte &amp; Nova Lima
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
             Captação de Leads
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 glass-panel">
+        <div
+          className="flex flex-wrap items-center gap-1.5 rounded-xl p-1.5 surface-card"
+          role="tablist"
+          aria-label="Modos de captação de leads"
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={subTab === "places"}
             onClick={() => setSubTab("places")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer",
+              "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
               subTab === "places"
-                ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             )}
           >
-            <MapPin className="h-3.5 w-3.5" />
+            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
             Captar Leads (BH)
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={subTab === "manual"}
             onClick={() => setSubTab("manual")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer",
+              "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
               subTab === "manual"
-                ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             )}
           >
-            <UserPlus className="h-3.5 w-3.5" />
+            <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
             Cadastro Manual
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={subTab === "csv"}
             onClick={() => setSubTab("csv")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer",
+              "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
               subTab === "csv"
-                ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             )}
           >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
+            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />
             Importar CSV
           </button>
         </div>
       </div>
 
-      {/* TAB 1: GOOGLE PLACES BH */}
+      {/* TAB 1: PLACES / OSM BH */}
       {subTab === "places" && (
         <div className="space-y-5">
-          <div className="glass-panel rounded-3xl p-6 space-y-4">
+          <div className="surface-card rounded-xl p-6 space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  Busca Inteligente por Nicho + Bairro (Google Places BH)
+                  Busca por Nicho + Bairro (BH &amp; Nova Lima)
                 </h2>
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                   Extrai nome, telefone, endereço e site com filtro automático
@@ -493,13 +541,13 @@ export function CaptureView({
               </div>
               <span
                 className={cn(
-                  "inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[11px] font-semibold",
+                  "inline-flex items-center gap-1.5 self-start rounded-md px-3 py-1 text-[11px] font-semibold",
                   placesMode === "google_live" || placesMode === "osm_free"
-                    ? "bg-emerald-500/15 text-emerald-400"
-                    : "bg-[var(--accent-soft)] text-[var(--accent)]"
+                    ? "badge-success"
+                    : "badge-accent"
                 )}
               >
-                <Sparkles className="h-3 w-3" />
+                <MapPin className="h-3 w-3" aria-hidden="true" />
                 {placesMode === "google_live"
                   ? "Google Places API Ativa"
                   : placesMode === "osm_free"
@@ -516,21 +564,28 @@ export function CaptureView({
               className="flex flex-col gap-2.5 sm:flex-row"
             >
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <label htmlFor="capture-places-query" className="sr-only">
+                  Buscar nicho e bairro em Belo Horizonte
+                </label>
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden="true"
+                />
                 <input
+                  id="capture-places-query"
                   type="text"
                   value={placesQuery}
                   onChange={(e) => setPlacesQuery(e.target.value)}
-                  placeholder='Ex: "restaurante eventos Lourdes" ou "confecção Barro Preto"'
-                  className="input-field w-full rounded-2xl py-3 pl-10 pr-4 text-sm"
+                  placeholder='Ex: "restaurante gastronomia Lourdes" ou "confecção Barro Preto"'
+                  className="input-field min-h-[46px] w-full rounded-lg py-3 pl-10 pr-4 text-sm"
                 />
               </div>
               <button
                 type="submit"
                 disabled={placesLoading}
-                className="btn-accent inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold disabled:opacity-60 cursor-pointer"
+                className="btn-accent inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-bold disabled:opacity-60"
               >
-                <Search className="h-4 w-4" />
+                <Search className="h-4 w-4" aria-hidden="true" />
                 {placesLoading ? "Buscando em BH..." : "Buscar Leads BH"}
               </button>
             </form>
@@ -544,7 +599,7 @@ export function CaptureView({
                   key={preset}
                   type="button"
                   onClick={() => handlePlacesSearch(preset)}
-                  className="rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/70 px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                  className="min-h-[34px] rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:text-[var(--accent-text)] transition-colors"
                 >
                   {preset}
                 </button>
@@ -552,16 +607,18 @@ export function CaptureView({
             </div>
           </div>
 
-          {/* Results Grid */}
           {!hasSearched ? (
-            <div className="glass-panel rounded-3xl p-10 text-center">
-              <MapPin className="mx-auto h-8 w-8 text-[var(--accent)]" />
+            <div className="surface-card rounded-xl p-10 text-center">
+              <MapPin
+                className="mx-auto h-8 w-8 text-[var(--accent-text)]"
+                aria-hidden="true"
+              />
               <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
                 Pronto para prospectar empresas em Belo Horizonte
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)] max-w-md mx-auto">
                 Digite um nicho e bairro acima ou clique em uma das sugestões
-                rápidas para testar a extração com filtro anti-duplicidade.
+                rápidas para buscar empresas reais com filtro anti-duplicidade.
               </p>
             </div>
           ) : (
@@ -575,14 +632,14 @@ export function CaptureView({
                   <div
                     key={place.placeId}
                     className={cn(
-                      "glass-panel rounded-3xl p-5 flex flex-col justify-between gap-4",
+                      "surface-card rounded-xl p-5 flex flex-col justify-between gap-4",
                       duplicate && "opacity-75"
                     )}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <span className="text-[11px] font-semibold text-[var(--accent)]">
+                          <span className="text-[11px] font-semibold text-[var(--accent-text)]">
                             {place.category}
                           </span>
                           <h3 className="mt-0.5 text-base font-bold text-[var(--text-primary)]">
@@ -591,8 +648,11 @@ export function CaptureView({
                         </div>
 
                         {place.rating && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-subtle)] px-2.5 py-1 font-mono-num text-xs font-semibold text-[var(--text-primary)] shrink-0">
-                            <Star className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]" />
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2.5 py-1 font-mono-num text-xs font-semibold text-[var(--text-primary)] shrink-0">
+                            <Star
+                              className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]"
+                              aria-hidden="true"
+                            />
                             {place.rating.toFixed(1)}
                           </span>
                         )}
@@ -600,23 +660,32 @@ export function CaptureView({
 
                       <div className="mt-3 space-y-1.5 text-xs text-[var(--text-secondary)]">
                         <p className="flex items-center gap-2">
-                          <Phone className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                          <Phone
+                            className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0"
+                            aria-hidden="true"
+                          />
                           <span className="font-mono-num">
                             {place.phone || "Telefone não informado"}
                           </span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0 mt-0.5" />
+                          <MapPin
+                            className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0 mt-0.5"
+                            aria-hidden="true"
+                          />
                           <span>{place.address}</span>
                         </p>
                         {place.website && (
                           <p className="flex items-center gap-2">
-                            <Globe className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                            <Globe
+                              className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0"
+                              aria-hidden="true"
+                            />
                             <a
                               href={place.website}
                               target="_blank"
                               rel="noreferrer"
-                              className="truncate text-[var(--accent)] hover:underline"
+                              className="truncate text-[var(--accent-text)] hover:underline"
                             >
                               {place.website.replace(/^https?:\/\//, "")}
                             </a>
@@ -625,14 +694,14 @@ export function CaptureView({
                         {(place.enrichedEmail || place.enrichedInstagram) && (
                           <div className="mt-2 flex flex-wrap gap-1.5 pt-1">
                             {place.enrichedEmail && (
-                              <span className="inline-flex items-center gap-1 rounded-lg bg-sky-500/12 px-2 py-1 text-[11px] font-medium text-sky-400">
-                                <Mail className="h-3 w-3" />
+                              <span className="badge-info inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium">
+                                <Mail className="h-3 w-3" aria-hidden="true" />
                                 {place.enrichedEmail}
                               </span>
                             )}
                             {place.enrichedInstagram && (
-                              <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-medium text-[var(--accent)]">
-                                <Instagram className="h-3 w-3" />
+                              <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium">
+                                <Instagram className="h-3 w-3" aria-hidden="true" />
                                 {place.enrichedInstagram}
                               </span>
                             )}
@@ -646,13 +715,14 @@ export function CaptureView({
                         <select
                           value={selectedFunnel}
                           disabled={duplicate}
+                          aria-label={`Funil de destino para ${place.name}`}
                           onChange={(e) =>
                             setPlaceFunnels((prev) => ({
                               ...prev,
                               [place.placeId]: e.target.value as FunnelId,
                             }))
                           }
-                          className="input-field rounded-xl px-2.5 py-2 text-xs disabled:opacity-50"
+                          className="input-field min-h-[40px] rounded-lg px-2.5 py-2 text-xs disabled:opacity-50"
                         >
                           {FUNNELS.map((f) => (
                             <option key={f.id} value={f.id}>
@@ -666,9 +736,12 @@ export function CaptureView({
                             type="button"
                             onClick={() => handleEnrichPlace(place)}
                             disabled={enrichingPlaceId === place.placeId}
-                            className="btn-ghost inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                            className="btn-ghost inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold disabled:opacity-50"
                           >
-                            <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />
+                            <Globe
+                              className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                              aria-hidden="true"
+                            />
                             {enrichingPlaceId === place.placeId
                               ? "Buscando..."
                               : "Buscar E-mail/Instagram"}
@@ -677,8 +750,8 @@ export function CaptureView({
                       </div>
 
                       {duplicate ? (
-                        <span className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500/12 px-3.5 py-2 text-xs font-semibold text-emerald-400">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="badge-success inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold">
+                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                           Já no CRM
                         </span>
                       ) : (
@@ -686,9 +759,9 @@ export function CaptureView({
                           type="button"
                           onClick={() => handleSendPlaceToCrm(place)}
                           disabled={sendingPlaceId === place.placeId}
-                          className="btn-accent inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50 cursor-pointer"
+                          className="btn-accent inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                           {sendingPlaceId === place.placeId
                             ? "Enviando..."
                             : "Enviar para o CRM"}
@@ -707,7 +780,7 @@ export function CaptureView({
       {subTab === "manual" && (
         <form
           onSubmit={handleManualSubmit}
-          className="glass-panel rounded-3xl p-6 sm:p-8 max-w-4xl space-y-5"
+          className="surface-card rounded-xl p-6 sm:p-8 max-w-4xl space-y-5"
         >
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
@@ -721,65 +794,85 @@ export function CaptureView({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-company"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Empresa / Cliente *
               </label>
               <input
+                id="manual-company"
                 type="text"
                 required
                 value={mCompany}
                 onChange={(e) => setMCompany(e.target.value)}
                 placeholder="Ex: Construtora Minas Horizonte"
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-contact"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Nome do Decisor *
               </label>
               <input
+                id="manual-contact"
                 type="text"
                 required
                 value={mContact}
                 onChange={(e) => setMContact(e.target.value)}
                 placeholder="Ex: Juliana Mendes"
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-phone"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 WhatsApp / Telefone *
               </label>
               <input
-                type="text"
+                id="manual-phone"
+                type="tel"
                 required
                 value={mPhone}
-                onChange={(e) => setMPhone(e.target.value)}
+                onChange={(e) => setMPhone(formatPhoneBr(e.target.value))}
                 placeholder="(31) 99999-9999"
-                className="input-field w-full rounded-xl px-3.5 py-2.5 font-mono-num text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 font-mono-num text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-email"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 E-mail Comercial
               </label>
               <input
+                id="manual-email"
                 type="email"
                 value={mEmail}
                 onChange={(e) => setMEmail(e.target.value)}
                 placeholder="juliana@empresa.com.br"
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-funnel"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Funil de Destino
               </label>
               <select
+                id="manual-funnel"
                 value={mFunnel}
                 onChange={(e) => {
                   const next = e.target.value as FunnelId;
@@ -787,7 +880,7 @@ export function CaptureView({
                   const found = FUNNELS.find((f) => f.id === next);
                   if (found) setMValue(String(found.defaultValue));
                 }}
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               >
                 {FUNNELS.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -798,70 +891,90 @@ export function CaptureView({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-value"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Valor Estimado (R$)
               </label>
               <input
+                id="manual-value"
                 type="number"
                 min={0}
                 value={mValue}
                 onChange={(e) => setMValue(e.target.value)}
-                className="input-field w-full rounded-xl px-3.5 py-2.5 font-mono-num text-sm font-semibold"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 font-mono-num text-sm font-semibold"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-role"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Cargo / Função
               </label>
               <input
+                id="manual-role"
                 type="text"
                 value={mRole}
                 onChange={(e) => setMRole(e.target.value)}
                 placeholder="Ex: Gerente de RH"
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                Bairro (BH)
+              <label
+                htmlFor="manual-neighborhood"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
+                Bairro (BH / Nova Lima)
               </label>
               <input
+                id="manual-neighborhood"
                 type="text"
                 value={mNeighborhood}
                 onChange={(e) => setMNeighborhood(e.target.value)}
                 placeholder="Ex: Lourdes, Savassi, Barro Preto..."
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-origin"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Origem
               </label>
               <input
+                id="manual-origin"
                 type="text"
                 value={mOrigin}
                 onChange={(e) => setMOrigin(e.target.value)}
                 placeholder="Instagram, Indicação, LinkedIn..."
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="manual-partner"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Parceiro Indicador (15% Comissão)
               </label>
               <select
+                id="manual-partner"
                 value={mPartnerId}
                 onChange={(e) => setMPartnerId(e.target.value)}
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               >
                 <option value="">Venda direta (sem parceiro)</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — {p.company} ({p.commissionRate}%)
+                    {p.name} ({p.company} · {p.commissionRate}%)
                   </option>
                 ))}
               </select>
@@ -869,25 +982,38 @@ export function CaptureView({
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+            <label
+              htmlFor="manual-notes"
+              className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+            >
               Observações Iniciais
             </label>
             <textarea
+              id="manual-notes"
               rows={3}
               value={mNotes}
               onChange={(e) => setMNotes(e.target.value)}
               placeholder="Contexto da abordagem, data desejada, tipo de evento ou coleção..."
-              className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+              className="input-field w-full rounded-lg px-3.5 py-2.5 text-sm"
             />
           </div>
+
+          {manualError && (
+            <p
+              role="alert"
+              className="badge-danger rounded-lg px-3.5 py-2.5 text-xs font-medium"
+            >
+              {manualError}
+            </p>
+          )}
 
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={submittingManual}
-              className="btn-accent inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold disabled:opacity-60 cursor-pointer"
+              className="btn-accent inline-flex min-h-[44px] items-center gap-2 rounded-lg px-6 py-3 text-sm font-bold disabled:opacity-60"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
               {submittingManual ? "Salvando..." : "Cadastrar Lead no CRM"}
             </button>
           </div>
@@ -896,7 +1022,7 @@ export function CaptureView({
 
       {/* TAB 3: CSV BULK IMPORTER */}
       {subTab === "csv" && (
-        <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-6">
+        <div className="surface-card rounded-xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
@@ -910,24 +1036,28 @@ export function CaptureView({
             <button
               type="button"
               onClick={handleDownloadSampleCsv}
-              className="btn-ghost inline-flex items-center gap-1.5 self-start rounded-xl px-3.5 py-2 text-xs font-semibold cursor-pointer"
+              className="btn-ghost inline-flex min-h-[42px] items-center gap-1.5 self-start rounded-lg px-3.5 py-2 text-xs font-semibold"
             >
-              <Download className="h-3.5 w-3.5" />
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
               Baixar CSV Modelo
             </button>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-center">
             <div className="sm:col-span-4">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="csv-target-funnel"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Funil de Destino da Importação
               </label>
               <select
+                id="csv-target-funnel"
                 value={csvTargetFunnel}
                 onChange={(e) =>
                   setCsvTargetFunnel(e.target.value as FunnelId)
                 }
-                className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
               >
                 {FUNNELS.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -938,8 +1068,14 @@ export function CaptureView({
             </div>
 
             <div className="sm:col-span-8">
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--border-strong)] bg-[var(--bg-subtle)]/50 px-6 py-6 text-center hover:border-[var(--accent-border)] transition-colors">
-                <Upload className="h-6 w-6 text-[var(--accent)]" />
+              <label
+                htmlFor="csv-file-input"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--border-strong)] bg-[var(--bg-subtle)] px-6 py-6 text-center hover:border-[var(--accent-border)] transition-colors"
+              >
+                <Upload
+                  className="h-6 w-6 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
                 <span className="mt-2 text-xs font-semibold text-[var(--text-primary)]">
                   {csvFileName
                     ? `Arquivo carregado: ${csvFileName}`
@@ -950,10 +1086,11 @@ export function CaptureView({
                   origem
                 </span>
                 <input
+                  id="csv-file-input"
                   type="file"
                   accept=".csv,text/csv"
                   onChange={handleCsvUpload}
-                  className="hidden"
+                  className="sr-only"
                 />
               </label>
             </div>
@@ -961,7 +1098,7 @@ export function CaptureView({
 
           {csvRows.length > 0 && (
             <div className="space-y-4">
-              <div className="overflow-x-auto rounded-2xl border border-[var(--border-hairline)]">
+              <div className="overflow-x-auto rounded-xl border border-[var(--border-hairline)]">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[var(--bg-subtle)] text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                     <tr>
@@ -974,7 +1111,7 @@ export function CaptureView({
                   </thead>
                   <tbody className="divide-y divide-[var(--border-hairline)]">
                     {csvRows.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-[var(--bg-subtle)]/40">
+                      <tr key={idx} className="hover:bg-[var(--bg-subtle)]">
                         <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
                           {row.companyName}
                         </td>
@@ -989,12 +1126,12 @@ export function CaptureView({
                         </td>
                         <td className="px-4 py-3">
                           {row.isDuplicate ? (
-                            <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                            <span className="badge-warning rounded-md px-2.5 py-0.5 text-[10px] font-semibold">
                               Duplicado (ignorado)
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                              <Check className="h-3 w-3" />
+                            <span className="badge-success inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[10px] font-semibold">
+                              <Check className="h-3 w-3" aria-hidden="true" />
                               Pronto
                             </span>
                           )}
@@ -1005,7 +1142,7 @@ export function CaptureView({
                 </table>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-[var(--text-secondary)]">
                   {csvRows.filter((r) => !r.isDuplicate).length} leads prontos
                   para importação
@@ -1014,9 +1151,9 @@ export function CaptureView({
                   type="button"
                   onClick={handleImportCsv}
                   disabled={importingCsv}
-                  className="btn-accent inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold disabled:opacity-50 cursor-pointer"
+                  className="btn-accent inline-flex min-h-[42px] items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-bold disabled:opacity-50"
                 >
-                  <FileSpreadsheet className="h-4 w-4" />
+                  <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
                   {importingCsv ? "Importando..." : "Confirmar Importação"}
                 </button>
               </div>

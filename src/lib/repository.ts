@@ -12,7 +12,9 @@ import {
 import {
   BRAND_DEFAULTS,
   ContractDocumentRef,
+  CronExecutionLog,
   CrmStoreData,
+  FunnelId,
   InteractionType,
   Lead,
   LeadInteraction,
@@ -22,6 +24,7 @@ import {
   PostSaleChecklistItem,
   ScriptTemplate,
   StudioSettings,
+  WhatsappQueueJob,
 } from "@/types/crm";
 import {
   createInitialSeedData,
@@ -153,9 +156,7 @@ async function writeLocalStore(data: CrmStoreData): Promise<void> {
   }
 }
 
-// ============================================================================
-// FIREBASE FIRESTORE ADAPTER
-// ============================================================================
+// Firebase Firestore adapter
 
 async function seedFirestoreIfEmpty(): Promise<CrmStoreData | null> {
   const db = getFirestoreDb();
@@ -236,9 +237,7 @@ async function readFirestoreStore(): Promise<CrmStoreData | null> {
   });
 }
 
-// ============================================================================
-// SUPABASE ADAPTER (OPTIONAL ALTERNATIVE)
-// ============================================================================
+// Supabase adapter (optional alternative)
 
 function mapSupabaseLeadRow(
   row: Record<string, unknown>,
@@ -419,9 +418,7 @@ async function seedSupabaseIfEmpty(): Promise<void> {
   }
 }
 
-// ============================================================================
-// PUBLIC REPOSITORY API (Firebase -> Supabase -> Local JSON)
-// ============================================================================
+// Public repository API (Firebase -> Supabase -> local JSON)
 
 export async function getStoreData(): Promise<CrmStoreData> {
   if (isFirebaseConfigured()) {
@@ -897,6 +894,7 @@ export async function trackProposalView(leadId: string): Promise<Lead | null> {
 }
 
 export interface ProposalApprovalPayload {
+  funnel?: FunnelId;
   packageName: string;
   addons: string[];
   totalValue: number;
@@ -918,9 +916,11 @@ export async function approveProposal(
     lead.stage === "sinal_pago" || lead.stage === "fechado"
       ? lead.stage
       : "follow_up";
+  const nextFunnel = payload.funnel
+    ? normalizeFunnelId(payload.funnel)
+    : lead.funnel;
 
-  const isPortrait =
-    Boolean(payload.cpf) && !payload.cnpj;
+  const isPortrait = Boolean(payload.cpf) && !payload.cnpj;
   const slug = (lead.companyName || lead.id)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -931,8 +931,8 @@ export async function approveProposal(
   const contractDocument: ContractDocumentRef = {
     type: isPortrait ? "retratos" : "corporativo",
     fileName: isPortrait
-      ? `Termo-Uso-Imagem-${slug}.pdf`
-      : `Contrato-Servicos-${slug}.pdf`,
+      ? `Termo-Uso-Imagem-Ultimo-Quadro-${slug}.pdf`
+      : `Contrato-Ultimo-Quadro-${slug}.pdf`,
     generatedAt: now,
     url: `/api/proposals/${lead.id}/pdf`,
   };
@@ -947,6 +947,7 @@ export async function approveProposal(
   return updateLead(
     leadId,
     {
+      funnel: nextFunnel,
       cnpj: payload.cnpj || lead.cnpj,
       cpf: payload.cpf || lead.cpf,
       razaoSocial: payload.razaoSocial,
@@ -963,7 +964,7 @@ export async function approveProposal(
     {
       type: "proposta_aprovada",
       title: "Proposta aprovada + Contrato PDF & Pix gerados",
-      description: `Pacote ${payload.packageName}${addonsLabel} — Total R$ ${payload.totalValue.toLocaleString("pt-BR")} | Data: ${payload.eventDate} | ${docSummary}.`,
+      description: `Pacote ${payload.packageName}${addonsLabel} | Total R$ ${payload.totalValue.toLocaleString("pt-BR")} | Data: ${payload.eventDate} | ${docSummary}.`,
     },
     true
   );
@@ -1203,4 +1204,209 @@ export async function resetDemoData(): Promise<CrmStoreData> {
 
   await writeLocalStore(seeded);
   return seeded;
+}
+
+export async function updatePartner(
+  partnerId: string,
+  patch: Partial<Omit<Partner, "id" | "createdAt">>
+): Promise<Partner | null> {
+  const store = await getStoreData();
+  const idx = store.partners.findIndex((p) => p.id === partnerId);
+  if (idx === -1) return null;
+
+  const updated: Partner = {
+    ...store.partners[idx],
+    ...patch,
+    id: partnerId,
+    commissionRate:
+      patch.commissionRate !== undefined
+        ? Number(patch.commissionRate) || 15
+        : store.partners[idx].commissionRate,
+  };
+
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.partners, partnerId),
+          stripUndefined(updated)
+        );
+        return updated;
+      }
+    } catch {
+      // Fall through to local store
+    }
+  }
+
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseClient()!;
+    const { error } = await supabase
+      .from("partners")
+      .update({
+        name: updated.name,
+        role: updated.role,
+        company: updated.company,
+        phone: updated.phone,
+        commission_rate: updated.commissionRate,
+      })
+      .eq("id", partnerId);
+    if (!error) return updated;
+  }
+
+  store.partners[idx] = updated;
+  await writeLocalStore(store);
+  return updated;
+}
+
+export async function deletePartner(partnerId: string): Promise<boolean> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await deleteDoc(doc(db, FIRESTORE_COLLECTIONS.partners, partnerId));
+        return true;
+      }
+    } catch {
+      // Fall through to local store
+    }
+  }
+
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseClient()!;
+    const { error } = await supabase
+      .from("partners")
+      .delete()
+      .eq("id", partnerId);
+    if (!error) return true;
+  }
+
+  const store = await getStoreData();
+  const before = store.partners.length;
+  store.partners = store.partners.filter((p) => p.id !== partnerId);
+  if (store.partners.length === before) return false;
+  await writeLocalStore(store);
+  return true;
+}
+
+const QUEUE_FILE = path.join(DATA_DIR, "whatsapp-queue.json");
+const CRON_LOGS_FILE = path.join(DATA_DIR, "cron-logs.json");
+let memoryQueueFallback: WhatsappQueueJob[] = [];
+let memoryCronFallback: CronExecutionLog[] = [];
+
+export async function getPersistedWhatsappQueue(): Promise<WhatsappQueueJob[]> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        const snap = await getDocs(
+          collection(db, FIRESTORE_COLLECTIONS.whatsappQueue)
+        );
+        return snap.docs
+          .map((d) => d.data() as WhatsappQueueJob)
+          .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+          .slice(0, 50);
+      }
+    } catch {
+      // Fall through to local queue
+    }
+  }
+
+  try {
+    const raw = await fs.readFile(QUEUE_FILE, "utf-8");
+    memoryQueueFallback = JSON.parse(raw) as WhatsappQueueJob[];
+    return memoryQueueFallback;
+  } catch {
+    return memoryQueueFallback;
+  }
+}
+
+export async function saveWhatsappQueueJob(
+  job: WhatsappQueueJob
+): Promise<void> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.whatsappQueue, job.id),
+          stripUndefined(job)
+        );
+        return;
+      }
+    } catch {
+      // Fall through to local file
+    }
+  }
+
+  const existing = await getPersistedWhatsappQueue();
+  const idx = existing.findIndex((item) => item.id === job.id);
+  const next =
+    idx >= 0
+      ? existing.map((item) => (item.id === job.id ? job : item))
+      : [job, ...existing].slice(0, 50);
+
+  memoryQueueFallback = next;
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(QUEUE_FILE, JSON.stringify(next, null, 2), "utf-8");
+  } catch {
+    // Ignore read-only filesystem
+  }
+}
+
+export async function getCronLogs(
+  limitCount: number = 10
+): Promise<CronExecutionLog[]> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        const snap = await getDocs(
+          collection(db, FIRESTORE_COLLECTIONS.cronLogs)
+        );
+        return snap.docs
+          .map((d) => d.data() as CronExecutionLog)
+          .sort((a, b) => (b.executedAt || "").localeCompare(a.executedAt || ""))
+          .slice(0, limitCount);
+      }
+    } catch {
+      // Fall through to local logs
+    }
+  }
+
+  try {
+    const raw = await fs.readFile(CRON_LOGS_FILE, "utf-8");
+    memoryCronFallback = JSON.parse(raw) as CronExecutionLog[];
+    return memoryCronFallback.slice(0, limitCount);
+  } catch {
+    return memoryCronFallback.slice(0, limitCount);
+  }
+}
+
+export async function saveCronLog(log: CronExecutionLog): Promise<void> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        await setDoc(
+          doc(db, FIRESTORE_COLLECTIONS.cronLogs, log.id),
+          stripUndefined(log)
+        );
+        return;
+      }
+    } catch {
+      // Fall through to local file
+    }
+  }
+
+  const existing = await getCronLogs(20);
+  const next = [log, ...existing].slice(0, 20);
+  memoryCronFallback = next;
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(CRON_LOGS_FILE, JSON.stringify(next, null, 2), "utf-8");
+  } catch {
+    // Ignore read-only filesystem
+  }
 }

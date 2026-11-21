@@ -4,13 +4,11 @@ import { formatCurrencyExact, formatDateBr } from "@/lib/utils";
 
 function toWinAnsiSafe(text: string): string {
   return text
-    .replaceAll("—", "-")
-    .replaceAll("–", "-")
-    .replaceAll("•", "-")
-    .replaceAll("°", "o")
-    .replaceAll("“", '"')
-    .replaceAll("”", '"')
-    .replaceAll("’", "'")
+    .replace(/\u2014|\u2013/g, "-")
+    .replace(/\u2022/g, "-")
+    .replace(/\u00b0/g, "o")
+    .replace(/\u201c|\u201d/g, '"')
+    .replace(/\u2019/g, "'")
     .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
 }
 

@@ -263,7 +263,7 @@ async function searchOpenStreetMapBH(
         const num = t["addr:housenumber"] ? `, ${t["addr:housenumber"]}` : "";
         const suburb = t["addr:suburb"] || center.label;
         const address = street
-          ? `${street}${num} — ${suburb}, Belo Horizonte - MG`
+          ? `${street}${num}, ${suburb}, Belo Horizonte - MG`
           : `${suburb}, Belo Horizonte - MG`;
 
         const categoryRaw =
@@ -345,7 +345,7 @@ async function searchOpenStreetMapBH(
           const road = addr.road || "";
           const house = addr.house_number ? `, ${addr.house_number}` : "";
           const formattedAddr = road
-            ? `${road}${house} — ${suburb}, Belo Horizonte - MG`
+            ? `${road}${house}, ${suburb}, Belo Horizonte - MG`
             : item.display_name?.split(",").slice(0, 3).join(",") ||
               `${suburb}, Belo Horizonte - MG`;
 
@@ -467,7 +467,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Real Belo Horizonte data via OpenStreetMap (Overpass + Nominatim — 100% Free, no billing required)
+    // 2. Real Belo Horizonte data via OpenStreetMap (Overpass + Nominatim, 100% free)
     const osmResults = await searchOpenStreetMapBH(
       combinedQuery,
       rawNeighborhood

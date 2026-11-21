@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { getStoreData, updateLead } from "@/lib/repository";
-import { interpolateTemplate } from "@/lib/utils";
+import {
+  getCronLogs,
+  getStoreData,
+  saveCronLog,
+  updateLead,
+} from "@/lib/repository";
+import { generateId, interpolateTemplate } from "@/lib/utils";
 import {
   enqueueWhatsappBatch,
+  processDueWhatsappQueue,
   resolveWhatsappConfig,
 } from "@/lib/whatsappQueue";
+import { CronExecutionAction, CronExecutionLog } from "@/types/crm";
 
 export const dynamic = "force-dynamic";
 
-interface FollowupActionResult {
-  leadId: string;
-  companyName: string;
-  contactName: string;
-  step: "dia_2" | "dia_5";
-  hoursSinceInteraction: number;
-  emailStatus: "enviado" | "simulado" | "sem_email" | "erro";
-  whatsappStatus: "enfileirado" | "modo_seguro_sem_api";
-  tagAdded?: string;
-}
-
-async function runFollowupCadence(dryRun: boolean = false) {
+async function runFollowupCadence(dryRun: boolean = false): Promise<CronExecutionLog> {
   const store = await getStoreData();
   const nowMs = Date.now();
   const baseUrl = (
@@ -36,9 +32,18 @@ async function runFollowupCadence(dryRun: boolean = false) {
 
   const resendKey = process.env.RESEND_API_KEY;
   const fromEmail =
-    process.env.RESEND_FROM_EMAIL ||
-    "ÚLTIMO QUADRO <onboarding@resend.dev>";
+    process.env.RESEND_FROM_EMAIL || "ÚLTIMO QUADRO <onboarding@resend.dev>";
   const waConfig = resolveWhatsappConfig(store.settings);
+
+  // Process any pending persisted WhatsApp queue items that are already due
+  let queueProcessed = 0;
+  if (!dryRun) {
+    const dueRes = await processDueWhatsappQueue({
+      config: waConfig,
+      forceAll: false,
+    });
+    queueProcessed = dueRes.processed.length;
+  }
 
   const eligibleLeads = store.leads.filter(
     (lead) =>
@@ -47,7 +52,7 @@ async function runFollowupCadence(dryRun: boolean = false) {
       !lead.respondeu
   );
 
-  const actions: FollowupActionResult[] = [];
+  const actions: CronExecutionAction[] = [];
   const whatsappJobsInput: Array<{
     leadId: string;
     companyName: string;
@@ -78,7 +83,7 @@ async function runFollowupCadence(dryRun: boolean = false) {
     };
 
     const subject = interpolateTemplate(
-      template?.subject || `Follow-up — ${lead.companyName}`,
+      template?.subject || `Follow-up: ${lead.companyName}`,
       vars
     );
     const bodyText = interpolateTemplate(
@@ -87,7 +92,7 @@ async function runFollowupCadence(dryRun: boolean = false) {
       vars
     );
 
-    let emailStatus: FollowupActionResult["emailStatus"] = "sem_email";
+    let emailStatus = "sem_email";
 
     if (lead.email) {
       if (dryRun || !resendKey) {
@@ -108,8 +113,7 @@ async function runFollowupCadence(dryRun: boolean = false) {
       }
     }
 
-    let whatsappStatus: FollowupActionResult["whatsappStatus"] =
-      "modo_seguro_sem_api";
+    let whatsappStatus = "modo_seguro_sem_api";
     if (waConfig && lead.phone) {
       whatsappStatus = "enfileirado";
       if (!dryRun) {
@@ -140,11 +144,11 @@ async function runFollowupCadence(dryRun: boolean = false) {
           type: "followup_auto",
           title:
             targetStep === "dia_5"
-              ? "Follow-up Automático — Dia 5 (Último Toque)"
-              : "Follow-up Automático — Dia 2",
+              ? "Follow-up Automático: Dia 5 (Último Toque)"
+              : "Follow-up Automático: Dia 2",
           description: `Cadência executada (${Math.floor(hoursSince)}h sem resposta). E-mail: ${emailStatus} | WhatsApp: ${whatsappStatus}${tagAdded ? ` | Tag adicionada: ${tagAdded}` : ""}.`,
         },
-        false // Preserva a contagem real de dias sem resposta do cliente até ele responder
+        false
       );
     }
 
@@ -162,48 +166,40 @@ async function runFollowupCadence(dryRun: boolean = false) {
 
   const queuedJobs =
     !dryRun && whatsappJobsInput.length > 0
-      ? enqueueWhatsappBatch({
+      ? await enqueueWhatsappBatch({
           items: whatsappJobsInput,
           config: waConfig,
-          onJobCompleted: async (job) => {
-            await updateLead(
-              job.leadId,
-              {},
-              {
-                type: "whatsapp",
-                title:
-                  job.status === "enviado"
-                    ? "Follow-up WhatsApp entregue (Fila Anti-Ban)"
-                    : `Follow-up WhatsApp (${job.status})`,
-                description: job.error
-                  ? `Erro no envio automático: ${job.error}`
-                  : `Mensagem disparada com intervalo seguro (${job.delaySeconds}s).`,
-              },
-              false
-            );
-          },
         })
       : [];
 
-  return {
+  const logEntry: CronExecutionLog = {
+    id: generateId("cron"),
     executedAt: new Date().toISOString(),
     dryRun,
     scannedEligible: eligibleLeads.length,
     triggeredCount: actions.length,
     whatsappQueueScheduled: queuedJobs.length,
+    queueProcessed,
     actions,
   };
+
+  if (!dryRun) {
+    await saveCronLog(logEntry);
+  }
+
+  return logEntry;
 }
 
 export async function GET(req: NextRequest) {
+  if (req.nextUrl.searchParams.get("history") === "1") {
+    const history = await getCronLogs(10);
+    return NextResponse.json({ history });
+  }
+
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
 
-  if (
-    cronSecret &&
-    authHeader &&
-    authHeader !== `Bearer ${cronSecret}`
-  ) {
+  if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
@@ -215,7 +211,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as { dryRun?: boolean };
     const result = await runFollowupCadence(Boolean(body.dryRun));
-    return NextResponse.json(result);
+    const history = await getCronLogs(10);
+    return NextResponse.json({ ...result, history });
   } catch {
     return NextResponse.json(
       { error: "Erro ao executar régua de follow-up." },

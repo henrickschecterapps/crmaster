@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Award,
   Calendar,
   Camera,
   Check,
@@ -16,8 +17,8 @@ import {
   Moon,
   QrCode,
   ShieldCheck,
-  Sparkles,
   Sun,
+  Tag,
   X,
 } from "lucide-react";
 import {
@@ -122,14 +123,12 @@ export function ProposalClient({
   );
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
 
-  // Reset selected package & addons whenever vertical or Social Moda toggle changes
   useEffect(() => {
     const featured = activePackages.find((p) => p.featured) ?? activePackages[0];
     setSelectedPackageId(featured.id);
     setSelectedAddonIds([]);
   }, [activePackages]);
 
-  // Approval modal state (supports both PJ CNPJ and PF CPF)
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [docMode, setDocMode] = useState<"cnpj" | "cpf">(
     lead.cpf && !lead.cnpj ? "cpf" : "cnpj"
@@ -146,7 +145,15 @@ export function ProposalClient({
     useState<ApprovedConfirmationData | null>(null);
   const [copiedPix, setCopiedPix] = useState(false);
 
-  // Automatic open tracking + Real-time Radar alert (10-min debounce on server)
+  useEffect(() => {
+    if (!showApprovalModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowApprovalModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showApprovalModal]);
+
   useEffect(() => {
     if (trackedRef.current) return;
     trackedRef.current = true;
@@ -234,6 +241,7 @@ export function ProposalClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          funnel: selectedVerticalId,
           packageName: selectedPackage.name,
           addons: addonNames,
           totalValue,
@@ -306,26 +314,35 @@ export function ProposalClient({
 
   return (
     <div className="min-h-[100dvh] pb-20">
-      {/* Official ÚLTIMO QUADRO Cinema Header */}
-      <header className="sticky top-0 z-30 border-b border-[var(--border-hairline)] bg-[var(--bg-canvas)]/85 backdrop-blur-xl">
+      <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <BrandMark showTagline />
 
           <div className="flex items-center gap-2.5">
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 font-mono-num text-[11px] font-semibold text-[var(--accent)]">
-              <Camera className="h-3 w-3" />
+            <span className="badge-accent hidden sm:inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono-num text-[11px] font-semibold">
+              <Camera className="h-3 w-3" aria-hidden="true" />
               24FPS · PROPOSTA INTERATIVA
             </span>
             <button
               type="button"
               onClick={toggleTheme}
-              className="btn-ghost flex h-9 w-9 items-center justify-center rounded-xl cursor-pointer"
-              aria-label="Alternar tema"
+              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+              aria-label={
+                theme === "dark"
+                  ? "Mudar para modo claro"
+                  : "Mudar para modo escuro"
+              }
             >
               {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-[var(--accent)]" />
+                <Sun
+                  className="h-4 w-4 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
               ) : (
-                <Moon className="h-4 w-4 text-[var(--text-primary)]" />
+                <Moon
+                  className="h-4 w-4 text-[var(--text-primary)]"
+                  aria-hidden="true"
+                />
               )}
             </button>
           </div>
@@ -333,12 +350,11 @@ export function ProposalClient({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 lg:px-8 space-y-12">
-        {/* Confirmation Screen with Static Pix BR Code + Contract PDF Download */}
         {approvedInfo ? (
           <section className="space-y-6">
-            <div className="glass-panel rounded-3xl border border-emerald-500/40 p-6 sm:p-8 space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-400">
-                <CheckCircle2 className="h-4 w-4" />
+            <div className="surface-card rounded-xl border border-[var(--status-success-border)] p-6 sm:p-8 space-y-3">
+              <div className="badge-success inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wider">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 Proposta Aprovada &amp; Pré-Reserva Confirmada
               </div>
               <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-4xl">
@@ -360,16 +376,15 @@ export function ProposalClient({
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-              {/* Left: Pix QR Code & Copy-Paste (7 cols) */}
-              <div className="glass-panel rounded-3xl p-6 sm:p-8 lg:col-span-7 space-y-6">
+              <div className="surface-card rounded-xl p-6 sm:p-8 lg:col-span-7 space-y-6">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
-                      <QrCode className="h-5 w-5" />
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                      <QrCode className="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div>
                       <h2 className="text-base font-bold text-[var(--text-primary)]">
-                        Pix Copia e Cola — Sinal de 50%
+                        Pix Copia e Cola (Sinal de 50%)
                       </h2>
                       <p className="text-xs text-[var(--text-muted)]">
                         Padrão BR Code / EMV · {approvedInfo.pix.recipientName} ·{" "}
@@ -377,18 +392,20 @@ export function ProposalClient({
                       </p>
                     </div>
                   </div>
-                  <span className="font-mono-num text-xl font-extrabold text-emerald-400">
+                  <span className="font-mono-num text-xl font-extrabold text-[var(--status-success)]">
                     {formatCurrencyExact(approvedInfo.pix.depositAmount)}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-12 sm:items-center">
                   <div className="sm:col-span-5 flex justify-center">
-                    <div className="rounded-3xl bg-white p-3.5 shadow-xl border border-zinc-200">
+                    <div className="rounded-xl bg-white p-3.5 shadow-lg border border-zinc-200">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={approvedInfo.pix.qrDataUrl}
                         alt="QR Code Pix para pagamento do sinal de 50%"
+                        width={192}
+                        height={192}
                         className="h-48 w-48 object-contain"
                       />
                     </div>
@@ -399,7 +416,7 @@ export function ProposalClient({
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
                         Código Pix Copia e Cola
                       </p>
-                      <div className="rounded-2xl bg-[var(--bg-subtle)] border border-[var(--border-hairline)] p-3 font-mono-num text-[11px] leading-relaxed text-[var(--text-secondary)] break-all max-h-28 overflow-y-auto select-all">
+                      <div className="rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-hairline)] p-3 font-mono-num text-[11px] leading-relaxed text-[var(--text-secondary)] break-all max-h-28 overflow-y-auto select-all">
                         {approvedInfo.pix.copyPaste}
                       </div>
                     </div>
@@ -408,16 +425,16 @@ export function ProposalClient({
                       <button
                         type="button"
                         onClick={handleCopyPix}
-                        className="btn-accent flex-1 inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs font-extrabold cursor-pointer"
+                        className="btn-accent flex-1 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-xs font-extrabold"
                       >
                         {copiedPix ? (
                           <>
-                            <Check className="h-4 w-4" />
-                            Código Pix Copiado!
+                            <Check className="h-4 w-4" aria-hidden="true" />
+                            Código Pix Copiado
                           </>
                         ) : (
                           <>
-                            <Copy className="h-4 w-4" />
+                            <Copy className="h-4 w-4" aria-hidden="true" />
                             Copiar Código Pix
                           </>
                         )}
@@ -427,9 +444,9 @@ export function ProposalClient({
                         href={approvedInfo.whatsappUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-extrabold text-zinc-950 hover:bg-emerald-400 transition-colors"
+                        className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-xs font-extrabold text-white hover:bg-emerald-500 transition-colors"
                       >
-                        <MessageCircle className="h-4 w-4" />
+                        <MessageCircle className="h-4 w-4" aria-hidden="true" />
                         Enviar Comprovante no WhatsApp
                       </a>
                     </div>
@@ -437,10 +454,9 @@ export function ProposalClient({
                 </div>
               </div>
 
-              {/* Right: Summary & Instant PDF Download (5 cols) */}
-              <div className="glass-panel rounded-3xl p-6 space-y-5 lg:col-span-5">
+              <div className="surface-card rounded-xl p-6 space-y-5 lg:col-span-5">
                 <div>
-                  <p className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                  <p className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
                     Resumo &amp; Documentação
                   </p>
                   <h3 className="mt-1 text-base font-bold text-[var(--text-primary)]">
@@ -485,15 +501,18 @@ export function ProposalClient({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[var(--text-muted)]">Sinal (50%)</span>
-                    <span className="font-mono-num font-bold text-emerald-400">
+                    <span className="font-mono-num font-bold text-[var(--status-success)]">
                       {formatCurrencyExact(approvedInfo.deposit)}
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-soft)]/50 p-4 space-y-3">
+                <div className="rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4 space-y-3">
                   <div className="flex items-start gap-3">
-                    <FileText className="h-5 w-5 text-[var(--accent)] shrink-0 mt-0.5" />
+                    <FileText
+                      className="h-5 w-5 text-[var(--accent-text)] shrink-0 mt-0.5"
+                      aria-hidden="true"
+                    />
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-[var(--text-primary)]">
                         {approvedInfo.isPortrait
@@ -508,9 +527,9 @@ export function ProposalClient({
                   <a
                     href={approvedInfo.pdfUrl}
                     download={approvedInfo.pdfFileName}
-                    className="btn-accent w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-extrabold"
+                    className="btn-accent w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-extrabold"
                   >
-                    <Download className="h-4 w-4" />
+                    <Download className="h-4 w-4" aria-hidden="true" />
                     Baixar Documento em PDF
                   </a>
                 </div>
@@ -519,11 +538,10 @@ export function ProposalClient({
           </section>
         ) : (
           <>
-            {/* Asymmetric Editorial Hero */}
+            {/* Editorial Hero */}
             <section className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-end">
               <div className="lg:col-span-8 space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3.5 py-1.5 font-mono-num text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+                <div className="inline-flex items-center gap-2 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3.5 py-1.5 font-mono-num text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                   {currentVertical.kicker}
                 </div>
                 <h1 className="text-3xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-5xl leading-[1.08]">
@@ -535,7 +553,7 @@ export function ProposalClient({
               </div>
 
               <div className="lg:col-span-4">
-                <div className="glass-panel rounded-3xl p-5 space-y-2.5 text-xs">
+                <div className="surface-card rounded-xl p-5 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Cliente</span>
                     <span className="font-semibold text-[var(--text-primary)] truncate">
@@ -551,12 +569,12 @@ export function ProposalClient({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Atuação</span>
                     <span className="font-medium text-[var(--text-secondary)]">
-                      BH &amp; Nova Lima — MG
+                      BH &amp; Nova Lima (MG)
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2.5">
                     <span className="text-[var(--text-muted)]">Condição</span>
-                    <span className="font-semibold text-[var(--accent)]">
+                    <span className="font-semibold text-[var(--accent-text)]">
                       50% reserva · 50% entrega
                     </span>
                   </div>
@@ -564,27 +582,33 @@ export function ProposalClient({
               </div>
             </section>
 
-            {/* Vertical Selector + 4 Vertical Pillars */}
+            {/* Vertical Selector + Pillars */}
             <section className="space-y-4">
-              <div className="flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 glass-panel">
+              <div
+                className="flex flex-wrap items-center gap-1.5 rounded-xl p-1.5 surface-card"
+                role="tablist"
+                aria-label="Frentes de produção audiovisual"
+              >
                 {SERVICES_CATALOG.map((svc) => {
                   const active = svc.id === selectedVerticalId;
                   return (
                     <button
                       key={svc.id}
                       type="button"
+                      role="tab"
+                      aria-selected={active}
                       onClick={() => {
                         setSelectedVerticalId(svc.id);
                         setUseSocialModa(false);
                       }}
                       className={cn(
-                        "rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer",
+                        "min-h-[40px] rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
                         active
-                          ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                          ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                           : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
                     >
-                      <span className="font-mono-num mr-1.5 opacity-75">
+                      <span className="font-mono-num mr-1.5 opacity-80">
                         {svc.index}
                       </span>
                       {svc.shortLabel}
@@ -597,9 +621,9 @@ export function ProposalClient({
                 {currentVertical.pillars.map((p) => (
                   <div
                     key={p.num}
-                    className="glass-panel rounded-2xl px-4 py-3.5"
+                    className="surface-card rounded-xl px-4 py-3.5"
                   >
-                    <p className="font-mono-num text-[11px] font-bold text-[var(--accent)]">
+                    <p className="font-mono-num text-[11px] font-bold text-[var(--accent-text)]">
                       {p.num}
                     </p>
                     <p className="mt-1 text-xs font-bold text-[var(--text-primary)]">
@@ -613,11 +637,10 @@ export function ProposalClient({
             {/* Interactive Packages + Addons + Sticky Dynamic Summary */}
             <section className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
               <div className="lg:col-span-8 space-y-8">
-                {/* Packages */}
                 <div className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                      <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+                      <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)]">
                         Passo 01 · {currentVertical.title}
                       </p>
                       <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
@@ -629,14 +652,15 @@ export function ProposalClient({
                       <button
                         type="button"
                         onClick={() => setUseSocialModa((prev) => !prev)}
+                        aria-pressed={useSocialModa}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all cursor-pointer self-start",
+                          "inline-flex min-h-[42px] items-center gap-1.5 rounded-lg border px-3.5 py-2 text-xs font-bold transition-colors self-start",
                           useSocialModa
-                            ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                            ? "badge-accent"
                             : "btn-ghost text-[var(--text-secondary)]"
                         )}
                       >
-                        <Sparkles className="h-3.5 w-3.5" />
+                        <Tag className="h-3.5 w-3.5" aria-hidden="true" />
                         {useSocialModa
                           ? "Projeto Impulso Moda BH Ativo (65% OFF)"
                           : "Ver Cota Social Moda BH (65% OFF)"}
@@ -652,11 +676,12 @@ export function ProposalClient({
                           key={pkg.id}
                           type="button"
                           onClick={() => setSelectedPackageId(pkg.id)}
+                          aria-pressed={isSelected}
                           className={cn(
-                            "relative flex flex-col justify-between rounded-3xl p-6 text-left transition-all cursor-pointer border",
+                            "relative flex flex-col justify-between rounded-xl p-6 text-left transition-colors border",
                             isSelected
-                              ? "bg-[var(--accent-soft)]/70 border-[var(--accent)] shadow-lg"
-                              : "glass-panel hover:border-[var(--border-strong)]"
+                              ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
+                              : "surface-card hover:border-[var(--border-strong)]"
                           )}
                         >
                           <div>
@@ -665,8 +690,8 @@ export function ProposalClient({
                                 {pkg.tier}
                               </span>
                               {pkg.badge && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent-fg)]">
-                                  <Sparkles className="h-3 w-3" />
+                                <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-btn)] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent-fg)]">
+                                  <Award className="h-3 w-3" aria-hidden="true" />
                                   {pkg.badge}
                                 </span>
                               )}
@@ -700,13 +725,14 @@ export function ProposalClient({
                                     className={cn(
                                       "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
                                       isSelected
-                                        ? "bg-[var(--accent)] text-[var(--accent-fg)]"
-                                        : "bg-[var(--bg-subtle)] text-[var(--accent)]"
+                                        ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
+                                        : "bg-[var(--bg-subtle)] text-[var(--accent-text)]"
                                     )}
                                   >
                                     <Check
                                       className="h-2.5 w-2.5"
                                       strokeWidth={3}
+                                      aria-hidden="true"
                                     />
                                   </span>
                                   <span>{feat}</span>
@@ -719,7 +745,7 @@ export function ProposalClient({
                             <span
                               className={
                                 isSelected
-                                  ? "text-[var(--accent)]"
+                                  ? "text-[var(--accent-text)]"
                                   : "text-[var(--text-muted)]"
                               }
                             >
@@ -731,12 +757,16 @@ export function ProposalClient({
                               className={cn(
                                 "h-5 w-5 rounded-full border-2 flex items-center justify-center",
                                 isSelected
-                                  ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
+                                  ? "border-[var(--accent-btn)] bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                                   : "border-[var(--border-strong)]"
                               )}
                             >
                               {isSelected && (
-                                <Check className="h-3 w-3" strokeWidth={3} />
+                                <Check
+                                  className="h-3 w-3"
+                                  strokeWidth={3}
+                                  aria-hidden="true"
+                                />
                               )}
                             </span>
                           </div>
@@ -749,7 +779,7 @@ export function ProposalClient({
                 {/* Add-ons */}
                 <div className="space-y-4">
                   <div>
-                    <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+                    <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)]">
                       Passo 02 · Adicionais da Vertical (Opcional)
                     </p>
                     <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
@@ -764,24 +794,24 @@ export function ProposalClient({
                         <label
                           key={addon.id}
                           className={cn(
-                            "flex cursor-pointer items-start gap-3.5 rounded-3xl border p-5 transition-all",
+                            "flex cursor-pointer items-start gap-3.5 rounded-xl border p-5 transition-colors",
                             checked
-                              ? "border-[var(--accent)] bg-[var(--accent-soft)]/55"
-                              : "glass-panel hover:border-[var(--border-strong)]"
+                              ? "border-[var(--accent-border)] bg-[var(--accent-soft)]"
+                              : "surface-card hover:border-[var(--border-strong)]"
                           )}
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleAddon(addon.id)}
-                            className="mt-1 h-4 w-4 rounded accent-[var(--accent)] cursor-pointer"
+                            className="mt-1 h-4 w-4 rounded accent-[var(--accent)]"
                           />
                           <div className="flex-1">
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-sm font-bold text-[var(--text-primary)]">
                                 {addon.name}
                               </span>
-                              <span className="font-mono-num text-xs font-bold text-[var(--accent)] shrink-0">
+                              <span className="font-mono-num text-xs font-bold text-[var(--accent-text)] shrink-0">
                                 +{formatCurrency(addon.price)}
                               </span>
                             </div>
@@ -795,10 +825,10 @@ export function ProposalClient({
                   </div>
                 </div>
 
-                {/* Differentials Bento Grid */}
+                {/* Differentials */}
                 <div className="space-y-4 pt-2">
                   <div>
-                    <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+                    <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)]">
                       Posicionamento &amp; Método · 97% Clímax
                     </p>
                     <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
@@ -812,10 +842,14 @@ export function ProposalClient({
                       return (
                         <div
                           key={item.title}
-                          className="glass-panel rounded-3xl p-5 flex items-start gap-3.5"
+                          className="surface-card rounded-xl p-5 flex items-start gap-3.5"
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
-                            <Icon className="h-5 w-5" strokeWidth={1.9} />
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                            <Icon
+                              className="h-5 w-5"
+                              strokeWidth={1.9}
+                              aria-hidden="true"
+                            />
                           </div>
                           <div>
                             <h3 className="text-xs font-bold text-[var(--text-primary)]">
@@ -832,11 +866,11 @@ export function ProposalClient({
                 </div>
               </div>
 
-              {/* Right: Sticky Dynamic Pricing Summary (4 cols) */}
+              {/* Right: Sticky Dynamic Pricing Summary */}
               <aside className="lg:col-span-4 lg:sticky lg:top-24">
-                <div className="glass-panel rounded-3xl p-6 space-y-5">
+                <div className="surface-card rounded-xl p-6 space-y-5">
                   <div>
-                    <p className="font-mono-num text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
+                    <p className="font-mono-num text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent-text)]">
                       Investimento Transparente
                     </p>
                     <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">
@@ -878,15 +912,15 @@ export function ProposalClient({
                     </div>
 
                     <div className="grid grid-cols-2 gap-2.5">
-                      <div className="rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent-border)] p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                      <div className="rounded-lg bg-[var(--accent-soft)] border border-[var(--accent-border)] p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent-text)]">
                           Sinal (50% Reserva)
                         </p>
                         <p className="mt-1 font-mono-num text-sm font-extrabold text-[var(--text-primary)]">
                           {formatCurrencyExact(depositValue)}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-[var(--bg-subtle)]/80 border border-[var(--border-hairline)] p-3">
+                      <div className="rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-hairline)] p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                           50% na Entrega
                         </p>
@@ -900,9 +934,9 @@ export function ProposalClient({
                   <button
                     type="button"
                     onClick={() => setShowApprovalModal(true)}
-                    className="btn-accent w-full inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-extrabold cursor-pointer"
+                    className="btn-accent w-full inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-5 py-3.5 text-sm font-extrabold"
                   >
-                    <CheckCircle2 className="h-4.5 w-4.5" />
+                    <CheckCircle2 className="h-4.5 w-4.5" aria-hidden="true" />
                     Aprovar Proposta e Reservar Data
                   </button>
 
@@ -922,31 +956,38 @@ export function ProposalClient({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           onClick={() => setShowApprovalModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="approval-modal-title"
         >
           <form
             onSubmit={handleApproveSubmit}
             onClick={(e) => e.stopPropagation()}
-            className="glass-panel w-full max-w-lg rounded-3xl bg-[var(--bg-surface-solid)] p-6 sm:p-7 space-y-5"
+            className="modal-surface w-full max-w-lg rounded-xl p-6 sm:p-7 space-y-5 max-h-[92dvh] overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                <p className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
                   Confirmação, PDF &amp; Pix Automático
                 </p>
-                <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">
+                <h3
+                  id="approval-modal-title"
+                  className="mt-1 text-lg font-bold text-[var(--text-primary)]"
+                >
                   Aprovar Proposta e Reservar Data
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowApprovalModal(false)}
-                className="btn-ghost flex h-8 w-8 items-center justify-center rounded-xl cursor-pointer"
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                aria-label="Fechar modal de aprovação"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
-            <div className="rounded-2xl bg-[var(--bg-subtle)]/75 p-4 text-xs space-y-1">
+            <div className="rounded-lg bg-[var(--bg-subtle)] p-4 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[var(--text-secondary)]">
                   {selectedPackage.name}
@@ -958,7 +999,7 @@ export function ProposalClient({
                   {formatCurrencyExact(totalValue)}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[var(--accent)] font-semibold">
+              <div className="flex items-center justify-between text-[var(--accent-text)] font-semibold">
                 <span>Sinal de reserva (50% via Pix)</span>
                 <span className="font-mono-num">
                   {formatCurrencyExact(depositValue)}
@@ -966,15 +1007,15 @@ export function ProposalClient({
               </div>
             </div>
 
-            {/* PJ / PF Switch */}
-            <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[var(--bg-subtle)] p-1 text-xs">
+            <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-[var(--bg-subtle)] p-1 text-xs">
               <button
                 type="button"
                 onClick={() => setDocMode("cnpj")}
+                aria-pressed={docMode === "cnpj"}
                 className={cn(
-                  "rounded-xl py-2 font-bold transition-all cursor-pointer",
+                  "min-h-[40px] rounded-md py-2 font-bold transition-colors",
                   docMode === "cnpj"
-                    ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                    ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                     : "text-[var(--text-secondary)]"
                 )}
               >
@@ -983,10 +1024,11 @@ export function ProposalClient({
               <button
                 type="button"
                 onClick={() => setDocMode("cpf")}
+                aria-pressed={docMode === "cpf"}
                 className={cn(
-                  "rounded-xl py-2 font-bold transition-all cursor-pointer",
+                  "min-h-[40px] rounded-md py-2 font-bold transition-colors",
                   docMode === "cpf"
-                    ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                    ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                     : "text-[var(--text-secondary)]"
                 )}
               >
@@ -998,83 +1040,109 @@ export function ProposalClient({
               {docMode === "cpf" ? (
                 <>
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                    <label
+                      htmlFor="approve-pf-name"
+                      className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                    >
                       Nome Completo *
                     </label>
                     <input
+                      id="approve-pf-name"
                       type="text"
                       required
                       value={razaoSocial}
                       onChange={(e) => setRazaoSocial(e.target.value)}
                       placeholder="Seu nome completo"
-                      className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                      className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                    <label
+                      htmlFor="approve-pf-cpf"
+                      className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                    >
                       CPF (p/ Termo de Uso de Imagem) *
                     </label>
                     <input
+                      id="approve-pf-cpf"
                       type="text"
                       required
                       value={cpf}
                       onChange={(e) => setCpf(formatCpf(e.target.value))}
                       placeholder="000.000.000-00"
-                      className="input-field w-full rounded-xl px-3.5 py-2.5 font-mono-num text-sm"
+                      className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 font-mono-num text-sm"
                     />
                   </div>
                 </>
               ) : (
                 <>
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                    <label
+                      htmlFor="approve-pj-cnpj"
+                      className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                    >
                       CNPJ da Empresa *
                     </label>
                     <input
+                      id="approve-pj-cnpj"
                       type="text"
                       required
                       value={cnpj}
                       onChange={(e) => setCnpj(formatCnpj(e.target.value))}
                       placeholder="00.000.000/0001-00"
-                      className="input-field w-full rounded-xl px-3.5 py-2.5 font-mono-num text-sm"
+                      className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 font-mono-num text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                    <label
+                      htmlFor="approve-pj-razao"
+                      className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                    >
                       Razão Social *
                     </label>
                     <input
+                      id="approve-pj-razao"
                       type="text"
                       required
                       value={razaoSocial}
                       onChange={(e) => setRazaoSocial(e.target.value)}
                       placeholder="Razão Social Completa Ltda"
-                      className="input-field w-full rounded-xl px-3.5 py-2.5 text-sm"
+                      className="input-field min-h-[44px] w-full rounded-lg px-3.5 py-2.5 text-sm"
                     />
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                <label
+                  htmlFor="approve-event-date"
+                  className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                >
                   Data da Produção / Evento *
                 </label>
                 <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <Calendar
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
                   <input
+                    id="approve-event-date"
                     type="date"
                     required
                     value={eventDate}
                     onChange={(e) => setEventDate(e.target.value)}
-                    className="input-field w-full rounded-xl py-2.5 pl-10 pr-3.5 font-mono-num text-sm"
+                    className="input-field min-h-[44px] w-full rounded-lg py-2.5 pl-10 pr-3.5 font-mono-num text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {errorMsg && (
-              <p className="rounded-xl bg-rose-500/15 px-3.5 py-2 text-xs font-medium text-rose-400">
+              <p
+                role="alert"
+                className="badge-danger rounded-lg px-3.5 py-2.5 text-xs font-medium"
+              >
                 {errorMsg}
               </p>
             )}
@@ -1083,16 +1151,16 @@ export function ProposalClient({
               <button
                 type="button"
                 onClick={() => setShowApprovalModal(false)}
-                className="btn-ghost rounded-xl px-4 py-2.5 text-xs font-semibold cursor-pointer"
+                className="btn-ghost min-h-[44px] rounded-lg px-4 py-2.5 text-xs font-semibold"
               >
                 Voltar
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="btn-accent inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-extrabold disabled:opacity-60 cursor-pointer"
+                className="btn-accent inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-xs font-extrabold disabled:opacity-60"
               >
-                <QrCode className="h-4 w-4" />
+                <QrCode className="h-4 w-4" aria-hidden="true" />
                 {submitting
                   ? "Gerando PDF & Pix..."
                   : "Confirmar, Gerar PDF & Pix"}

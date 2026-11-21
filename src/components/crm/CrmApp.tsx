@@ -2,9 +2,12 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Database,
+  Handshake,
   Kanban,
   LayoutDashboard,
+  LogOut,
   Moon,
   Plus,
   RefreshCw,
@@ -31,8 +34,10 @@ import { DashboardView } from "@/components/crm/DashboardView";
 import { KanbanView } from "@/components/crm/KanbanView";
 import { CaptureView } from "@/components/crm/CaptureView";
 import { DispatcherView } from "@/components/crm/DispatcherView";
+import { PartnersView } from "@/components/crm/PartnersView";
 import { SettingsView } from "@/components/crm/SettingsView";
 import { LeadDetailModal } from "@/components/crm/LeadDetailModal";
+import { QuickNewLeadModal } from "@/components/crm/QuickNewLeadModal";
 import type { CreateLeadInput } from "@/lib/repository";
 
 type ActiveModule =
@@ -40,6 +45,7 @@ type ActiveModule =
   | "kanban"
   | "capture"
   | "dispatcher"
+  | "partners"
   | "settings";
 
 interface CrmAppProps {
@@ -61,7 +67,12 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   >("places");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [dispatchLeadId, setDispatchLeadId] = useState<string | null>(null);
+  const [showQuickNewLead, setShowQuickNewLead] = useState(false);
+  const [quickNewLeadFunnel, setQuickNewLeadFunnel] =
+    useState<FunnelId>("corporativo");
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -81,7 +92,6 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Mirror state to localStorage for offline/instant visibility
   useEffect(() => {
     try {
       window.localStorage.setItem(LOCAL_MIRROR_KEY, JSON.stringify(store));
@@ -94,19 +104,32 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     if (!silent) setSyncing(true);
     try {
       const res = await fetch("/api/store", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (!silent) {
+          setSyncError(
+            "Não foi possível sincronizar com o servidor. Verifique sua conexão."
+          );
+        }
+        return;
+      }
       const json = (await res.json()) as {
         data: CrmStoreData;
         status: IntegrationStatus;
       };
       setStore(json.data);
       setStatus(json.status);
+      setSyncError(null);
+    } catch {
+      if (!silent) {
+        setSyncError(
+          "Falha de rede ao sincronizar os dados. Tente novamente."
+        );
+      }
     } finally {
       if (!silent) setSyncing(false);
     }
   }, []);
 
-  // Auto-sync when client views/approves a proposal in another tab or window returns focus
   useEffect(() => {
     const onFocus = () => {
       refreshStore(true);
@@ -120,12 +143,12 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
         refreshStore(true);
         if (event.data?.type === "proposal_viewed") {
           notify(
-            `Proposta aberta por ${event.data.companyName}! Card movido para Proposta Aberta.`,
+            `Proposta aberta por ${event.data.companyName}. Card movido para Proposta Aberta.`,
             "info"
           );
         } else if (event.data?.type === "proposal_approved") {
           notify(
-            `Proposta aprovada por ${event.data.companyName}! Verifique os dados de reserva.`,
+            `Proposta aprovada por ${event.data.companyName}. Verifique os dados de reserva.`,
             "success"
           );
         }
@@ -146,35 +169,40 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     patch: Partial<Lead>,
     interaction?: { type: InteractionType; title: string; description: string },
     touchLastInteraction = true
-  ) => {
-    const res = await fetch(`/api/leads/${leadId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patch, interaction, touchLastInteraction }),
-    });
-    if (!res.ok) {
-      notify("Erro ao salvar atualização do lead.", "error");
-      return;
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patch, interaction, touchLastInteraction }),
+      });
+      if (!res.ok) {
+        notify("Erro ao salvar atualização do lead.", "error");
+        return false;
+      }
+      const { lead } = (await res.json()) as { lead: Lead };
+      setStore((prev) => ({
+        ...prev,
+        leads: prev.leads.map((l) => (l.id === lead.id ? lead : l)),
+      }));
+      return true;
+    } catch {
+      notify("Erro de rede ao salvar atualização do lead.", "error");
+      return false;
     }
-    const { lead } = (await res.json()) as { lead: Lead };
-    setStore((prev) => ({
-      ...prev,
-      leads: prev.leads.map((l) => (l.id === lead.id ? lead : l)),
-    }));
   };
 
   const handleMoveStage = async (leadId: string, newStage: StageId) => {
-    const lead = store.leads.find((l) => l.id === leadId);
-    if (!lead) return;
+    const previousLead = store.leads.find((l) => l.id === leadId);
+    if (!previousLead || previousLead.stage === newStage) return;
 
     const paymentPatch: Partial<Lead> = {};
-    if (newStage === "sinal_pago" && lead.paymentStatus === "pendente") {
+    if (newStage === "sinal_pago" && previousLead.paymentStatus === "pendente") {
       paymentPatch.paymentStatus = "sinal_pago";
     } else if (newStage === "fechado") {
       paymentPatch.paymentStatus = "quitado";
     }
 
-    // Optimistic update
     setStore((prev) => ({
       ...prev,
       leads: prev.leads.map((l) =>
@@ -182,33 +210,50 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       ),
     }));
 
-    await handleUpdateLead(
+    const ok = await handleUpdateLead(
       leadId,
       { stage: newStage, ...paymentPatch },
       {
         type: "etapa",
         title: `Etapa alterada para ${getStageLabel(newStage)}`,
-        description: `Movido de ${getStageLabel(lead.stage)} para ${getStageLabel(newStage)}.`,
+        description: `Movido de ${getStageLabel(previousLead.stage)} para ${getStageLabel(newStage)}.`,
       },
       true
     );
+
+    if (!ok) {
+      setStore((prev) => ({
+        ...prev,
+        leads: prev.leads.map((l) => (l.id === leadId ? previousLead : l)),
+      }));
+      notify(
+        `Falha ao mover ${previousLead.companyName}. Posição anterior restaurada.`,
+        "error"
+      );
+      return;
+    }
+
     notify(
-      `${lead.companyName} movido para ${getStageLabel(newStage)}.`,
+      `${previousLead.companyName} movido para ${getStageLabel(newStage)}.`,
       "success"
     );
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    const res = await fetch(`/api/leads/${leadId}`, { method: "DELETE" });
-    if (!res.ok) {
-      notify("Erro ao excluir lead.", "error");
-      return;
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify("Erro ao excluir lead.", "error");
+        return;
+      }
+      setStore((prev) => ({
+        ...prev,
+        leads: prev.leads.filter((l) => l.id !== leadId),
+      }));
+      notify("Lead removido do CRM.", "info");
+    } catch {
+      notify("Erro de rede ao excluir lead.", "error");
     }
-    setStore((prev) => ({
-      ...prev,
-      leads: prev.leads.filter((l) => l.id !== leadId),
-    }));
-    notify("Lead removido do CRM.", "info");
   };
 
   const handleCreateLead = async (input: CreateLeadInput) => {
@@ -217,6 +262,9 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
+    if (!res.ok) {
+      throw new Error("Falha ao criar lead.");
+    }
     const json = (await res.json()) as { lead: Lead; duplicate: boolean };
     if (!json.duplicate && json.lead) {
       setStore((prev) => ({
@@ -233,6 +281,9 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leads: inputs }),
     });
+    if (!res.ok) {
+      throw new Error("Falha ao importar leads.");
+    }
     const json = (await res.json()) as {
       imported: Lead[];
       skippedDuplicates: number;
@@ -252,7 +303,10 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      notify("Não foi possível salvar as configurações.", "error");
+      return;
+    }
     const json = await res.json();
     if (json.settings) {
       setStore((prev) => ({ ...prev, settings: json.settings }));
@@ -279,6 +333,10 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(partner),
     });
+    if (!res.ok) {
+      notify("Erro ao cadastrar parceiro.", "error");
+      throw new Error("Erro ao cadastrar parceiro");
+    }
     const { partner: created } = (await res.json()) as { partner: Partner };
     setStore((prev) => ({
       ...prev,
@@ -286,6 +344,43 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     }));
     notify(`Parceiro "${created.name}" cadastrado.`, "success");
     return created;
+  };
+
+  const handleUpdatePartner = async (
+    partnerId: string,
+    patch: Partial<Omit<Partner, "id" | "createdAt">>
+  ) => {
+    const res = await fetch(`/api/partners/${partnerId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      notify("Erro ao atualizar parceiro.", "error");
+      return;
+    }
+    const { partner: updated } = (await res.json()) as { partner: Partner };
+    setStore((prev) => ({
+      ...prev,
+      partners: prev.partners.map((p) => (p.id === updated.id ? updated : p)),
+    }));
+  };
+
+  const handleDeletePartner = async (partnerId: string) => {
+    const res = await fetch(`/api/partners/${partnerId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      notify("Erro ao remover parceiro.", "error");
+      return;
+    }
+    setStore((prev) => ({
+      ...prev,
+      partners: prev.partners.filter((p) => p.id !== partnerId),
+      leads: prev.leads.map((l) =>
+        l.partnerId === partnerId ? { ...l, partnerId: null } : l
+      ),
+    }));
   };
 
   const handleSaveTemplate = async (
@@ -298,6 +393,10 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(template),
     });
+    if (!res.ok) {
+      notify("Erro ao salvar template.", "error");
+      throw new Error("Erro ao salvar template");
+    }
     const { template: saved } = (await res.json()) as {
       template: ScriptTemplate;
     };
@@ -317,7 +416,10 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     const res = await fetch(`/api/templates/${templateId}`, {
       method: "DELETE",
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      notify("Erro ao remover template.", "error");
+      return;
+    }
     setStore((prev) => ({
       ...prev,
       templates: prev.templates.filter((t) => t.id !== templateId),
@@ -325,35 +427,76 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     notify("Template removido da biblioteca.", "info");
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.reload();
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const openQuickNewLead = (funnel: FunnelId) => {
+    setQuickNewLeadFunnel(funnel);
+    setShowQuickNewLead(true);
+  };
+
   const navItems: Array<{
     id: ActiveModule;
     label: string;
+    shortLabel: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: number;
   }> = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      shortLabel: "Painel",
+      icon: LayoutDashboard,
+    },
     {
       id: "kanban",
       label: "CRM Kanban",
+      shortLabel: "Kanban",
       icon: Kanban,
       badge: store.leads.length,
     },
-    { id: "capture", label: "Captação BH", icon: UserPlus },
-    { id: "dispatcher", label: "Disparador & Scripts", icon: Send },
-    { id: "settings", label: "Automações & Config", icon: Settings },
+    {
+      id: "capture",
+      label: "Captação BH",
+      shortLabel: "Captar",
+      icon: UserPlus,
+    },
+    {
+      id: "dispatcher",
+      label: "Disparador & Scripts",
+      shortLabel: "Disparo",
+      icon: Send,
+    },
+    {
+      id: "partners",
+      label: "Parceiros (15%)",
+      shortLabel: "Parceiros",
+      icon: Handshake,
+      badge: store.partners.length,
+    },
+    {
+      id: "settings",
+      label: "Automações & Config",
+      shortLabel: "Config",
+      icon: Settings,
+    },
   ];
 
   return (
     <div className="min-h-[100dvh] flex flex-col lg:flex-row">
-      {/* Left Navigation Sidebar (Desktop) */}
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:justify-between border-r border-[var(--border-hairline)] bg-[var(--bg-subtle)]/55 px-4 py-6">
+      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:justify-between border-r border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-4 py-6">
         <div className="space-y-8">
-          {/* Studio Identity */}
           <div className="px-1">
             <BrandMark />
           </div>
 
-          {/* Nav Links */}
           <nav className="space-y-1.5" aria-label="Navegação Principal">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -363,19 +506,20 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveModule(item.id)}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-xs font-semibold transition-all cursor-pointer",
+                    "flex w-full min-h-[42px] items-center justify-between rounded-lg px-3.5 py-2.5 text-xs font-semibold transition-colors border",
                     active
-                      ? "bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent-border)]"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] border border-transparent"
+                      ? "bg-[var(--accent-soft)] text-[var(--accent-text)] border-[var(--accent-border)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] border-transparent"
                   )}
                 >
                   <span className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4" aria-hidden="true" />
                     {item.label}
                   </span>
                   {item.badge !== undefined && (
-                    <span className="rounded-full bg-[var(--bg-surface-solid)] px-2 py-0.5 font-mono-num text-[10px] text-[var(--text-secondary)]">
+                    <span className="rounded-md bg-[var(--bg-surface-solid)] px-2 py-0.5 font-mono-num text-[10px] text-[var(--text-secondary)]">
                       {item.badge}
                     </span>
                   )}
@@ -385,43 +529,41 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
           </nav>
         </div>
 
-        {/* Bottom Persistence & Theme Status */}
         <div className="space-y-3 border-t border-[var(--border-hairline)] pt-4">
-          <div className="rounded-2xl bg-[var(--bg-surface-solid)]/80 border border-[var(--border-hairline)] p-3 text-[11px]">
+          <div className="rounded-xl bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)] p-3 text-[11px]">
             <div className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
-              <Database className="h-3.5 w-3.5 text-[var(--accent)]" />
+              <Database
+                className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                aria-hidden="true"
+              />
               {status.databaseMode === "firebase"
                 ? "Firebase Conectado"
                 : status.databaseMode === "supabase"
                 ? "Supabase Conectado"
                 : "Modo Local + Fallback"}
             </div>
-            <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-muted)]">
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
               {status.databaseMode === "firebase"
                 ? `Cloud Firestore ativo (${status.firebaseProjectId || "Firebase"}).`
                 : status.databaseMode === "supabase"
                 ? "Persistência sincronizada em nuvem."
-                : "Dados salvos localmente (.data + localStorage). Insira as chaves no .env.local quando desejar."}
+                : "Dados salvos localmente (.data + localStorage)."}
             </p>
           </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Utility Header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] bg-[var(--bg-canvas)]/80 px-4 py-3.5 backdrop-blur-xl sm:px-6 lg:px-8">
-          {/* Mobile brand */}
+        <header className="glass-bar sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] px-4 py-3 sm:px-6 lg:px-8">
           <div className="lg:hidden">
             <BrandMark compact />
           </div>
 
           <div className="hidden lg:flex items-center gap-2.5 text-xs text-[var(--text-muted)]">
-            <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
             <span className="font-medium text-[var(--text-secondary)]">
               A história termina. A imagem fica.
             </span>
-            <span className="opacity-40">·</span>
+            <span aria-hidden="true">·</span>
             <span className="font-mono-num text-[11px]">
               Belo Horizonte &amp; Nova Lima · 24FPS
             </span>
@@ -432,69 +574,89 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               type="button"
               onClick={() => refreshStore(false)}
               disabled={syncing}
-              className="btn-ghost inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold cursor-pointer"
+              className="btn-ghost inline-flex min-h-[40px] min-w-[40px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
               title="Sincronizar aberturas de proposta e leads"
+              aria-label="Sincronizar dados do CRM"
             >
               <RefreshCw
                 className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
+                aria-hidden="true"
               />
               <span className="hidden sm:inline">Sincronizar</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setCaptureSubTab("manual");
-                setActiveModule("capture");
-              }}
-              className="btn-accent inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold cursor-pointer"
+              onClick={() => openQuickNewLead(activeFunnel)}
+              className="btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Novo Lead</span>
             </button>
 
             <button
               type="button"
               onClick={toggleTheme}
-              className="btn-ghost flex h-9 w-9 items-center justify-center rounded-xl cursor-pointer"
-              aria-label="Alternar tema claro/escuro"
-              title={theme === "dark" ? "Mudar para Modo Claro" : "Mudar para Modo Escuro"}
+              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+              aria-label={
+                theme === "dark"
+                  ? "Mudar para modo claro"
+                  : "Mudar para modo escuro"
+              }
+              title={
+                theme === "dark"
+                  ? "Mudar para Modo Claro"
+                  : "Mudar para Modo Escuro"
+              }
             >
               {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-[var(--accent)]" />
+                <Sun
+                  className="h-4 w-4 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
               ) : (
-                <Moon className="h-4 w-4 text-[var(--text-primary)]" />
+                <Moon
+                  className="h-4 w-4 text-[var(--text-primary)]"
+                  aria-hidden="true"
+                />
               )}
             </button>
+
+            {status.adminAuthEnabled && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                aria-label="Encerrar sessão administrativa"
+                title="Sair do CRM"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </header>
 
-        {/* Mobile Nav Pills */}
-        <div className="flex gap-1.5 overflow-x-auto border-b border-[var(--border-hairline)] px-4 py-2.5 lg:hidden">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = activeModule === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveModule(item.id)}
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold cursor-pointer",
-                  active
-                    ? "bg-[var(--accent)] text-[var(--accent-fg)]"
-                    : "bg-[var(--bg-subtle)] text-[var(--text-secondary)]"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+        {syncError && (
+          <div
+            role="alert"
+            className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl badge-danger px-4 py-3 text-xs sm:mx-6 lg:mx-8"
+          >
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {syncError}
+            </span>
+            <button
+              type="button"
+              onClick={() => refreshStore(false)}
+              className="rounded-lg border border-current px-3 py-1.5 text-xs font-bold hover:opacity-80"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
-        {/* Active Module Workspace */}
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8 max-w-[1600px] w-full mx-auto">
           {activeModule === "dashboard" && (
             <DashboardView
               leads={store.leads}
@@ -521,11 +683,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                 setDispatchLeadId(lead.id);
                 setActiveModule("dispatcher");
               }}
-              onOpenNewLead={(funnel) => {
-                setActiveFunnel(funnel);
-                setCaptureSubTab("manual");
-                setActiveModule("capture");
-              }}
+              onOpenNewLead={(funnel) => openQuickNewLead(funnel)}
             />
           )}
 
@@ -549,7 +707,9 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               settings={store.settings}
               integrationStatus={status}
               initialLeadId={dispatchLeadId}
-              onUpdateLead={handleUpdateLead}
+              onUpdateLead={async (leadId, patch, interaction, touch) => {
+                await handleUpdateLead(leadId, patch, interaction, touch);
+              }}
               onSyncLead={(updatedLead) =>
                 setStore((prev) => ({
                   ...prev,
@@ -561,6 +721,21 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               onSaveTemplate={handleSaveTemplate}
               onDeleteTemplate={handleDeleteTemplate}
               onUpdateNextDate={handleUpdateNextDate}
+              onNotify={notify}
+            />
+          )}
+
+          {activeModule === "partners" && (
+            <PartnersView
+              partners={store.partners}
+              leads={store.leads}
+              onCreatePartner={handleCreatePartner}
+              onUpdatePartner={handleUpdatePartner}
+              onDeletePartner={handleDeletePartner}
+              onUpdateLead={async (leadId, patch, interaction, touch) => {
+                await handleUpdateLead(leadId, patch, interaction, touch);
+              }}
+              onSelectLead={(lead) => setSelectedLeadId(lead.id)}
               onNotify={notify}
             />
           )}
@@ -578,13 +753,54 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
         </main>
       </div>
 
-      {/* Lead Detail Slide-over Modal */}
+      {/* Fixed Mobile Bottom Navigation Bar */}
+      <nav
+        aria-label="Navegação Mobile"
+        className="glass-bar safe-bottom fixed bottom-0 inset-x-0 z-30 border-t border-[var(--border-hairline)] lg:hidden"
+      >
+        <div className="grid grid-cols-6 gap-0.5 px-1.5 pt-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeModule === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveModule(item.id)}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[10px] font-semibold transition-colors",
+                  active
+                    ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate max-w-full">{item.shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {showQuickNewLead && (
+        <QuickNewLeadModal
+          defaultFunnel={quickNewLeadFunnel}
+          partners={store.partners}
+          onClose={() => setShowQuickNewLead(false)}
+          onCreateLead={handleCreateLead}
+          onNotify={notify}
+        />
+      )}
+
       {selectedLead && (
         <LeadDetailModal
           lead={selectedLead}
           partners={store.partners}
           onClose={() => setSelectedLeadId(null)}
-          onUpdateLead={handleUpdateLead}
+          onUpdateLead={async (leadId, patch, interaction, touch) => {
+            await handleUpdateLead(leadId, patch, interaction, touch);
+          }}
           onSyncLead={(updatedLead) =>
             setStore((prev) => ({
               ...prev,
@@ -604,17 +820,18 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
         />
       )}
 
-      {/* Subtle Toast Banner */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-20 right-4 z-50 max-w-sm lg:bottom-5 lg:right-5"
+        >
           <div
             className={cn(
-              "glass-panel rounded-2xl px-4 py-3 text-xs font-semibold shadow-2xl border",
-              toast.tone === "success" &&
-                "border-emerald-500/40 text-emerald-400",
-              toast.tone === "error" && "border-rose-500/40 text-rose-400",
-              toast.tone === "info" &&
-                "border-[var(--accent-border)] text-[var(--accent)]"
+              "modal-surface rounded-xl px-4 py-3 text-xs font-semibold",
+              toast.tone === "success" && "badge-success",
+              toast.tone === "error" && "badge-danger",
+              toast.tone === "info" && "badge-accent"
             )}
           >
             {toast.message}

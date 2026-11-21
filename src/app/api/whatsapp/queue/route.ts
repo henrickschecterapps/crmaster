@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStoreData, updateLead } from "@/lib/repository";
+import { getStoreData } from "@/lib/repository";
 import {
   enqueueWhatsappBatch,
   EnqueueWhatsappInput,
   getWhatsappQueueJobs,
+  processDueWhatsappQueue,
   resolveWhatsappConfig,
 } from "@/lib/whatsappQueue";
 
@@ -12,10 +13,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const store = await getStoreData();
   const config = resolveWhatsappConfig(store.settings);
+  const jobs = await getWhatsappQueueJobs();
   return NextResponse.json({
     configured: Boolean(config),
     provider: config?.provider ?? store.settings.whatsappProvider,
-    jobs: getWhatsappQueueJobs(),
+    jobs,
   });
 }
 
@@ -34,31 +36,9 @@ export async function POST(req: NextRequest) {
     const store = await getStoreData();
     const config = resolveWhatsappConfig(store.settings);
 
-    const jobs = enqueueWhatsappBatch({
+    const jobs = await enqueueWhatsappBatch({
       items,
       config,
-      onJobCompleted: async (job) => {
-        const lead = store.leads.find((l) => l.id === job.leadId);
-        const nextStage = lead?.stage === "captado" ? "contatado" : undefined;
-
-        await updateLead(
-          job.leadId,
-          nextStage ? { stage: nextStage } : {},
-          {
-            type: "whatsapp",
-            title:
-              job.status === "enviado"
-                ? "WhatsApp automático enviado (Fila Anti-Ban)"
-                : job.status === "simulado"
-                ? "WhatsApp automático simulado (API não configurada)"
-                : "Falha no disparo automático de WhatsApp",
-            description: job.error
-              ? job.error
-              : `Agendado com intervalo de ${Math.round(job.delaySeconds / 60)} min para proteção anti-banimento.`,
-          },
-          true
-        );
-      },
     });
 
     return NextResponse.json(
@@ -72,6 +52,28 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Não foi possível enfileirar mensagens." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = (await req.json().catch(() => ({}))) as { forceAll?: boolean };
+    const store = await getStoreData();
+    const config = resolveWhatsappConfig(store.settings);
+    const result = await processDueWhatsappQueue({
+      config,
+      forceAll: Boolean(body.forceAll),
+    });
+    const jobs = await getWhatsappQueueJobs();
+    return NextResponse.json({
+      processedCount: result.processed.length,
+      jobs,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Erro ao processar fila de WhatsApp." },
       { status: 500 }
     );
   }

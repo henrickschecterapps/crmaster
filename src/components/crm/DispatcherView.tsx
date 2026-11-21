@@ -8,12 +8,12 @@ import {
   Clock,
   Copy,
   Edit3,
+  FileText,
   Layers,
   Mail,
   MessageCircle,
   Plus,
   Send,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -93,8 +93,10 @@ export function DispatcherView({
   const [copiedMsg, setCopiedMsg] = useState(false);
   const [batchLeadIds, setBatchLeadIds] = useState<string[]>([]);
   const [enqueueingBatch, setEnqueueingBatch] = useState(false);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(
+    null
+  );
 
-  // Script library editor state
   const [editingTemplate, setEditingTemplate] = useState<{
     id?: string;
     name: string;
@@ -104,6 +106,15 @@ export function DispatcherView({
     body: string;
   } | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
+
+  useEffect(() => {
+    if (!editingTemplate) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEditingTemplate(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editingTemplate]);
 
   useEffect(() => {
     if (initialLeadId) {
@@ -151,6 +162,15 @@ export function DispatcherView({
     setCustomMessage(interpolateTemplate(selectedTemplate.body, vars));
   }, [selectedLead, selectedTemplate, proposalUrl, nextAvailableDate]);
 
+  const activeEmailProviderLabel = integrationStatus.gmailLive
+    ? "Gmail SMTP Ativo"
+    : integrationStatus.resendLive
+    ? "Resend API Ativa"
+    : "E-mail: Modo Simulação";
+
+  const activeEmailProviderLive =
+    integrationStatus.gmailLive || integrationStatus.resendLive;
+
   const handleSendWhatsappSafe = async () => {
     if (!selectedLead || !customMessage.trim()) {
       onNotify("Selecione um lead e preencha a mensagem.", "error");
@@ -179,20 +199,17 @@ export function DispatcherView({
 
     onNotify(
       selectedLead.stage === "captado"
-        ? `WhatsApp aberto para ${selectedLead.contactName}! Card movido para Contatado.`
+        ? `WhatsApp aberto para ${selectedLead.contactName}. Card movido para Contatado.`
         : `WhatsApp aberto e registrado na linha do tempo de ${selectedLead.companyName}.`,
       "success"
     );
   };
 
-  const handleSendEmailResend = async () => {
+  const handleSendEmail = async () => {
     if (!selectedLead) return;
     const targetEmail = customEmail.trim();
     if (!targetEmail) {
-      onNotify(
-        "Informe um e-mail de destino antes de disparar.",
-        "error"
-      );
+      onNotify("Informe um e-mail de destino antes de disparar.", "error");
       return;
     }
 
@@ -206,7 +223,7 @@ export function DispatcherView({
           to: targetEmail,
           subject:
             customSubject.trim() ||
-            `Proposta Comercial — ${selectedLead.companyName}`,
+            `Proposta Comercial | ${selectedLead.companyName}`,
           message: customMessage,
           proposalUrl,
         }),
@@ -221,12 +238,19 @@ export function DispatcherView({
         onSyncLead(json.lead as Lead);
       }
 
-      onNotify(
-        json.mode === "live"
-          ? `E-mail enviado via Resend para ${targetEmail}!`
-          : `E-mail simulado e registrado no histórico (adicione RESEND_API_KEY para envio real).`,
-        "success"
-      );
+      if (json.mode === "live") {
+        const providerName =
+          json.provider === "gmail" ? "Gmail SMTP" : "Resend API";
+        onNotify(
+          `E-mail enviado via ${providerName} para ${targetEmail}.`,
+          "success"
+        );
+      } else {
+        onNotify(
+          "E-mail simulado e registrado no histórico. Configure Gmail SMTP ou Resend para envio real.",
+          "info"
+        );
+      }
     } catch {
       onNotify("Erro de rede ao disparar e-mail.", "error");
     } finally {
@@ -240,7 +264,7 @@ export function DispatcherView({
       setCopiedMsg(true);
       setTimeout(() => setCopiedMsg(false), 1800);
     } catch {
-      // Ignore
+      // Ignore clipboard failure
     }
   };
 
@@ -295,8 +319,8 @@ export function DispatcherView({
       setBatchLeadIds([]);
       onNotify(
         json.mode === "live"
-          ? `${json.enqueued} disparo(s) agendados via API com intervalos aleatórios de 3–6 min!`
-          : `${json.enqueued} disparo(s) simulados na Fila Anti-Ban (configure Evolution/Z-API em Configurações para envio real).`,
+          ? `${json.enqueued} disparo(s) agendados via API com intervalos aleatórios de 3 a 6 min.`
+          : `${json.enqueued} disparo(s) salvos na Fila Anti-Ban (configure Evolution/Z-API em Configurações para envio automático).`,
         "success"
       );
     } finally {
@@ -322,7 +346,9 @@ export function DispatcherView({
     if (!editingTemplate) return;
     setEditingTemplate({
       ...editingTemplate,
-      body: `${editingTemplate.body}${editingTemplate.body.endsWith(" ") || !editingTemplate.body ? "" : " "}${token}`,
+      body: `${editingTemplate.body}${
+        editingTemplate.body.endsWith(" ") || !editingTemplate.body ? "" : " "
+      }${token}`,
     });
   };
 
@@ -333,10 +359,9 @@ export function DispatcherView({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+          <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
             Outbound &amp; Relacionamento Ativo
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
@@ -351,25 +376,24 @@ export function DispatcherView({
               name: "",
               funnel: "corporativo",
               channel: "ambos",
-              subject: "Proposta Exclusiva — {{nome_empresa}} | ÚLTIMO QUADRO",
+              subject: "Proposta Exclusiva | {{nome_empresa}} | ÚLTIMO QUADRO",
               body: "Olá {{nome_contato}}, tudo bem?\n\nPreparei uma proposta personalizada da ÚLTIMO QUADRO para a {{nome_empresa}}: {{link_proposta}}\n\nTenho agenda em {{proxima_data_livre}}.",
             })
           }
-          className="btn-accent inline-flex items-center gap-1.5 self-start rounded-xl px-4 py-2.5 text-xs font-bold cursor-pointer"
+          className="btn-accent inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-lg px-4 py-2.5 text-xs font-bold"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
           Novo Script
         </button>
       </div>
 
-      {/* Main Split Workspace */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        {/* LEFT PANE: SMART DISPATCHER (7 cols) */}
-        <section className="glass-panel rounded-3xl p-6 xl:col-span-7 space-y-5">
-          <div className="flex items-center justify-between gap-2">
+        {/* LEFT PANE: SMART DISPATCHER */}
+        <section className="surface-card rounded-xl p-6 xl:col-span-7 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
-                <Send className="h-4 w-4" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                <Send className="h-4 w-4" aria-hidden="true" />
               </span>
               <div>
                 <h2 className="text-sm font-bold text-[var(--text-primary)]">
@@ -383,45 +407,50 @@ export function DispatcherView({
             </div>
             <span
               className={cn(
-                "rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                integrationStatus.resendLive
-                  ? "bg-emerald-500/15 text-emerald-400"
-                  : "bg-[var(--bg-subtle)] text-[var(--text-muted)]"
+                "rounded-md px-2.5 py-1 text-[10px] font-semibold",
+                activeEmailProviderLive
+                  ? "badge-success"
+                  : "bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-hairline)]"
               )}
             >
-              {integrationStatus.resendLive
-                ? "Resend API Ativa"
-                : "Resend: Modo Simulação"}
+              {activeEmailProviderLabel}
             </span>
           </div>
 
-          {/* Selectors */}
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="dispatch-lead-select"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Selecionar Lead
               </label>
               <select
+                id="dispatch-lead-select"
                 value={selectedLead?.id || ""}
                 onChange={(e) => setSelectedLeadId(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2.5 text-xs font-medium"
+                className="input-field min-h-[44px] w-full rounded-lg px-3 py-2.5 text-xs font-medium"
               >
                 {leads.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.companyName} — {l.contactName} ({getStageLabel(l.stage)})
+                    {l.companyName} ({l.contactName} · {getStageLabel(l.stage)})
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="dispatch-template-select"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Template de Script
               </label>
               <select
+                id="dispatch-template-select"
                 value={selectedTemplate?.id || ""}
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="input-field w-full rounded-xl px-3 py-2.5 text-xs font-medium"
+                className="input-field min-h-[44px] w-full rounded-lg px-3 py-2.5 text-xs font-medium"
               >
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -432,9 +461,8 @@ export function DispatcherView({
             </div>
           </div>
 
-          {/* Lead Quick Strip + Next Available Date */}
           {selectedLead && (
-            <div className="grid grid-cols-1 gap-3 rounded-2xl bg-[var(--bg-subtle)]/70 p-3.5 sm:grid-cols-12 sm:items-center">
+            <div className="grid grid-cols-1 gap-3 rounded-xl bg-[var(--bg-subtle)] p-3.5 sm:grid-cols-12 sm:items-center">
               <div className="sm:col-span-7 space-y-0.5 text-xs">
                 <p className="font-bold text-[var(--text-primary)]">
                   {selectedLead.contactName}{" "}
@@ -448,127 +476,154 @@ export function DispatcherView({
                 </p>
               </div>
               <div className="sm:col-span-5">
-                <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                <label
+                  htmlFor="dispatch-next-date"
+                  className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+                >
                   {"{{proxima_data_livre}}"}
                 </label>
                 <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <Calendar
+                    className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
                   <input
+                    id="dispatch-next-date"
                     type="text"
                     value={nextAvailableDate}
                     onChange={(e) => setNextAvailableDate(e.target.value)}
                     onBlur={() => onUpdateNextDate(nextAvailableDate)}
                     placeholder="Ex: 05/12/2026"
-                    className="input-field w-full rounded-xl py-1.5 pl-8 pr-2.5 font-mono-num text-xs"
+                    className="input-field min-h-[38px] w-full rounded-lg py-1.5 pl-8 pr-2.5 font-mono-num text-xs"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Email Recipient + Subject */}
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-12">
             <div className="sm:col-span-5">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="dispatch-email-to"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 E-mail de Destino
               </label>
               <input
+                id="dispatch-email-to"
                 type="email"
                 value={customEmail}
                 onChange={(e) => setCustomEmail(e.target.value)}
                 placeholder="email@empresa.com.br"
-                className="input-field w-full rounded-xl px-3.5 py-2 text-xs font-medium"
+                className="input-field min-h-[42px] w-full rounded-lg px-3.5 py-2 text-xs font-medium"
               />
             </div>
             <div className="sm:col-span-7">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              <label
+                htmlFor="dispatch-email-subject"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+              >
                 Assunto do E-mail
               </label>
               <input
+                id="dispatch-email-subject"
                 type="text"
                 value={customSubject}
                 onChange={(e) => setCustomSubject(e.target.value)}
-                className="input-field w-full rounded-xl px-3.5 py-2 text-xs font-medium"
+                className="input-field min-h-[42px] w-full rounded-lg px-3.5 py-2 text-xs font-medium"
               />
             </div>
           </div>
 
-          {/* Interpolated Message Body */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <label
+                htmlFor="dispatch-message-body"
+                className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+              >
                 Mensagem Pronta (Editável antes do disparo)
               </label>
               <button
                 type="button"
                 onClick={handleCopyMessage}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                className="inline-flex min-h-[32px] items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-text)]"
               >
                 {copiedMsg ? (
                   <>
-                    <Check className="h-3 w-3 text-emerald-400" />
+                    <Check
+                      className="h-3 w-3 text-[var(--status-success)]"
+                      aria-hidden="true"
+                    />
                     Copiado
                   </>
                 ) : (
                   <>
-                    <Copy className="h-3 w-3" />
+                    <Copy className="h-3 w-3" aria-hidden="true" />
                     Copiar Texto
                   </>
                 )}
               </button>
             </div>
             <textarea
-              rows={10}
+              id="dispatch-message-body"
+              rows={9}
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
-              className="input-field w-full rounded-2xl p-4 text-xs leading-relaxed"
+              className="input-field w-full rounded-xl p-4 text-xs leading-relaxed"
             />
           </div>
 
-          {/* Primary Dispatch Actions */}
           <div className="flex flex-col gap-3 pt-1 sm:flex-row">
             <button
               type="button"
               onClick={handleSendWhatsappSafe}
               disabled={!selectedLead}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-xs font-bold text-zinc-950 hover:bg-emerald-400 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
+              className="flex-1 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-xs font-bold text-white hover:bg-emerald-500 active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              <MessageCircle className="h-4 w-4" />
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
               Enviar no WhatsApp (Modo Seguro)
             </button>
 
             <button
               type="button"
-              onClick={handleSendEmailResend}
+              onClick={handleSendEmail}
               disabled={!selectedLead || sendingEmail}
-              className="btn-accent flex-1 inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-xs font-bold disabled:opacity-50 cursor-pointer"
+              className="btn-accent flex-1 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg px-5 py-3 text-xs font-bold disabled:opacity-50"
             >
-              <Mail className="h-4 w-4" />
+              <Mail className="h-4 w-4" aria-hidden="true" />
               {sendingEmail
-                ? "Enviando via Resend..."
+                ? "Enviando e-mail..."
+                : integrationStatus.gmailLive
+                ? "Enviar E-mail (Gmail SMTP)"
                 : "Enviar E-mail (Resend API)"}
             </button>
           </div>
 
-          {/* Phase 2: Batch Queue Anti-Ban (3-6 min random interval) */}
-          <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/55 p-4 space-y-3">
+          {/* Batch Queue Anti-Ban */}
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-[var(--accent)]" />
+                <Layers
+                  className="h-4 w-4 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
                 <div>
                   <h3 className="text-xs font-bold text-[var(--text-primary)]">
-                    Disparo em Lote — Fila Anti-Ban (3 a 6 min)
+                    Disparo em Lote: Fila Anti-Ban (3 a 6 min)
                   </h3>
                   <p className="text-[11px] text-[var(--text-muted)]">
                     {integrationStatus.whatsappApiLive
-                      ? `Evolution/Z-API ativa (${integrationStatus.whatsappProvider.toUpperCase()}): aplica intervalo aleatório entre 3 e 6 min.`
-                      : "Modo Seguro padrão ativo. Preencha Evolution/Z-API em Configurações para envio automático real."}
+                      ? `API ativa (${integrationStatus.whatsappProvider.toUpperCase()}): aplica intervalo aleatório entre 3 e 6 min.`
+                      : "Fila persistida no banco. Configure Evolution/Z-API em Configurações para envio automático."}
                   </p>
                 </div>
               </div>
 
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-solid)] px-2.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-secondary)]">
-                <Clock className="h-3 w-3 text-[var(--accent)]" />
+              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-solid)] px-2.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-secondary)]">
+                <Clock
+                  className="h-3 w-3 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
                 {batchLeadIds.length} selecionado(s)
               </span>
             </div>
@@ -583,10 +638,11 @@ export function DispatcherView({
                       key={lead.id}
                       type="button"
                       onClick={() => toggleBatchLead(lead.id)}
+                      aria-pressed={selected}
                       className={cn(
-                        "rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold transition-all cursor-pointer",
+                        "min-h-[36px] rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
                         selected
-                          ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                          ? "badge-success"
                           : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
                       )}
                     >
@@ -601,23 +657,26 @@ export function DispatcherView({
                 type="button"
                 onClick={handleEnqueueWhatsappBatch}
                 disabled={enqueueingBatch || batchLeadIds.length === 0}
-                className="btn-ghost inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-45 cursor-pointer bg-[var(--bg-surface-solid)]"
+                className="btn-ghost inline-flex min-h-[42px] items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-45 bg-[var(--bg-surface-solid)]"
               >
-                <Layers className="h-3.5 w-3.5 text-emerald-400" />
+                <Layers
+                  className="h-3.5 w-3.5 text-[var(--status-success)]"
+                  aria-hidden="true"
+                />
                 {enqueueingBatch
                   ? "Agendando na Fila..."
-                  : `Enfileirar ${batchLeadIds.length || ""} Lead(s) (Intervalo 3–6 min)`}
+                  : `Enfileirar ${batchLeadIds.length || ""} Lead(s) (3 a 6 min)`}
               </button>
             </div>
           </div>
         </section>
 
-        {/* RIGHT PANE: SCRIPT LIBRARY (5 cols) */}
-        <section className="glass-panel rounded-3xl p-6 xl:col-span-5 flex flex-col space-y-4">
+        {/* RIGHT PANE: SCRIPT LIBRARY */}
+        <section className="surface-card rounded-xl p-6 xl:col-span-5 flex flex-col space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--accent)]">
-                <BookOpen className="h-4 w-4" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--accent-text)]">
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
               </span>
               <div>
                 <h2 className="text-sm font-bold text-[var(--text-primary)]">
@@ -630,48 +689,54 @@ export function DispatcherView({
             </div>
           </div>
 
-          {/* Dynamic Variables Legend */}
-          <div className="flex flex-wrap gap-1.5 rounded-2xl bg-[var(--bg-subtle)]/70 p-3">
+          <div className="flex flex-wrap gap-1.5 rounded-lg bg-[var(--bg-subtle)] p-3">
             {TEMPLATE_VARIABLES.map((v) => (
               <span
                 key={v.token}
-                className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-2 py-1 font-mono-num text-[10px] text-[var(--accent)]"
+                className="rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-2 py-1 font-mono-num text-[10px] text-[var(--accent-text)]"
               >
                 {v.token}
               </span>
             ))}
           </div>
 
-          {/* Template Cards List */}
           <div className="space-y-3 flex-1 overflow-y-auto pr-1">
             {templates.map((tpl) => {
               const isSelected = selectedTemplate?.id === tpl.id;
+              const isConfirmingDelete = deletingTemplateId === tpl.id;
+
               return (
                 <div
                   key={tpl.id}
-                  onClick={() => setSelectedTemplateId(tpl.id)}
                   className={cn(
-                    "rounded-2xl border p-4 transition-all cursor-pointer",
+                    "rounded-xl border p-4 transition-colors",
                     isSelected
-                      ? "border-[var(--accent-border)] bg-[var(--accent-soft)]/50"
-                      : "border-[var(--border-hairline)] bg-[var(--bg-subtle)]/50 hover:border-[var(--border-strong)]"
+                      ? "border-[var(--accent-border)] bg-[var(--accent-soft)]"
+                      : "border-[var(--border-hairline)] bg-[var(--bg-subtle)] hover:border-[var(--border-strong)]"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-solid)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
-                        <Sparkles className="h-2.5 w-2.5 text-[var(--accent)]" />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTemplateId(tpl.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-solid)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
+                        <FileText
+                          className="h-2.5 w-2.5 text-[var(--accent-text)]"
+                          aria-hidden="true"
+                        />
                         {getTemplateFunnelLabel(tpl.funnel)}
                       </span>
                       <h3 className="mt-1.5 text-xs font-bold text-[var(--text-primary)]">
                         {tpl.name}
                       </h3>
-                    </div>
+                      <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                        {tpl.body}
+                      </p>
+                    </button>
 
-                    <div
-                      className="flex items-center gap-1 shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() =>
@@ -684,33 +749,54 @@ export function DispatcherView({
                             body: tpl.body,
                           })
                         }
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-surface-solid)] hover:text-[var(--text-primary)] cursor-pointer"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-surface-solid)] hover:text-[var(--text-primary)]"
+                        aria-label={`Editar script ${tpl.name}`}
                         title="Editar script"
                       >
-                        <Edit3 className="h-3.5 w-3.5" />
+                        <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (
-                            window.confirm(
-                              `Remover template "${tpl.name}" da biblioteca?`
-                            )
-                          ) {
-                            await onDeleteTemplate(tpl.id);
-                          }
-                        }}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-rose-500/15 hover:text-rose-400 cursor-pointer"
+                        onClick={() =>
+                          setDeletingTemplateId(
+                            isConfirmingDelete ? null : tpl.id
+                          )
+                        }
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger)]"
+                        aria-label={`Excluir script ${tpl.name}`}
                         title="Excluir script"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
                     </div>
                   </div>
 
-                  <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-                    {tpl.body}
-                  </p>
+                  {isConfirmingDelete && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg badge-danger p-2.5 text-[11px]">
+                      <span className="font-semibold">
+                        Remover este template?
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await onDeleteTemplate(tpl.id);
+                            setDeletingTemplateId(null);
+                          }}
+                          className="rounded-md bg-[var(--status-danger)] px-2.5 py-1 font-bold text-white"
+                        >
+                          Confirmar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingTemplateId(null)}
+                          className="rounded-md border border-current px-2.5 py-1 font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -721,33 +807,44 @@ export function DispatcherView({
       {/* Template Create/Edit Modal */}
       {editingTemplate && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           onClick={() => setEditingTemplate(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="template-modal-title"
         >
           <form
             onSubmit={handleSaveTemplateForm}
             onClick={(e) => e.stopPropagation()}
-            className="glass-panel w-full max-w-2xl rounded-3xl bg-[var(--bg-surface-solid)] p-6 space-y-4"
+            className="modal-surface w-full max-w-2xl rounded-xl p-6 space-y-4 max-h-[92dvh] overflow-y-auto"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--text-primary)]">
+              <h3
+                id="template-modal-title"
+                className="text-base font-bold text-[var(--text-primary)]"
+              >
                 {editingTemplate.id ? "Editar Script" : "Criar Novo Script"}
               </h3>
               <button
                 type="button"
                 onClick={() => setEditingTemplate(null)}
-                className="btn-ghost flex h-8 w-8 items-center justify-center rounded-xl cursor-pointer"
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                aria-label="Fechar modal de script"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                <label
+                  htmlFor="tpl-name"
+                  className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+                >
                   Nome do Template *
                 </label>
                 <input
+                  id="tpl-name"
                   type="text"
                   required
                   value={editingTemplate.name}
@@ -758,15 +855,19 @@ export function DispatcherView({
                     })
                   }
                   placeholder="Ex: Follow-up Pós-Proposta Aberta"
-                  className="input-field w-full rounded-xl px-3 py-2 text-xs"
+                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                <label
+                  htmlFor="tpl-funnel"
+                  className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+                >
                   Funil Associado
                 </label>
                 <select
+                  id="tpl-funnel"
                   value={editingTemplate.funnel}
                   onChange={(e) =>
                     setEditingTemplate({
@@ -774,7 +875,7 @@ export function DispatcherView({
                       funnel: e.target.value as TemplateFunnelId,
                     })
                   }
-                  className="input-field w-full rounded-xl px-3 py-2 text-xs"
+                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-xs"
                 >
                   {FUNNELS.map((f) => (
                     <option key={f.id} value={f.id}>
@@ -787,10 +888,14 @@ export function DispatcherView({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+              <label
+                htmlFor="tpl-subject"
+                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+              >
                 Assunto do E-mail
               </label>
               <input
+                id="tpl-subject"
                 type="text"
                 value={editingTemplate.subject}
                 onChange={(e) =>
@@ -799,13 +904,16 @@ export function DispatcherView({
                     subject: e.target.value,
                   })
                 }
-                className="input-field w-full rounded-xl px-3 py-2 text-xs"
+                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-xs"
               />
             </div>
 
             <div>
               <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                <label
+                  htmlFor="tpl-body"
+                  className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                >
                   Corpo do Script *
                 </label>
                 <div className="flex flex-wrap gap-1">
@@ -814,7 +922,7 @@ export function DispatcherView({
                       key={v.token}
                       type="button"
                       onClick={() => insertVariableIntoEditor(v.token)}
-                      className="rounded-lg bg-[var(--accent-soft)] px-2 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--accent)] hover:opacity-85 cursor-pointer"
+                      className="badge-accent rounded-md px-2 py-1 font-mono-num text-[10px] font-semibold hover:opacity-85"
                     >
                       + {v.token}
                     </button>
@@ -822,6 +930,7 @@ export function DispatcherView({
                 </div>
               </div>
               <textarea
+                id="tpl-body"
                 rows={8}
                 required
                 value={editingTemplate.body}
@@ -831,7 +940,7 @@ export function DispatcherView({
                     body: e.target.value,
                   })
                 }
-                className="input-field w-full rounded-2xl p-3.5 text-xs leading-relaxed"
+                className="input-field w-full rounded-xl p-3.5 text-xs leading-relaxed"
               />
             </div>
 
@@ -839,14 +948,14 @@ export function DispatcherView({
               <button
                 type="button"
                 onClick={() => setEditingTemplate(null)}
-                className="btn-ghost rounded-xl px-4 py-2 text-xs font-semibold cursor-pointer"
+                className="btn-ghost min-h-[42px] rounded-lg px-4 py-2 text-xs font-semibold"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={savingTemplate}
-                className="btn-accent rounded-xl px-5 py-2 text-xs font-bold disabled:opacity-50 cursor-pointer"
+                className="btn-accent min-h-[42px] rounded-lg px-5 py-2 text-xs font-bold disabled:opacity-50"
               >
                 {savingTemplate ? "Salvando..." : "Salvar Script"}
               </button>

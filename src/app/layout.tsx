@@ -19,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title:
-    "ÚLTIMO QUADRO — CRM Comercial | Fotografia Autoral & Produção Audiovisual BH",
+    "ÚLTIMO QUADRO | CRM Comercial · Fotografia Autoral & Produção Audiovisual BH",
   description:
     "A história termina. A imagem fica. CRM comercial, prospecção BH & Nova Lima e propostas interativas da Último Quadro.",
 };

@@ -18,8 +18,8 @@ export default async function ProposalPage(props: {
   if (!lead) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center px-4">
-        <div className="glass-panel max-w-md w-full rounded-3xl p-8 text-center space-y-4">
-          <div className="mx-auto flex h-12 w-20 items-center justify-center rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-2.5">
+        <div className="surface-card max-w-md w-full rounded-xl p-8 text-center space-y-4">
+          <div className="mx-auto flex h-12 w-20 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-2.5">
             <UltimoQuadroIcon className="w-full h-auto" />
           </div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">
@@ -32,9 +32,9 @@ export default async function ProposalPage(props: {
           </p>
           <Link
             href="/"
-            className="btn-accent inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold"
+            className="btn-accent inline-flex min-h-[42px] items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Voltar ao CRM ÚLTIMO QUADRO
           </Link>
         </div>
