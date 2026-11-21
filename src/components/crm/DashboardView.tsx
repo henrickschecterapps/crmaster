@@ -10,6 +10,7 @@ import {
   DollarSign,
   Download,
   Eye,
+  Film,
   Handshake,
   Pencil,
   TrendingUp,
@@ -22,6 +23,7 @@ import {
   Lead,
   Partner,
   PARTNER_ROLES,
+  STAGES,
   StudioSettings,
 } from "@/types/crm";
 import {
@@ -205,6 +207,18 @@ export function DashboardView({
     };
   }, [filteredLeads, partners]);
 
+  const stageSummary = useMemo(() => {
+    return STAGES.map((s) => {
+      const sLeads = filteredLeads.filter((l) => l.stage === s.id);
+      const sum = sLeads.reduce((acc, l) => acc + l.estimatedValue, 0);
+      return {
+        ...s,
+        count: sLeads.length,
+        sum,
+      };
+    });
+  }, [filteredLeads]);
+
   const goalProgress =
     settings.monthlyGoal > 0
       ? Math.min(100, (metrics.confirmedTotal / settings.monthlyGoal) * 100)
@@ -361,18 +375,22 @@ export function DashboardView({
 
       {/* Primary Asymmetric Bento Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-        {/* Card 1: Faturamento Confirmado vs Meta Mensal */}
-        <section className="surface-card rounded-xl p-6 md:col-span-12 xl:col-span-6 flex flex-col justify-between">
+        {/* Card 1: Faturamento Confirmado vs Meta Mensal (with Viewfinder frame & 24FPS Timecode Bar) */}
+        <section className="surface-card viewfinder-frame rounded-xl p-6 md:col-span-12 xl:col-span-6 flex flex-col justify-between">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--status-success-bg)] text-[var(--status-success)]">
-                  <DollarSign className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                  <DollarSign
+                    className="h-4 w-4"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
                 </span>
                 Faturamento Confirmado (Sinais + Quitados)
               </div>
               <div className="mt-4 flex flex-wrap items-baseline gap-3">
-                <span className="font-mono-num text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+                <span className="font-mono-num text-4xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-5xl">
                   {formatCurrency(metrics.confirmedTotal)}
                 </span>
                 <span className="badge-success rounded-md px-2.5 py-0.5 font-mono-num text-xs font-semibold">
@@ -446,15 +464,38 @@ export function DashboardView({
             </div>
           </div>
 
-          <div className="mt-6 space-y-3">
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+          {/* 24FPS Film-Reel Timecode Progress Bar */}
+          <div className="mt-6 space-y-2.5">
+            <div className="flex items-center justify-between font-mono-num text-[10px] text-[var(--text-muted)]">
+              <span className="inline-flex items-center gap-1">
+                <Film
+                  className="h-3 w-3 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
+                00:00 · INÍCIO
+              </span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span className="font-bold text-[var(--accent-text)]">
+                97% CLÍMAX
+              </span>
+            </div>
+
+            <div className="relative h-3 w-full overflow-hidden rounded-md bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
               <div
-                className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
-                style={{ width: `${Math.max(4, goalProgress)}%` }}
+                className="h-full bg-[var(--accent)] transition-all duration-500"
+                style={{ width: `${Math.max(3, goalProgress)}%` }}
+              />
+              {/* 97% Climax frame marker line */}
+              <div
+                className="pointer-events-none absolute inset-y-0 w-[2px] bg-[var(--text-primary)]/50"
+                style={{ left: "97%" }}
+                title="Frame 97% Clímax"
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2.5 pt-2 sm:grid-cols-3">
               <div className="rounded-lg bg-[var(--bg-subtle)] px-3.5 py-2.5">
                 <p className="text-[11px] text-[var(--text-muted)]">
                   Sinais (50%)
@@ -488,7 +529,11 @@ export function DashboardView({
           <div>
             <div className="flex items-center justify-between">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
-                <TrendingUp className="h-4.5 w-4.5" strokeWidth={2} aria-hidden="true" />
+                <TrendingUp
+                  className="h-4.5 w-4.5"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
               </span>
               <span className="rounded-md border border-[var(--border-hairline)] px-2.5 py-0.5 font-mono-num text-[11px] text-[var(--text-secondary)]">
                 {metrics.pipelineCount} ativos
@@ -525,7 +570,11 @@ export function DashboardView({
                     : "bg-[var(--status-success-bg)] text-[var(--status-success)]"
                 )}
               >
-                <AlertTriangle className="h-4.5 w-4.5" strokeWidth={2} aria-hidden="true" />
+                <AlertTriangle
+                  className="h-4.5 w-4.5"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
               </span>
               <span className="text-[11px] font-medium text-[var(--text-muted)]">
                 &gt; 48h sem contato
@@ -551,7 +600,49 @@ export function DashboardView({
           </div>
         </section>
 
-        {/* Row 2: Comissões de Parceiros */}
+        {/* Horizontal 6-Stage Commercial Funnel Strip */}
+        <section className="surface-card rounded-xl p-4 md:col-span-12">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Termômetro de Etapas do Funil ({filteredLeads.length} leads)
+            </span>
+            <span className="font-mono-num text-[11px] text-[var(--text-secondary)]">
+              Clique em uma frente abaixo para abrir o Kanban
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+            {stageSummary.map((st, idx) => (
+              <div
+                key={st.id}
+                className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3.5 py-2.5 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-primary)] truncate">
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full shrink-0",
+                        st.accentClass
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span className="font-mono-num text-[10px] text-[var(--text-muted)]">
+                      0{idx + 1}
+                    </span>
+                    {st.shortLabel}
+                  </span>
+                  <span className="rounded-md bg-[var(--bg-surface-solid)] px-1.5 py-0.5 font-mono-num text-[10px] font-bold text-[var(--text-secondary)]">
+                    {st.count}
+                  </span>
+                </div>
+                <p className="mt-1.5 font-mono-num text-xs font-semibold text-[var(--text-secondary)]">
+                  {formatCurrency(st.sum)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Row 3: Comissões de Parceiros */}
         <section className="surface-card rounded-xl p-6 md:col-span-6 xl:col-span-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">

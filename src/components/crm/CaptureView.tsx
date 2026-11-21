@@ -4,8 +4,10 @@ import React, { useMemo, useState } from "react";
 import {
   Check,
   CheckCircle2,
+  CheckSquare,
   Download,
   FileSpreadsheet,
+  Filter,
   Globe,
   Instagram,
   Mail,
@@ -57,6 +59,8 @@ const BH_PRESET_QUERIES = [
   "hotel corporativo Vila da Serra",
 ];
 
+type ResultFilter = "all" | "phone" | "instagram" | "email" | "hide_existing";
+
 interface ParsedCsvRow {
   companyName: string;
   contactName: string;
@@ -100,6 +104,9 @@ export function CaptureView({
     total?: number;
   }>({});
   const [placeResults, setPlaceResults] = useState<PlaceCandidate[]>([]);
+  const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
+  const [selectedPlaceIds, setSelectedPlaceIds] = useState<string[]>([]);
+  const [importingSelectedPlaces, setImportingSelectedPlaces] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [placeFunnels, setPlaceFunnels] = useState<Record<string, FunnelId>>(
     {}
@@ -157,14 +164,28 @@ export function CaptureView({
     return { phones, names };
   }, [leads]);
 
-  const isLeadDuplicate = (companyName: string, phone: string): boolean => {
-    const p = normalizePhone(phone);
-    const n = normalizeName(companyName);
-    return (
-      (Boolean(p) && existingSignatures.phones.has(p)) ||
-      (Boolean(n) && existingSignatures.names.has(n))
-    );
-  };
+  const isLeadDuplicate = React.useCallback(
+    (companyName: string, phone: string): boolean => {
+      const p = normalizePhone(phone);
+      const n = normalizeName(companyName);
+      return (
+        (Boolean(p) && existingSignatures.phones.has(p)) ||
+        (Boolean(n) && existingSignatures.names.has(n))
+      );
+    },
+    [existingSignatures]
+  );
+
+  const filteredPlaceResults = useMemo(() => {
+    return placeResults.filter((p) => {
+      if (resultFilter === "phone") return Boolean(p.phone);
+      if (resultFilter === "instagram") return Boolean(p.enrichedInstagram);
+      if (resultFilter === "email") return Boolean(p.enrichedEmail);
+      if (resultFilter === "hide_existing")
+        return !isLeadDuplicate(p.name, p.phone);
+      return true;
+    });
+  }, [placeResults, resultFilter, isLeadDuplicate]);
 
   const handlePlacesSearch = async (queryOverride?: string) => {
     const q = (queryOverride ?? placesQuery).trim();
@@ -173,6 +194,7 @@ export function CaptureView({
 
     setPlacesLoading(true);
     setHasSearched(true);
+    setSelectedPlaceIds([]);
     try {
       const res = await fetch("/api/places/search", {
         method: "POST",
@@ -181,7 +203,7 @@ export function CaptureView({
       });
       const json = await res.json();
       if (!res.ok) {
-        onNotify(json.error || "Erro ao consultar Places API", "error");
+        onNotify(json.error || "Erro ao consultar estabelecimentos", "error");
         return;
       }
       setPlacesMode(json.mode);
@@ -201,6 +223,83 @@ export function CaptureView({
       onNotify("Falha de rede ao consultar empresas em BH.", "error");
     } finally {
       setPlacesLoading(false);
+    }
+  };
+
+  const toggleSelectPlace = (placeId: string) => {
+    setSelectedPlaceIds((prev) =>
+      prev.includes(placeId)
+        ? prev.filter((id) => id !== placeId)
+        : [...prev, placeId]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    const selectable = filteredPlaceResults
+      .filter((p) => !isLeadDuplicate(p.name, p.phone))
+      .map((p) => p.placeId);
+
+    const allAlreadySelected =
+      selectable.length > 0 &&
+      selectable.every((id) => selectedPlaceIds.includes(id));
+
+    if (allAlreadySelected) {
+      setSelectedPlaceIds([]);
+    } else {
+      setSelectedPlaceIds(selectable);
+    }
+  };
+
+  const handleBulkImportSelectedPlaces = async () => {
+    const chosen = placeResults.filter(
+      (p) =>
+        selectedPlaceIds.includes(p.placeId) &&
+        !isLeadDuplicate(p.name, p.phone)
+    );
+    if (chosen.length === 0) {
+      onNotify("Selecione ao menos 1 empresa inédita para importar.", "info");
+      return;
+    }
+
+    setImportingSelectedPlaces(true);
+    try {
+      const inputs: CreateLeadInput[] = chosen.map((candidate) => {
+        const chosenFunnel =
+          placeFunnels[candidate.placeId] || candidate.suggestedFunnel;
+        const defaultVal =
+          FUNNELS.find((f) => f.id === chosenFunnel)?.defaultValue ?? 1950;
+
+        return {
+          companyName: candidate.name,
+          contactName: "Responsável Comercial",
+          phone: candidate.phone || "(31) 99000-0000",
+          email: candidate.enrichedEmail || "",
+          instagram: candidate.enrichedInstagram || undefined,
+          neighborhood: candidate.neighborhood,
+          address: candidate.address,
+          website: candidate.website,
+          funnel: chosenFunnel,
+          estimatedValue: defaultVal,
+          origin:
+            candidate.source === "overture" || placesMode === "overture_bh"
+              ? "Overture Maps BH"
+              : placesMode === "google_live"
+              ? "Google Places BH"
+              : "OpenStreetMap BH",
+          notes: `Captado em BH (${candidate.category}). Endereço: ${candidate.address}.`,
+        };
+      });
+
+      const res = await onCreateLeadsBulk(inputs);
+      setSelectedPlaceIds([]);
+      onNotify(
+        `${res.imported.length} empresa(s) importadas para o CRM (${res.skippedDuplicates} duplicadas ignoradas).`,
+        "success"
+      );
+    } catch {
+      onNotify("Erro ao importar empresas selecionadas.", "error");
+    } finally {
+      setImportingSelectedPlaces(false);
     }
   };
 
@@ -555,7 +654,7 @@ export function CaptureView({
         </div>
       </div>
 
-      {/* TAB 1: PLACES / OSM BH */}
+      {/* TAB 1: OVERTURE MAPS BH + OSM FALLBACK */}
       {subTab === "places" && (
         <div className="space-y-5">
           <div className="surface-card rounded-xl p-6 space-y-4">
@@ -565,8 +664,8 @@ export function CaptureView({
                   Busca por Nicho + Bairro (BH &amp; Nova Lima)
                 </h2>
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  Extrai nome, telefone, endereço e site com filtro automático
-                  anti-duplicidade.
+                  Extrai nome, telefone, e-mail, Instagram, endereço e site com
+                  filtro automático anti-duplicidade.
                 </p>
               </div>
               <span
@@ -652,7 +751,7 @@ export function CaptureView({
                 aria-hidden="true"
               />
               <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
-                Pronto para prospectar empresas em Belo Horizonte
+                Pronto para prospectar empresas em Belo Horizonte &amp; Nova Lima
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)] max-w-md mx-auto">
                 Digite um nicho e bairro acima ou clique em uma das sugestões
@@ -660,162 +759,261 @@ export function CaptureView({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {placeResults.map((place) => {
-                const duplicate = isLeadDuplicate(place.name, place.phone);
-                const selectedFunnel =
-                  placeFunnels[place.placeId] || place.suggestedFunnel;
+            <div className="space-y-4">
+              {/* Quick Filters + Batch Selection Bar */}
+              <div className="surface-card rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div
+                  className="flex flex-wrap items-center gap-1.5"
+                  role="group"
+                  aria-label="Filtrar resultados da busca"
+                >
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)] mr-1">
+                    <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                    Filtrar:
+                  </span>
+                  {(
+                    [
+                      {
+                        id: "all",
+                        label: `Todos (${placeResults.length})`,
+                      },
+                      {
+                        id: "phone",
+                        label: `Com Telefone (${placeResults.filter((p) => p.phone).length})`,
+                      },
+                      {
+                        id: "instagram",
+                        label: `Com Instagram (${placeResults.filter((p) => p.enrichedInstagram).length})`,
+                      },
+                      {
+                        id: "email",
+                        label: `Com E-mail (${placeResults.filter((p) => p.enrichedEmail).length})`,
+                      },
+                      {
+                        id: "hide_existing",
+                        label: "Ocultar já no CRM",
+                      },
+                    ] as const
+                  ).map((fOpt) => (
+                    <button
+                      key={fOpt.id}
+                      type="button"
+                      onClick={() => setResultFilter(fOpt.id)}
+                      aria-pressed={resultFilter === fOpt.id}
+                      className={cn(
+                        "min-h-[34px] rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                        resultFilter === fOpt.id
+                          ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
+                          : "bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      )}
+                    >
+                      {fOpt.label}
+                    </button>
+                  ))}
+                </div>
 
-                return (
-                  <div
-                    key={place.placeId}
-                    className={cn(
-                      "surface-card rounded-xl p-5 flex flex-col justify-between gap-4",
-                      duplicate && "opacity-75"
-                    )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllFiltered}
+                    className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
                   >
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className="text-[11px] font-semibold text-[var(--accent-text)]">
-                            {place.category}
-                          </span>
-                          <h3 className="mt-0.5 text-base font-bold text-[var(--text-primary)]">
-                            {place.name}
-                          </h3>
+                    <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                    Selecionar página
+                  </button>
+
+                  {selectedPlaceIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBulkImportSelectedPlaces}
+                      disabled={importingSelectedPlaces}
+                      className="btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                      {importingSelectedPlaces
+                        ? "Importando..."
+                        : `Importar Selecionados (${selectedPlaceIds.length})`}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {filteredPlaceResults.map((place) => {
+                  const duplicate = isLeadDuplicate(place.name, place.phone);
+                  const selectedFunnel =
+                    placeFunnels[place.placeId] || place.suggestedFunnel;
+                  const isChecked = selectedPlaceIds.includes(place.placeId);
+
+                  return (
+                    <div
+                      key={place.placeId}
+                      className={cn(
+                        "surface-card rounded-xl p-5 flex flex-col justify-between gap-4 transition-colors",
+                        isChecked && "border-[var(--accent-border)] bg-[var(--accent-soft)]/30",
+                        duplicate && "opacity-75"
+                      )}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            {!duplicate && (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelectPlace(place.placeId)}
+                                aria-label={`Selecionar ${place.name} para importação em lote`}
+                                className="mt-1 h-4 w-4 rounded accent-[var(--accent)] shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[11px] font-semibold text-[var(--accent-text)]">
+                                {place.category} · {place.neighborhood}
+                              </span>
+                              <h3 className="mt-0.5 text-base font-bold text-[var(--text-primary)]">
+                                {place.name}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {place.rating ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2.5 py-1 font-mono-num text-xs font-semibold text-[var(--text-primary)] shrink-0">
+                              <Star
+                                className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]"
+                                aria-hidden="true"
+                              />
+                              {place.rating.toFixed(1)}
+                            </span>
+                          ) : place.confidence ? (
+                            <span
+                              title="Score de confiança Overture Maps"
+                              className="badge-success inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-mono-num text-[11px] font-semibold shrink-0"
+                            >
+                              {Math.round(place.confidence * 100)}% ativo
+                            </span>
+                          ) : null}
                         </div>
 
-                        {place.rating ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2.5 py-1 font-mono-num text-xs font-semibold text-[var(--text-primary)] shrink-0">
-                            <Star
-                              className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]"
-                              aria-hidden="true"
-                            />
-                            {place.rating.toFixed(1)}
-                          </span>
-                        ) : place.confidence ? (
-                          <span
-                            title="Score de confiança Overture Maps"
-                            className="badge-success inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-mono-num text-[11px] font-semibold shrink-0"
-                          >
-                            {Math.round(place.confidence * 100)}% ativo
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-3 space-y-1.5 text-xs text-[var(--text-secondary)]">
-                        <p className="flex items-center gap-2">
-                          <Phone
-                            className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0"
-                            aria-hidden="true"
-                          />
-                          <span className="font-mono-num">
-                            {place.phone || "Telefone não informado"}
-                          </span>
-                        </p>
-                        <p className="flex items-start gap-2">
-                          <MapPin
-                            className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0 mt-0.5"
-                            aria-hidden="true"
-                          />
-                          <span>{place.address}</span>
-                        </p>
-                        {place.website && (
+                        <div className="mt-3 space-y-1.5 text-xs text-[var(--text-secondary)]">
                           <p className="flex items-center gap-2">
-                            <Globe
+                            <Phone
                               className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0"
                               aria-hidden="true"
                             />
-                            <a
-                              href={place.website}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="truncate text-[var(--accent-text)] hover:underline"
-                            >
-                              {place.website.replace(/^https?:\/\//, "")}
-                            </a>
+                            <span className="font-mono-num">
+                              {place.phone || "Telefone não informado"}
+                            </span>
                           </p>
-                        )}
-                        {(place.enrichedEmail || place.enrichedInstagram) && (
-                          <div className="mt-2 flex flex-wrap gap-1.5 pt-1">
-                            {place.enrichedEmail && (
-                              <span className="badge-info inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium">
-                                <Mail className="h-3 w-3" aria-hidden="true" />
-                                {place.enrichedEmail}
-                              </span>
-                            )}
-                            {place.enrichedInstagram && (
-                              <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium">
-                                <Instagram className="h-3 w-3" aria-hidden="true" />
-                                {place.enrichedInstagram}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2.5 border-t border-[var(--border-hairline)] pt-3.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <select
-                          value={selectedFunnel}
-                          disabled={duplicate}
-                          aria-label={`Funil de destino para ${place.name}`}
-                          onChange={(e) =>
-                            setPlaceFunnels((prev) => ({
-                              ...prev,
-                              [place.placeId]: e.target.value as FunnelId,
-                            }))
-                          }
-                          className="input-field min-h-[40px] rounded-lg px-2.5 py-2 text-xs disabled:opacity-50"
-                        >
-                          {FUNNELS.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.label}
-                            </option>
-                          ))}
-                        </select>
-
-                        {place.website && (
-                          <button
-                            type="button"
-                            onClick={() => handleEnrichPlace(place)}
-                            disabled={enrichingPlaceId === place.placeId}
-                            className="btn-ghost inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold disabled:opacity-50"
-                          >
-                            <Globe
-                              className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                          <p className="flex items-start gap-2">
+                            <MapPin
+                              className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0 mt-0.5"
                               aria-hidden="true"
                             />
-                            {enrichingPlaceId === place.placeId
-                              ? "Buscando..."
-                              : "Buscar E-mail/Instagram"}
+                            <span>{place.address}</span>
+                          </p>
+                          {place.website && (
+                            <p className="flex items-center gap-2">
+                              <Globe
+                                className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0"
+                                aria-hidden="true"
+                              />
+                              <a
+                                href={place.website}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="truncate text-[var(--accent-text)] hover:underline"
+                              >
+                                {place.website.replace(/^https?:\/\//, "")}
+                              </a>
+                            </p>
+                          )}
+                          {(place.enrichedEmail || place.enrichedInstagram) && (
+                            <div className="mt-2 flex flex-wrap gap-1.5 pt-1">
+                              {place.enrichedEmail && (
+                                <span className="badge-info inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium">
+                                  <Mail className="h-3 w-3" aria-hidden="true" />
+                                  {place.enrichedEmail}
+                                </span>
+                              )}
+                              {place.enrichedInstagram && (
+                                <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium">
+                                  <Instagram
+                                    className="h-3 w-3"
+                                    aria-hidden="true"
+                                  />
+                                  {place.enrichedInstagram}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5 border-t border-[var(--border-hairline)] pt-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <select
+                            value={selectedFunnel}
+                            disabled={duplicate}
+                            aria-label={`Funil de destino para ${place.name}`}
+                            onChange={(e) =>
+                              setPlaceFunnels((prev) => ({
+                                ...prev,
+                                [place.placeId]: e.target.value as FunnelId,
+                              }))
+                            }
+                            className="input-field min-h-[40px] rounded-lg px-2.5 py-2 text-xs disabled:opacity-50"
+                          >
+                            {FUNNELS.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {place.website && (
+                            <button
+                              type="button"
+                              onClick={() => handleEnrichPlace(place)}
+                              disabled={enrichingPlaceId === place.placeId}
+                              className="btn-ghost inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold disabled:opacity-50"
+                            >
+                              <Globe
+                                className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                                aria-hidden="true"
+                              />
+                              {enrichingPlaceId === place.placeId
+                                ? "Buscando..."
+                                : "Buscar E-mail/Instagram"}
+                            </button>
+                          )}
+                        </div>
+
+                        {duplicate ? (
+                          <span className="badge-success inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold">
+                            <CheckCircle2
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
+                            Já no CRM
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendPlaceToCrm(place)}
+                            disabled={sendingPlaceId === place.placeId}
+                            className="btn-accent inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                            {sendingPlaceId === place.placeId
+                              ? "Enviando..."
+                              : "Enviar para o CRM"}
                           </button>
                         )}
                       </div>
-
-                      {duplicate ? (
-                        <span className="badge-success inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold">
-                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          Já no CRM
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSendPlaceToCrm(place)}
-                          disabled={sendingPlaceId === place.placeId}
-                          className="btn-accent inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
-                        >
-                          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                          {sendingPlaceId === place.placeId
-                            ? "Enviando..."
-                            : "Enviar para o CRM"}
-                        </button>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

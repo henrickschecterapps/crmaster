@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Aperture,
   Award,
   Calendar,
   Camera,
@@ -67,6 +68,121 @@ interface ApprovedConfirmationData {
   };
 }
 
+const VERTICAL_STORYBOARD: Record<
+  FunnelId,
+  {
+    lens: string;
+    colorProfile: string;
+    frames: Array<{ tc: string; title: string; detail: string }>;
+  }
+> = {
+  corporativo: {
+    lens: "35mm & 85mm f/1.4 · Dual Slot RAW",
+    colorProfile: "4K 24FPS · Rec.709 Editorial + Áudio Lapela",
+    frames: [
+      {
+        tc: "00:00:14:08",
+        title: "Keynotes & Liderança",
+        detail: "Enquadramento de autoridade no palco e reação da plateia.",
+      },
+      {
+        tc: "00:01:42:19",
+        title: "Networking & Cultura",
+        detail: "Momentos espontâneos para Employer Branding e LinkedIn.",
+      },
+      {
+        tc: "00:02:58:23",
+        title: "Aftermovie Institucional 4K",
+        detail: "Corte dinâmico com depoimentos e identidade da empresa.",
+      },
+    ],
+  },
+  estetica: {
+    lens: "50mm & 85mm Prime · Luz Difusa Clean Skin",
+    colorProfile: "4K Vertical · Fidelidade de Pele + Lapela Wireless",
+    frames: [
+      {
+        tc: "00:00:03:00",
+        title: "Hook de Retenção (3s)",
+        detail: "Abertura magnética pensada para performance em Meta Ads.",
+      },
+      {
+        tc: "00:00:28:12",
+        title: "Procedimento & Detalhe",
+        detail: "Close-ups limpos que transmitem biossegurança e alto padrão.",
+      },
+      {
+        tc: "00:01:15:04",
+        title: "Retrato de Autoridade",
+        detail: "Direção de postura no consultório para feed e anúncios.",
+      },
+    ],
+  },
+  nightlife: {
+    lens: "24mm & 35mm f/1.4 Low-Light + Flash Shutter Drag",
+    colorProfile: "4K 60/24FPS · High-Contrast Cinema Club",
+    frames: [
+      {
+        tc: "00:00:09:16",
+        title: "Energia de Pista & DJ",
+        detail: "Movimento de luz, atmosfera noturna e pista cheia.",
+      },
+      {
+        tc: "00:01:19:02",
+        title: "Coquetelaria & Público",
+        detail: "Lifestyle espontâneo em alta nitidez sem estourar o ambiente.",
+      },
+      {
+        tc: "00:02:11:22",
+        title: "Aftermovie no Beat",
+        detail: "Edição rítmica entregue em até 48h para impulsionar o próximo evento.",
+      },
+    ],
+  },
+  moda: {
+    lens: "50mm & 85mm f/1.4 · Fidelidade de Cor & Textura",
+    colorProfile: "4K Vertical · Color Checker Calibrado",
+    frames: [
+      {
+        tc: "00:00:11:05",
+        title: "Caimento em Movimento",
+        detail: "Fashion Reels 4K destacando fluidez e corte de cada peça.",
+      },
+      {
+        tc: "00:00:48:17",
+        title: "Macro de Tecido & Acabamento",
+        detail: "Detalhes de costura e aviamentos que valorizam o ticket da coleção.",
+      },
+      {
+        tc: "00:01:36:20",
+        title: "Spoiler no Mesmo Dia (6h)",
+        detail: "10 a 15 fotos prontas no mesmo dia para lançamento imediato.",
+      },
+    ],
+  },
+  gastronomia: {
+    lens: "50mm & 90mm Macro · Estúdio Portátil Dedicado",
+    colorProfile: "4K Food Reels / ASMR · Otimização iFood + Alta Res",
+    frames: [
+      {
+        tc: "00:00:06:14",
+        title: "Hero Shot de Apetite",
+        detail: "Iluminação lateral ressaltando brilho, vapor e frescor dos ingredientes.",
+      },
+      {
+        tc: "00:00:34:09",
+        title: "Preparo & Finalização (ASMR)",
+        detail: "Corte, calda, brasa e coquetelaria em 4K para Reels de alta fome visual.",
+      },
+      {
+        tc: "00:01:22:18",
+        title: "Cardápio iFood & Ambiente",
+        detail: "Arquivos calibrados para conversão no delivery e posicionamento da casa.",
+      },
+    ],
+  },
+};
+
 const DIFFERENTIALS = [
   {
     icon: ShieldCheck,
@@ -110,6 +226,8 @@ export function ProposalClient({
     () => getServiceVertical(selectedVerticalId),
     [selectedVerticalId]
   );
+
+  const storyboard = VERTICAL_STORYBOARD[selectedVerticalId];
 
   const activePackages = useMemo(() => {
     if (selectedVerticalId === "moda" && useSocialModa) {
@@ -194,6 +312,21 @@ export function ProposalClient({
   }, [selectedPackage, selectedAddons]);
 
   const depositValue = totalValue * 0.5;
+
+  const quickQuestionWhatsappUrl = useMemo(() => {
+    const addonNames = selectedAddons.map((a) => a.name);
+    const addonsText =
+      addonNames.length > 0 ? ` + ${addonNames.join(", ")}` : "";
+    const msg = `Olá Henrique (ÚLTIMO QUADRO)! Estou vendo a proposta interativa da *${lead.companyName}* (${currentVertical.title}: pacote *${selectedPackage.name}*${addonsText} · ${formatCurrencyExact(totalValue)}) e gostaria de alinhar uma dúvida rápida.`;
+    return buildWhatsappUrl(studioWhatsapp, msg);
+  }, [
+    lead.companyName,
+    currentVertical.title,
+    selectedPackage.name,
+    selectedAddons,
+    totalValue,
+    studioWhatsapp,
+  ]);
 
   const toggleAddon = (id: string) => {
     setSelectedAddonIds((prev) =>
@@ -313,13 +446,24 @@ export function ProposalClient({
   };
 
   return (
-    <div className="min-h-[100dvh] pb-20">
+    <div className="min-h-[100dvh] pb-28 lg:pb-20">
+      <div className="cinema-grain" aria-hidden="true" />
+
       <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <BrandMark showTagline />
 
-          <div className="flex items-center gap-2.5">
-            <span className="badge-accent hidden sm:inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono-num text-[11px] font-semibold">
+          <div className="flex items-center gap-2">
+            <a
+              href={quickQuestionWhatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="badge-success hidden sm:inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold hover:opacity-85"
+            >
+              <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              Falar no WhatsApp
+            </a>
+            <span className="badge-accent hidden md:inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono-num text-[11px] font-semibold">
               <Camera className="h-3 w-3" aria-hidden="true" />
               24FPS · PROPOSTA INTERATIVA
             </span>
@@ -349,10 +493,10 @@ export function ProposalClient({
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 lg:px-8 space-y-12">
+      <main className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 lg:px-8 space-y-10">
         {approvedInfo ? (
           <section className="space-y-6">
-            <div className="surface-card rounded-xl border border-[var(--status-success-border)] p-6 sm:p-8 space-y-3">
+            <div className="surface-card viewfinder-frame rounded-xl border border-[var(--status-success-border)] p-6 sm:p-8 space-y-3">
               <div className="badge-success inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wider">
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 Proposta Aprovada &amp; Pré-Reserva Confirmada
@@ -553,7 +697,7 @@ export function ProposalClient({
               </div>
 
               <div className="lg:col-span-4">
-                <div className="surface-card rounded-xl p-5 space-y-2.5 text-xs">
+                <div className="surface-card viewfinder-frame rounded-xl p-5 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Cliente</span>
                     <span className="font-semibold text-[var(--text-primary)] truncate">
@@ -582,7 +726,7 @@ export function ProposalClient({
               </div>
             </section>
 
-            {/* Vertical Selector + Pillars */}
+            {/* Vertical Selector + Cinema 24FPS Storyboard Showcase */}
             <section className="space-y-4">
               <div
                 className="flex flex-wrap items-center gap-1.5 rounded-xl p-1.5 surface-card"
@@ -617,20 +761,67 @@ export function ProposalClient({
                 })}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {currentVertical.pillars.map((p) => (
-                  <div
-                    key={p.num}
-                    className="surface-card rounded-xl px-4 py-3.5"
-                  >
-                    <p className="font-mono-num text-[11px] font-bold text-[var(--accent-text)]">
-                      {p.num}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-[var(--text-primary)]">
-                      {p.label}
-                    </p>
+              {/* Cinema Storyboard & Technical Direction Strip */}
+              <div className="surface-card rounded-xl p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-3">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Aperture
+                      className="h-4 w-4 text-[var(--accent-text)]"
+                      aria-hidden="true"
+                    />
+                    <span className="font-bold text-[var(--text-primary)]">
+                      Direção de Fotografia &amp; Storyboard 24FPS
+                    </span>
                   </div>
-                ))}
+                  <div className="flex flex-wrap items-center gap-2 font-mono-num text-[11px] text-[var(--text-secondary)]">
+                    <span className="rounded-md bg-[var(--bg-subtle)] px-2.5 py-1">
+                      {storyboard.lens}
+                    </span>
+                    <span className="rounded-md bg-[var(--bg-subtle)] px-2.5 py-1 text-[var(--accent-text)]">
+                      {storyboard.colorProfile}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {storyboard.frames.map((frame, fIdx) => (
+                    <div
+                      key={frame.tc}
+                      className="viewfinder-frame rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between font-mono-num text-[10px] text-[var(--text-muted)]">
+                          <span>FRAME 0{fIdx + 1}</span>
+                          <span className="text-[var(--accent-text)]">
+                            TC {frame.tc}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs font-bold text-[var(--text-primary)]">
+                          {frame.title}
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                          {frame.detail}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 pt-1">
+                  {currentVertical.pillars.map((p) => (
+                    <div
+                      key={p.num}
+                      className="rounded-lg bg-[var(--bg-subtle)] px-3.5 py-2.5 border border-[var(--border-hairline)]"
+                    >
+                      <p className="font-mono-num text-[10px] font-bold text-[var(--accent-text)]">
+                        {p.num}
+                      </p>
+                      <p className="mt-0.5 text-xs font-bold text-[var(--text-primary)]">
+                        {p.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -680,7 +871,7 @@ export function ProposalClient({
                           className={cn(
                             "relative flex flex-col justify-between rounded-xl p-6 text-left transition-colors border",
                             isSelected
-                              ? "bg-[var(--accent-soft)] border-[var(--accent-border)]"
+                              ? "viewfinder-frame bg-[var(--accent-soft)] border-[var(--accent-border)]"
                               : "surface-card hover:border-[var(--border-strong)]"
                           )}
                         >
@@ -691,7 +882,10 @@ export function ProposalClient({
                               </span>
                               {pkg.badge && (
                                 <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-btn)] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent-fg)]">
-                                  <Award className="h-3 w-3" aria-hidden="true" />
+                                  <Award
+                                    className="h-3 w-3"
+                                    aria-hidden="true"
+                                  />
                                   {pkg.badge}
                                 </span>
                               )}
@@ -868,7 +1062,7 @@ export function ProposalClient({
 
               {/* Right: Sticky Dynamic Pricing Summary */}
               <aside className="lg:col-span-4 lg:sticky lg:top-24">
-                <div className="surface-card rounded-xl p-6 space-y-5">
+                <div className="surface-card viewfinder-frame rounded-xl p-6 space-y-5">
                   <div>
                     <p className="font-mono-num text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent-text)]">
                       Investimento Transparente
@@ -931,14 +1125,26 @@ export function ProposalClient({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowApprovalModal(true)}
-                    className="btn-accent w-full inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-5 py-3.5 text-sm font-extrabold"
-                  >
-                    <CheckCircle2 className="h-4.5 w-4.5" aria-hidden="true" />
-                    Aprovar Proposta e Reservar Data
-                  </button>
+                  <div className="space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowApprovalModal(true)}
+                      className="btn-accent w-full inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-5 py-3.5 text-sm font-extrabold"
+                    >
+                      <CheckCircle2 className="h-4.5 w-4.5" aria-hidden="true" />
+                      Aprovar Proposta e Reservar Data
+                    </button>
+
+                    <a
+                      href={quickQuestionWhatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-ghost w-full inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold text-[var(--status-success)]"
+                    >
+                      <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                      Tirar dúvida rápida no WhatsApp
+                    </a>
+                  </div>
 
                   <p className="text-center text-[11px] leading-relaxed text-[var(--text-muted)]">
                     Gera automaticamente o Contrato/Termo em PDF e o QR Code Pix
@@ -950,6 +1156,50 @@ export function ProposalClient({
           </>
         )}
       </main>
+
+      {/* Fixed Mobile Conversion Bottom Bar */}
+      {!approvedInfo && (
+        <div className="glass-bar safe-bottom fixed bottom-0 inset-x-0 z-30 border-t border-[var(--border-hairline)] px-4 pt-2.5 lg:hidden">
+          <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-[var(--text-primary)]">
+                {selectedPackage.name}
+              </p>
+              <p className="font-mono-num text-[11px] text-[var(--text-secondary)]">
+                Total:{" "}
+                <strong className="text-[var(--text-primary)]">
+                  {formatCurrency(totalValue)}
+                </strong>{" "}
+                · Sinal:{" "}
+                <span className="text-[var(--accent-text)] font-bold">
+                  {formatCurrency(depositValue)}
+                </span>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={quickQuestionWhatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="badge-success flex h-11 w-11 items-center justify-center rounded-lg"
+                aria-label="Tirar dúvida no WhatsApp"
+                title="Tirar dúvida no WhatsApp"
+              >
+                <MessageCircle className="h-4.5 w-4.5" aria-hidden="true" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowApprovalModal(true)}
+                className="btn-accent inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-extrabold"
+              >
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                Reservar Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Approval & Reservation Modal */}
       {showApprovalModal && (

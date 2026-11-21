@@ -41,6 +41,7 @@ import {
 } from "@/types/crm";
 import {
   buildPostSaleChecklist,
+  buildWhatsappUrl,
   cn,
   formatCnpj,
   formatCpf,
@@ -51,6 +52,8 @@ import {
   formatPhoneBr,
   getLeadStagnation,
 } from "@/lib/utils";
+
+type DrawerTab = "overview" | "finance" | "timeline";
 
 interface LeadDetailModalProps {
   lead: Lead;
@@ -82,6 +85,7 @@ export function LeadDetailModal({
   onOpenDispatcher,
   onNotify,
 }: LeadDetailModalProps) {
+  const [activeTab, setActiveTab] = useState<DrawerTab>("overview");
   const [companyName, setCompanyName] = useState(lead.companyName);
   const [contactName, setContactName] = useState(lead.contactName);
   const [contactRole, setContactRole] = useState(lead.contactRole || "");
@@ -179,6 +183,7 @@ export function LeadDetailModal({
     try {
       await navigator.clipboard.writeText(fullProposalUrl);
       setCopiedLink(true);
+      onNotify("Link da proposta copiado para a área de transferência.", "info");
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {
       // Ignore clipboard failure
@@ -479,811 +484,878 @@ export function LeadDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-hairline)] px-5 py-4 sm:px-6">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-text)]">
-                Detalhes do Lead
-              </span>
-              {stagnation.level === "critical" && (
-                <span className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                  <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                  {stagnation.label}
+        <div className="border-b border-[var(--border-hairline)] px-5 pt-4 pb-3 sm:px-6 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-mono-num text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-text)]">
+                  Ficha do Lead · {formatCurrency(numericValue)}
                 </span>
-              )}
-              {stagnation.level === "warning" && (
-                <span className="badge-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                  <Clock className="h-3 w-3" aria-hidden="true" />
-                  {stagnation.label}
-                </span>
-              )}
-              {lead.visualizadaEm && (
-                <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                  <Eye className="h-3 w-3" aria-hidden="true" />
-                  Visualizada {lead.visualizacoesProposta}x
-                </span>
-              )}
-              {(lead.tags ?? []).map((tag) => (
-                <span
-                  key={tag}
-                  className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <h2
-              id="lead-detail-title"
-              className="mt-1 truncate text-xl font-bold text-[var(--text-primary)]"
-            >
-              {lead.companyName}
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onOpenDispatcher(lead)}
-              className="btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold"
-            >
-              <Send className="h-3.5 w-3.5" aria-hidden="true" />
-              Disparar Msg
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
-              aria-label="Fechar detalhes do lead"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 space-y-6">
-          {/* Follow-up Automation & Safety Lock Strip */}
-          <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                  automacaoAtiva
-                    ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
-                    : "bg-[var(--bg-surface-solid)] text-[var(--text-muted)]"
+                {stagnation.level === "critical" && (
+                  <span className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                    <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                    {stagnation.label}
+                  </span>
                 )}
-              >
-                <Bot className="h-4.5 w-4.5" aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-xs font-bold text-[var(--text-primary)]">
-                  Régua de Follow-up Automático (Dia 2 / Dia 5)
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  {respondeu
-                    ? "Cliente respondeu. Trava de segurança desativou a cadência."
-                    : automacaoAtiva
-                    ? `Ativa (etapa atual: ${
-                        lead.followupStep === 0
-                          ? "aguardando Dia 2"
-                          : lead.followupStep === 1
-                          ? "Dia 2 enviado"
-                          : "Dia 5 / Último Toque enviado"
-                      })`
-                    : "Desativada para este lead."}
-                </p>
+                {stagnation.level === "warning" && (
+                  <span className="badge-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                    {stagnation.label}
+                  </span>
+                )}
+                {lead.visualizadaEm && (
+                  <span className="badge-accent inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                    <Eye className="h-3 w-3" aria-hidden="true" />
+                    Visualizada {lead.visualizacoesProposta}x
+                  </span>
+                )}
+                {(lead.tags ?? []).map((tag) => (
+                  <span
+                    key={tag}
+                    className="badge-danger inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold"
+                  >
+                    {tag}
+                  </span>
+                ))}
               </div>
+              <h2
+                id="lead-detail-title"
+                className="mt-1 truncate text-xl font-bold text-[var(--text-primary)]"
+              >
+                {lead.companyName}
+              </h2>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <label
-                htmlFor="lead-automacao-toggle"
-                className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]"
+            <div className="flex items-center gap-1.5 shrink-0">
+              <a
+                href={buildWhatsappUrl(
+                  phone,
+                  `Olá ${contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO.`
+                )}
+                target="_blank"
+                rel="noreferrer"
+                className="badge-success inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold"
+                title="Chamar no WhatsApp direto"
               >
-                <input
-                  id="lead-automacao-toggle"
-                  type="checkbox"
-                  checked={automacaoAtiva}
-                  onChange={(e) => {
-                    const next = e.target.checked;
-                    setAutomacaoAtiva(next);
-                    if (next) setRespondeu(false);
-                  }}
-                  className="h-4 w-4 rounded accent-[var(--accent)]"
+                <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => onOpenDispatcher(lead)}
+                className="btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold"
+              >
+                <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">Disparar Script</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                aria-label="Fechar detalhes do lead"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          {/* Persistent Proposal & PDF Quick Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--bg-subtle)] px-3 py-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold text-[var(--text-secondary)] shrink-0">
+                Proposta:
+              </span>
+              <span className="truncate font-mono-num text-[11px] text-[var(--text-muted)]">
+                {fullProposalUrl}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleCopyProposal}
+                className="btn-ghost inline-flex min-h-[32px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold bg-[var(--bg-surface-solid)]"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check
+                      className="h-3 w-3 text-[var(--status-success)]"
+                      aria-hidden="true"
+                    />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" aria-hidden="true" />
+                    Copiar Link
+                  </>
+                )}
+              </button>
+              <a
+                href={proposalPath}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-ghost inline-flex min-h-[32px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold bg-[var(--bg-surface-solid)]"
+              >
+                <ExternalLink
+                  className="h-3 w-3 text-[var(--accent-text)]"
+                  aria-hidden="true"
                 />
-                Automação
-              </label>
-
-              {!respondeu ? (
-                <button
-                  type="button"
-                  onClick={handleMarkResponded}
-                  className="badge-success inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold hover:opacity-85"
-                >
-                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  Marcar como Respondeu
-                </button>
-              ) : (
-                <span className="badge-success inline-flex min-h-[38px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold">
-                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Respondeu
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Trackable Proposal Banner + PDF Contract Box */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-            <div className="sm:col-span-7 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4 flex flex-col justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-[var(--text-primary)]">
-                  Proposta Web Rastreável + Radar
-                </p>
-                <p className="mt-0.5 truncate font-mono-num text-[11px] text-[var(--text-secondary)]">
-                  {fullProposalUrl}
-                </p>
-                {lead.visualizadaEm ? (
-                  <p className="mt-1 text-[11px] text-[var(--accent-text)]">
-                    Aberta {lead.visualizacoesProposta}x · primeira em{" "}
-                    {formatDateTimeBr(lead.visualizadaEm)}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                    Dispara alerta de Radar ao abrir (debounce 10 min).
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyProposal}
-                  className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-[var(--bg-surface-solid)]"
-                >
-                  {copiedLink ? (
-                    <>
-                      <Check
-                        className="h-3.5 w-3.5 text-[var(--status-success)]"
-                        aria-hidden="true"
-                      />
-                      Copiado
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                      Copiar Link
-                    </>
-                  )}
-                </button>
-                <a
-                  href={proposalPath}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                  Abrir Proposta
-                </a>
-              </div>
-            </div>
-
-            <div className="sm:col-span-5 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 flex flex-col justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]">
-                  <FileText
-                    className="h-4 w-4 text-[var(--accent-text)]"
-                    aria-hidden="true"
-                  />
-                  {isPortrait ? "Termo de Imagem (PDF)" : "Contrato PDF"}
-                </div>
-                {lead.contractDocument ? (
-                  <p className="mt-1 truncate font-mono-num text-[11px] text-[var(--status-success)]">
-                    {lead.contractDocument.fileName}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                    Gerado automaticamente na aprovação ou sob demanda abaixo.
-                  </p>
-                )}
-              </div>
+                Abrir
+              </a>
               <a
                 href={`/api/proposals/${lead.id}/pdf`}
                 download
-                className="btn-ghost inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold bg-[var(--bg-surface-solid)]"
+                className="btn-ghost inline-flex min-h-[32px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold bg-[var(--bg-surface-solid)]"
               >
                 <Download
-                  className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                  className="h-3 w-3 text-[var(--accent-text)]"
                   aria-hidden="true"
                 />
-                Baixar PDF Agora
+                {isPortrait ? "Termo PDF" : "Contrato PDF"}
               </a>
             </div>
           </div>
 
-          {/* Core Editable Fields + Website Enricher */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="lead-company"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Empresa / Cliente
-              </label>
-              <input
-                id="lead-company"
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
+          {/* 3-Tab Navigation */}
+          <div
+            className="grid grid-cols-3 gap-1.5 rounded-lg bg-[var(--bg-subtle)] p-1"
+            role="tablist"
+            aria-label="Seções da ficha do lead"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "overview"}
+              onClick={() => setActiveTab("overview")}
+              className={cn(
+                "min-h-[36px] rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors",
+                activeTab === "overview"
+                  ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+            >
+              1. Cadastro &amp; Régua
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "finance"}
+              onClick={() => setActiveTab("finance")}
+              className={cn(
+                "min-h-[36px] rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors",
+                activeTab === "finance"
+                  ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+            >
+              2. Financeiro &amp; Pós-Venda
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "timeline"}
+              onClick={() => setActiveTab("timeline")}
+              className={cn(
+                "min-h-[36px] rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors",
+                activeTab === "timeline"
+                  ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+            >
+              3. Timeline ({lead.interactions.length})
+            </button>
+          </div>
+        </div>
 
-            <div>
-              <label
-                htmlFor="lead-contact"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Decisor / Contato
-              </label>
-              <input
-                id="lead-contact"
-                type="text"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-phone"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                WhatsApp / Telefone
-              </label>
-              <input
-                id="lead-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
-                placeholder="(31) 99999-9999"
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-email"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                E-mail Comercial
-              </label>
-              <input
-                id="lead-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-website"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Website
-              </label>
-              <div className="flex gap-1.5">
-                <div className="relative flex-1">
-                  <Globe
-                    className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
-                    aria-hidden="true"
-                  />
+        {/* Scrollable Tab Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 space-y-5">
+          {/* TAB 1: OVERVIEW & CADASTRO */}
+          {activeTab === "overview" && (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="lead-company"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Empresa / Cliente
+                  </label>
                   <input
-                    id="lead-website"
+                    id="lead-company"
                     type="text"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="https://empresa.com.br"
-                    className="input-field min-h-[42px] w-full rounded-lg py-2 pl-8 pr-3 text-xs"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={handleEnrichWebsite}
-                  disabled={enriching}
-                  className="btn-ghost shrink-0 inline-flex min-h-[42px] items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-semibold disabled:opacity-50"
-                  title="Buscar e-mail corporativo e Instagram no site"
-                >
-                  <Search
-                    className="h-3.5 w-3.5 text-[var(--accent-text)]"
-                    aria-hidden="true"
-                  />
-                  {enriching ? "..." : "Enriquecer"}
-                </button>
-              </div>
-            </div>
 
-            <div>
-              <label
-                htmlFor="lead-instagram"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Instagram
-              </label>
-              <div className="relative">
-                <Instagram
-                  className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
-                  aria-hidden="true"
-                />
-                <input
-                  id="lead-instagram"
-                  type="text"
-                  value={instagram}
-                  onChange={(e) => setInstagram(e.target.value)}
-                  placeholder="@empresa"
-                  className="input-field min-h-[42px] w-full rounded-lg py-2 pl-8 pr-3 text-xs"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-funnel"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Funil
-              </label>
-              <select
-                id="lead-funnel"
-                value={funnel}
-                onChange={(e) => setFunnel(e.target.value as Lead["funnel"])}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
-              >
-                {FUNNELS.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label} ({f.subtitle})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-stage"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Etapa do Kanban
-              </label>
-              <select
-                id="lead-stage"
-                value={stage}
-                onChange={(e) => setStage(e.target.value as StageId)}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
-              >
-                {STAGES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-value"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Valor Estimado (R$)
-              </label>
-              <input
-                id="lead-value"
-                type="number"
-                min={0}
-                value={estimatedValue}
-                onChange={(e) => setEstimatedValue(e.target.value)}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm font-semibold"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="lead-event-date"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                Data do Evento / Ensaio
-              </label>
-              <div className="relative">
-                <Calendar
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-                  aria-hidden="true"
-                />
-                <input
-                  id="lead-event-date"
-                  type="date"
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                  className="input-field min-h-[42px] w-full rounded-lg py-2 pl-9 pr-3 font-mono-num text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Status (50% Sinal / 50% Final) */}
-          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <CreditCard
-                  className="h-4 w-4 text-[var(--status-success)]"
-                  aria-hidden="true"
-                />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                  Status Financeiro (50% Sinal / 50% Quitação)
-                </h3>
-              </div>
-              <span className="font-mono-num text-xs text-[var(--text-secondary)]">
-                Sinal 50%: {formatCurrency(numericValue * 0.5)}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {(
-                [
-                  { id: "pendente", label: "Pendente", sub: "R$ 0 recebido" },
-                  {
-                    id: "sinal_pago",
-                    label: "Sinal Pago (50%)",
-                    sub: formatCurrency(numericValue * 0.5),
-                  },
-                  {
-                    id: "quitado",
-                    label: "Quitado (100%)",
-                    sub: formatCurrency(numericValue),
-                  },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setPaymentStatus(opt.id)}
-                  aria-pressed={paymentStatus === opt.id}
-                  className={cn(
-                    "min-h-[54px] rounded-lg border px-3 py-2.5 text-left transition-colors",
-                    paymentStatus === opt.id
-                      ? "badge-success"
-                      : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-                  )}
-                >
-                  <p className="text-xs font-bold">{opt.label}</p>
-                  <p className="mt-0.5 font-mono-num text-[11px] opacity-85">
-                    {opt.sub}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Automatic Post-Sale & Recurrence Checklist */}
-          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <ClipboardCheck
-                  className="h-4 w-4 text-[var(--status-success)]"
-                  aria-hidden="true"
-                />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                  Checklist de Pós-Venda &amp; Recorrência
-                </h3>
-              </div>
-              {checklist.length > 0 ? (
-                <span className="font-mono-num text-xs font-semibold text-[var(--status-success)]">
-                  {completedChecklist}/{checklist.length} concluídas
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateChecklistNow}
-                  className="text-xs font-semibold text-[var(--accent-text)] hover:underline"
-                >
-                  + Gerar Checklist Agora
-                </button>
-              )}
-            </div>
-
-            {checklist.length === 0 ? (
-              <p className="text-xs text-[var(--text-muted)]">
-                Criado automaticamente ao mover o card para{" "}
-                <strong>Fechado</strong> (com datas de prévia, galeria, NF,
-                depoimento e alerta de recorrência).
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {checklist.map((item) => (
+                <div>
                   <label
-                    key={item.id}
+                    htmlFor="lead-contact"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Decisor / Contato
+                  </label>
+                  <input
+                    id="lead-contact"
+                    type="text"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-phone"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    WhatsApp / Telefone
+                  </label>
+                  <input
+                    id="lead-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
+                    placeholder="(31) 99999-9999"
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-email"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    E-mail Comercial
+                  </label>
+                  <input
+                    id="lead-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-website"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Website
+                  </label>
+                  <div className="flex gap-1.5">
+                    <div className="relative flex-1">
+                      <Globe
+                        className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
+                        aria-hidden="true"
+                      />
+                      <input
+                        id="lead-website"
+                        type="text"
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        placeholder="https://empresa.com.br"
+                        className="input-field min-h-[42px] w-full rounded-lg py-2 pl-8 pr-3 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleEnrichWebsite}
+                      disabled={enriching}
+                      className="btn-ghost shrink-0 inline-flex min-h-[42px] items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-semibold disabled:opacity-50"
+                      title="Buscar e-mail corporativo e Instagram no site"
+                    >
+                      <Search
+                        className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                        aria-hidden="true"
+                      />
+                      {enriching ? "..." : "Enriquecer"}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-instagram"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Instagram
+                  </label>
+                  <div className="relative">
+                    <Instagram
+                      className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]"
+                      aria-hidden="true"
+                    />
+                    <input
+                      id="lead-instagram"
+                      type="text"
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      placeholder="@empresa"
+                      className="input-field min-h-[42px] w-full rounded-lg py-2 pl-8 pr-3 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-funnel"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Vertical / Funil
+                  </label>
+                  <select
+                    id="lead-funnel"
+                    value={funnel}
+                    onChange={(e) => setFunnel(e.target.value as Lead["funnel"])}
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
+                  >
+                    {FUNNELS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.label} ({f.subtitle})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-stage"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Etapa do Kanban
+                  </label>
+                  <select
+                    id="lead-stage"
+                    value={stage}
+                    onChange={(e) => setStage(e.target.value as StageId)}
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
+                  >
+                    {STAGES.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-value"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Valor Estimado (R$)
+                  </label>
+                  <input
+                    id="lead-value"
+                    type="number"
+                    min={0}
+                    value={estimatedValue}
+                    onChange={(e) => setEstimatedValue(e.target.value)}
+                    className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="lead-event-date"
+                    className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                  >
+                    Data do Evento / Produção
+                  </label>
+                  <div className="relative">
+                    <Calendar
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                      aria-hidden="true"
+                    />
+                    <input
+                      id="lead-event-date"
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="input-field min-h-[42px] w-full rounded-lg py-2 pl-9 pr-3 font-mono-num text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="lead-notes"
+                  className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
+                >
+                  Anotações Estratégicas do Projeto
+                </label>
+                <textarea
+                  id="lead-notes"
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Briefing do evento, expectativas de entrega, restrições de horário..."
+                  className="input-field w-full rounded-lg px-3.5 py-2.5 text-sm leading-relaxed"
+                />
+              </div>
+
+              {/* Follow-up Automation & Safety Lock Strip */}
+              <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <span
                     className={cn(
-                      "flex min-h-[42px] cursor-pointer items-center justify-between gap-3 rounded-lg border px-3.5 py-2 text-xs transition-colors",
-                      item.completed
-                        ? "border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--text-muted)] line-through"
-                        : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-primary)]"
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                      automacaoAtiva
+                        ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                        : "bg-[var(--bg-surface-solid)] text-[var(--text-muted)]"
                     )}
                   >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() => handleToggleChecklistItem(item.id)}
-                        className="h-4 w-4 rounded accent-[var(--accent)] shrink-0"
-                      />
-                      <span className="truncate font-medium">{item.title}</span>
-                    </span>
-                    <span className="shrink-0 font-mono-num text-[11px] text-[var(--text-secondary)]">
-                      {formatDateBr(item.dueDate)}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Partner Linking & Automatic 15% Commission */}
-          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Handshake
-                  className="h-4 w-4 text-[var(--accent-text)]"
-                  aria-hidden="true"
-                />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                  Parceiro Indicador &amp; Comissão Automática (15%)
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewPartner((prev) => !prev)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-text)] hover:underline"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                Novo Parceiro
-              </button>
-            </div>
-
-            {showNewPartner && (
-              <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface-solid)] p-3.5 space-y-2.5">
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    placeholder="Nome do parceiro"
-                    aria-label="Nome do novo parceiro"
-                    value={newPartnerName}
-                    onChange={(e) => setNewPartnerName(e.target.value)}
-                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
-                  />
-                  <select
-                    aria-label="Perfil do novo parceiro"
-                    value={newPartnerRole}
-                    onChange={(e) =>
-                      setNewPartnerRole(e.target.value as PartnerRole)
-                    }
-                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
-                  >
-                    <option value="gerente_espaco">
-                      Gerente de Espaço de Eventos (15%)
-                    </option>
-                    <option value="modelo_provador">
-                      Modelo de Provador (15%)
-                    </option>
-                    <option value="outro">Parceiro Comercial (15%)</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Espaço / Agência / Região"
-                    aria-label="Espaço ou agência do novo parceiro"
-                    value={newPartnerCompany}
-                    onChange={(e) => setNewPartnerCompany(e.target.value)}
-                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="WhatsApp (31) 9..."
-                    aria-label="WhatsApp do novo parceiro"
-                    value={newPartnerPhone}
-                    onChange={(e) =>
-                      setNewPartnerPhone(formatPhoneBr(e.target.value))
-                    }
-                    className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 font-mono-num text-xs"
-                  />
+                    <Bot className="h-4.5 w-4.5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-[var(--text-primary)]">
+                      Régua de Follow-up Automático (Dia 2 / Dia 5)
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {respondeu
+                        ? "Cliente respondeu. Trava de segurança desativou a cadência."
+                        : automacaoAtiva
+                        ? `Ativa (etapa atual: ${
+                            lead.followupStep === 0
+                              ? "aguardando Dia 2"
+                              : lead.followupStep === 1
+                              ? "Dia 2 enviado"
+                              : "Dia 5 / Último Toque enviado"
+                          })`
+                        : "Desativada para este lead."}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPartner(false)}
-                    className="btn-ghost min-h-[38px] rounded-lg px-3 py-1.5 text-xs"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreatePartnerInline}
-                    className="btn-accent min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-bold"
-                  >
-                    Cadastrar &amp; Vincular
-                  </button>
-                </div>
-              </div>
-            )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-center">
-              <div className="sm:col-span-7">
-                <label htmlFor="lead-partner-select" className="sr-only">
-                  Parceiro indicador
-                </label>
-                <select
-                  id="lead-partner-select"
-                  value={partnerId}
-                  onChange={(e) => setPartnerId(e.target.value)}
-                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-xs"
-                >
-                  <option value="">Sem parceiro indicador (venda direta)</option>
-                  {partners.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({PARTNER_ROLES[p.role]} · {p.commissionRate}%)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-5 flex items-center justify-between rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)] px-3.5 py-2">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Comissão ({commissionRate}%)
-                  </p>
-                  <p className="font-mono-num text-sm font-bold text-[var(--accent-text)]">
-                    {formatCurrencyExact(commissionAmount)}
-                  </p>
-                </div>
-                {partnerId && (
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <label
-                    htmlFor="lead-commission-paid"
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]"
+                    htmlFor="lead-automacao-toggle"
+                    className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]"
                   >
                     <input
-                      id="lead-commission-paid"
+                      id="lead-automacao-toggle"
                       type="checkbox"
-                      checked={commissionPaid}
-                      onChange={(e) => setCommissionPaid(e.target.checked)}
+                      checked={automacaoAtiva}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setAutomacaoAtiva(next);
+                        if (next) setRespondeu(false);
+                      }}
                       className="h-4 w-4 rounded accent-[var(--accent)]"
                     />
-                    Paga
+                    Automação
                   </label>
-                )}
+
+                  {!respondeu ? (
+                    <button
+                      type="button"
+                      onClick={handleMarkResponded}
+                      className="badge-success inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold hover:opacity-85"
+                    >
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      Marcar como Respondeu
+                    </button>
+                  ) : (
+                    <span className="badge-success inline-flex min-h-[38px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold">
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      Respondeu
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* Billing / Contract Info */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="lead-doc"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                {isPortrait
-                  ? "CPF (p/ Termo de Imagem)"
-                  : "CNPJ (p/ Contrato / NFS-e)"}
-              </label>
-              {isPortrait ? (
-                <input
-                  id="lead-doc"
-                  type="text"
-                  value={cpf}
-                  onChange={(e) => setCpf(formatCpf(e.target.value))}
-                  placeholder="000.000.000-00"
-                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
-                />
-              ) : (
-                <input
-                  id="lead-doc"
-                  type="text"
-                  value={cnpj}
-                  onChange={(e) => setCnpj(formatCnpj(e.target.value))}
-                  placeholder="00.000.000/0001-00"
-                  className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
-                />
-              )}
-            </div>
-            <div>
-              <label
-                htmlFor="lead-razao"
-                className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-              >
-                {isPortrait ? "Nome Completo no Termo" : "Razão Social"}
-              </label>
-              <input
-                id="lead-razao"
-                type="text"
-                value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
-                placeholder={isPortrait ? "Nome completo" : "Razão Social Ltda"}
-                className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          {/* General Notes */}
-          <div>
-            <label
-              htmlFor="lead-notes"
-              className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
-            >
-              Anotações Estratégicas do Projeto
-            </label>
-            <textarea
-              id="lead-notes"
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Briefing do evento, expectativas de entrega, restrições de horário..."
-              className="input-field w-full rounded-lg px-3.5 py-2.5 text-sm leading-relaxed"
-            />
-          </div>
-
-          {/* Chronological Timeline + Add Note */}
-          <div className="space-y-3 border-t border-[var(--border-hairline)] pt-5">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-              Linha do Tempo de Interações ({lead.interactions.length})
-            </h3>
-
-            <form onSubmit={handleAddInteraction} className="flex gap-2">
-              <label htmlFor="lead-new-note" className="sr-only">
-                Nova anotação ou interação
-              </label>
-              <input
-                id="lead-new-note"
-                type="text"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Registrar ligação, follow-up ou observação (zera o alerta de 48h)..."
-                className="input-field min-h-[42px] flex-1 rounded-lg px-3.5 py-2 text-xs"
-              />
-              <button
-                type="submit"
-                disabled={addingNote || !newNote.trim()}
-                className="btn-accent min-h-[42px] rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
-              >
-                Registrar
-              </button>
-            </form>
-
-            <div className="space-y-2.5 pt-1">
-              {lead.interactions.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-3 rounded-xl bg-[var(--bg-subtle)] p-3.5 border border-[var(--border-hairline)]"
-                >
-                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)]">
-                    {getInteractionIcon(item.type)}
+          {/* TAB 2: FINANCEIRO, PARCEIRO & PÓS-VENDA */}
+          {activeTab === "finance" && (
+            <>
+              {/* Payment Status (50% Sinal / 50% Final) */}
+              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CreditCard
+                      className="h-4 w-4 text-[var(--status-success)]"
+                      aria-hidden="true"
+                    />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                      Status Financeiro (50% Sinal / 50% Quitação)
+                    </h3>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-[var(--text-primary)]">
-                        {item.title}
+                  <span className="font-mono-num text-xs text-[var(--text-secondary)]">
+                    Sinal 50%: {formatCurrency(numericValue * 0.5)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {(
+                    [
+                      { id: "pendente", label: "Pendente", sub: "R$ 0 recebido" },
+                      {
+                        id: "sinal_pago",
+                        label: "Sinal Pago (50%)",
+                        sub: formatCurrency(numericValue * 0.5),
+                      },
+                      {
+                        id: "quitado",
+                        label: "Quitado (100%)",
+                        sub: formatCurrency(numericValue),
+                      },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setPaymentStatus(opt.id)}
+                      aria-pressed={paymentStatus === opt.id}
+                      className={cn(
+                        "min-h-[54px] rounded-lg border px-3 py-2.5 text-left transition-colors",
+                        paymentStatus === opt.id
+                          ? "badge-success"
+                          : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+                      )}
+                    >
+                      <p className="text-xs font-bold">{opt.label}</p>
+                      <p className="mt-0.5 font-mono-num text-[11px] opacity-85">
+                        {opt.sub}
                       </p>
-                      <span className="font-mono-num text-[10px] text-[var(--text-muted)]">
-                        {formatDateTimeBr(item.createdAt)}
-                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Partner Linking & Automatic 15% Commission */}
+              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Handshake
+                      className="h-4 w-4 text-[var(--accent-text)]"
+                      aria-hidden="true"
+                    />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                      Parceiro Indicador &amp; Comissão Automática (15%)
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPartner((prev) => !prev)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-text)] hover:underline"
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Novo Parceiro
+                  </button>
+                </div>
+
+                {showNewPartner && (
+                  <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface-solid)] p-3.5 space-y-2.5">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      <input
+                        type="text"
+                        placeholder="Nome do parceiro"
+                        aria-label="Nome do novo parceiro"
+                        value={newPartnerName}
+                        onChange={(e) => setNewPartnerName(e.target.value)}
+                        className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
+                      />
+                      <select
+                        aria-label="Perfil do novo parceiro"
+                        value={newPartnerRole}
+                        onChange={(e) =>
+                          setNewPartnerRole(e.target.value as PartnerRole)
+                        }
+                        className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
+                      >
+                        <option value="gerente_espaco">
+                          Gerente de Espaço de Eventos (15%)
+                        </option>
+                        <option value="modelo_provador">
+                          Modelo de Provador (15%)
+                        </option>
+                        <option value="outro">Parceiro Comercial (15%)</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Espaço / Agência / Região"
+                        aria-label="Espaço ou agência do novo parceiro"
+                        value={newPartnerCompany}
+                        onChange={(e) => setNewPartnerCompany(e.target.value)}
+                        className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 text-xs"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="WhatsApp (31) 9..."
+                        aria-label="WhatsApp do novo parceiro"
+                        value={newPartnerPhone}
+                        onChange={(e) =>
+                          setNewPartnerPhone(formatPhoneBr(e.target.value))
+                        }
+                        className="input-field min-h-[40px] rounded-lg px-2.5 py-1.5 font-mono-num text-xs"
+                      />
                     </div>
-                    {item.description && (
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-                        {item.description}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPartner(false)}
+                        className="btn-ghost min-h-[38px] rounded-lg px-3 py-1.5 text-xs"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreatePartnerInline}
+                        className="btn-accent min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-bold"
+                      >
+                        Cadastrar &amp; Vincular
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-center">
+                  <div className="sm:col-span-7">
+                    <label htmlFor="lead-partner-select" className="sr-only">
+                      Parceiro indicador
+                    </label>
+                    <select
+                      id="lead-partner-select"
+                      value={partnerId}
+                      onChange={(e) => setPartnerId(e.target.value)}
+                      className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-xs"
+                    >
+                      <option value="">Sem parceiro indicador (venda direta)</option>
+                      {partners.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({PARTNER_ROLES[p.role]} · {p.commissionRate}%)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-5 flex items-center justify-between rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)] px-3.5 py-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                        Comissão ({commissionRate}%)
                       </p>
+                      <p className="font-mono-num text-sm font-bold text-[var(--accent-text)]">
+                        {formatCurrencyExact(commissionAmount)}
+                      </p>
+                    </div>
+                    {partnerId && (
+                      <label
+                        htmlFor="lead-commission-paid"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]"
+                      >
+                        <input
+                          id="lead-commission-paid"
+                          type="checkbox"
+                          checked={commissionPaid}
+                          onChange={(e) => setCommissionPaid(e.target.checked)}
+                          className="h-4 w-4 rounded accent-[var(--accent)]"
+                        />
+                        Paga
+                      </label>
                     )}
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Billing / Contract Info */}
+              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                    <FileText
+                      className="h-4 w-4 text-[var(--accent-text)]"
+                      aria-hidden="true"
+                    />
+                    Dados Fiscais &amp; Contrato PDF
+                  </div>
+                  <a
+                    href={`/api/proposals/${lead.id}/pdf`}
+                    download
+                    className="btn-ghost inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold bg-[var(--bg-surface-solid)]"
+                  >
+                    <Download
+                      className="h-3.5 w-3.5 text-[var(--accent-text)]"
+                      aria-hidden="true"
+                    />
+                    Baixar PDF
+                  </a>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="lead-doc"
+                      className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+                    >
+                      {isPortrait
+                        ? "CPF (p/ Termo de Imagem)"
+                        : "CNPJ (p/ Contrato / NFS-e)"}
+                    </label>
+                    {isPortrait ? (
+                      <input
+                        id="lead-doc"
+                        type="text"
+                        value={cpf}
+                        onChange={(e) => setCpf(formatCpf(e.target.value))}
+                        placeholder="000.000.000-00"
+                        className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
+                      />
+                    ) : (
+                      <input
+                        id="lead-doc"
+                        type="text"
+                        value={cnpj}
+                        onChange={(e) => setCnpj(formatCnpj(e.target.value))}
+                        placeholder="00.000.000/0001-00"
+                        className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 font-mono-num text-sm"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="lead-razao"
+                      className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+                    >
+                      {isPortrait ? "Nome Completo no Termo" : "Razão Social"}
+                    </label>
+                    <input
+                      id="lead-razao"
+                      type="text"
+                      value={razaoSocial}
+                      onChange={(e) => setRazaoSocial(e.target.value)}
+                      placeholder={
+                        isPortrait ? "Nome completo" : "Razão Social Ltda"
+                      }
+                      className="input-field min-h-[42px] w-full rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Automatic Post-Sale & Recurrence Checklist */}
+              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck
+                      className="h-4 w-4 text-[var(--status-success)]"
+                      aria-hidden="true"
+                    />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                      Checklist de Pós-Venda &amp; Recorrência
+                    </h3>
+                  </div>
+                  {checklist.length > 0 ? (
+                    <span className="font-mono-num text-xs font-semibold text-[var(--status-success)]">
+                      {completedChecklist}/{checklist.length} concluídas
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGenerateChecklistNow}
+                      className="text-xs font-semibold text-[var(--accent-text)] hover:underline"
+                    >
+                      + Gerar Checklist Agora
+                    </button>
+                  )}
+                </div>
+
+                {checklist.length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Criado automaticamente ao mover o card para{" "}
+                    <strong>Fechado</strong> (com datas de prévia, galeria, NF,
+                    depoimento e alerta de recorrência).
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {checklist.map((item) => (
+                      <label
+                        key={item.id}
+                        className={cn(
+                          "flex min-h-[42px] cursor-pointer items-center justify-between gap-3 rounded-lg border px-3.5 py-2 text-xs transition-colors",
+                          item.completed
+                            ? "border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--text-muted)] line-through"
+                            : "border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] text-[var(--text-primary)]"
+                        )}
+                      >
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            onChange={() => handleToggleChecklistItem(item.id)}
+                            className="h-4 w-4 rounded accent-[var(--accent)] shrink-0"
+                          />
+                          <span className="truncate font-medium">
+                            {item.title}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-mono-num text-[11px] text-[var(--text-secondary)]">
+                          {formatDateBr(item.dueDate)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* TAB 3: TIMELINE & INTERACTIONS */}
+          {activeTab === "timeline" && (
+            <div className="space-y-4">
+              <form onSubmit={handleAddInteraction} className="flex gap-2">
+                <label htmlFor="lead-new-note" className="sr-only">
+                  Nova anotação ou interação
+                </label>
+                <input
+                  id="lead-new-note"
+                  type="text"
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Registrar ligação, reunião, follow-up ou observação (zera o alerta de 48h)..."
+                  className="input-field min-h-[44px] flex-1 rounded-lg px-3.5 py-2 text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={addingNote || !newNote.trim()}
+                  className="btn-accent min-h-[44px] rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50"
+                >
+                  Registrar
+                </button>
+              </form>
+
+              <div className="space-y-2.5">
+                {lead.interactions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-3 rounded-xl bg-[var(--bg-subtle)] p-3.5 border border-[var(--border-hairline)]"
+                  >
+                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--border-hairline)]">
+                      {getInteractionIcon(item.type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">
+                          {item.title}
+                        </p>
+                        <span className="font-mono-num text-[10px] text-[var(--text-muted)]">
+                          {formatDateTimeBr(item.createdAt)}
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Sticky Footer Actions with Inline Delete Confirmation */}
