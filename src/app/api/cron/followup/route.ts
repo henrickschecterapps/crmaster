@@ -37,7 +37,7 @@ async function runFollowupCadence(dryRun: boolean = false) {
   const resendKey = process.env.RESEND_API_KEY;
   const fromEmail =
     process.env.RESEND_FROM_EMAIL ||
-    "Henrique Matos Studio <onboarding@resend.dev>";
+    "ÚLTIMO QUADRO <onboarding@resend.dev>";
   const waConfig = resolveWhatsappConfig(store.settings);
 
   const eligibleLeads = store.leads.filter(

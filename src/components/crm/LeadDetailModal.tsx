@@ -154,7 +154,7 @@ export function LeadDetailModal({
     ? numericValue * (commissionRate / 100)
     : 0;
   const stagnation = getLeadStagnation(lead);
-  const isPortrait = funnel === "retratos_lifestyle";
+  const isPortrait = Boolean(cpf) && !cnpj;
 
   const proposalPath = `/proposta/${lead.id}`;
   const fullProposalUrl =

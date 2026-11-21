@@ -105,9 +105,9 @@ export function KanbanView({
 
   return (
     <div className="space-y-5">
-      {/* Funnel Tabs Header */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {/* Funnel Tabs Header — 5 Official Último Quadro Verticals */}
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {FUNNELS.map((funnel) => {
             const fLeads = leads.filter((l) => l.funnel === funnel.id);
             const total = fLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
@@ -118,7 +118,7 @@ export function KanbanView({
                 type="button"
                 onClick={() => onChangeFunnel(funnel.id)}
                 className={cn(
-                  "rounded-2xl px-4 py-3 text-left transition-all cursor-pointer border",
+                  "rounded-2xl px-3.5 py-3 text-left transition-all cursor-pointer border",
                   isActive
                     ? "bg-[var(--accent-soft)] border-[var(--accent-border)] shadow-sm"
                     : "glass-panel hover:border-[var(--border-strong)]"
@@ -127,21 +127,24 @@ export function KanbanView({
                 <div className="flex items-center justify-between gap-2">
                   <span
                     className={cn(
-                      "text-xs font-bold tracking-tight",
+                      "truncate text-xs font-bold tracking-tight",
                       isActive
                         ? "text-[var(--accent)]"
                         : "text-[var(--text-primary)]"
                     )}
                   >
-                    {funnel.label}
+                    <span className="font-mono-num mr-1.5 opacity-65">
+                      {funnel.index}
+                    </span>
+                    {funnel.shortLabel}
                   </span>
                   <span className="rounded-full bg-[var(--bg-subtle)] px-2 py-0.5 font-mono-num text-[11px] font-semibold text-[var(--text-secondary)]">
                     {fLeads.length}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                  <span>{funnel.subtitle}</span>
-                  <span className="font-mono-num text-[var(--text-secondary)]">
+                <div className="mt-1 flex items-center justify-between gap-1 text-[10px] text-[var(--text-muted)]">
+                  <span className="truncate">{funnel.subtitle}</span>
+                  <span className="font-mono-num text-[var(--text-secondary)] shrink-0">
                     {formatCurrency(total)}
                   </span>
                 </div>
@@ -150,7 +153,7 @@ export function KanbanView({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="relative flex-1 sm:flex-initial">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <input

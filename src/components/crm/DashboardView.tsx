@@ -216,11 +216,11 @@ export function DashboardView({
       {/* Header + Revenue Stream Quick Filters */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-            Painel Executivo · Belo Horizonte
+          <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+            ÚLTIMO QUADRO · BH &amp; Nova Lima · 24FPS
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-            Financeiro &amp; Metas Comerciais
+            Painel Financeiro &amp; Metas Comerciais
           </h1>
         </div>
 

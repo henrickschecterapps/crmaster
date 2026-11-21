@@ -45,11 +45,12 @@ interface CaptureViewProps {
 }
 
 const BH_PRESET_QUERIES = [
-  "restaurante eventos Lourdes",
-  "confecção Barro Preto",
-  "espaço de eventos Pampulha",
-  "hotel corporativo Savassi",
-  "clínica estética Funcionários",
+  "restaurante gastronomia Lourdes",
+  "confecção moda Barro Preto",
+  "clínica estética Savassi",
+  "bar nightlife Savassi",
+  "espaço eventos Pampulha",
+  "hotel corporativo Vila da Serra",
 ];
 
 interface ParsedCsvRow {
@@ -68,7 +69,7 @@ export function CaptureView({
   partners,
   integrationStatus,
   initialSubTab = "places",
-  defaultFunnel = "festas_corporativas",
+  defaultFunnel = "corporativo",
   onCreateLead,
   onCreateLeadsBulk,
   onNotify,
@@ -117,7 +118,7 @@ export function CaptureView({
   const [csvRows, setCsvRows] = useState<ParsedCsvRow[]>([]);
   const [csvFileName, setCsvFileName] = useState("");
   const [csvTargetFunnel, setCsvTargetFunnel] =
-    useState<FunnelId>("festas_corporativas");
+    useState<FunnelId>("corporativo");
   const [importingCsv, setImportingCsv] = useState(false);
 
   // Anti-duplicity lookup sets

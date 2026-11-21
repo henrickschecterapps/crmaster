@@ -1,4 +1,9 @@
-import { CrmStoreData, PlaceCandidate, ScriptTemplate } from "@/types/crm";
+import {
+  BRAND_DEFAULTS,
+  CrmStoreData,
+  PlaceCandidate,
+  ScriptTemplate,
+} from "@/types/crm";
 import { buildPostSaleChecklist } from "@/lib/utils";
 
 function hoursAgo(hours: number): string {
@@ -13,12 +18,12 @@ export function createPhase2FollowupTemplates(): ScriptTemplate[] {
       funnel: "geral",
       channel: "ambos",
       subject:
-        "Re: Proposta Fotografia & Audiovisual — {{nome_empresa}} | Henrique Matos",
+        "Re: Proposta Fotografia & Audiovisual 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
       body: `Olá {{nome_contato}}, tudo bem?
 
-Passando rapidamente para saber se você conseguiu abrir a proposta personalizada que preparei para a {{nome_empresa}}.
+Passando rapidamente pela ÚLTIMO QUADRO para saber se você conseguiu abrir a proposta personalizada que preparei para a {{nome_empresa}}.
 
-Caso queira ajustar a carga horária ou incluir o aftermovie vertical (Reels), consigo adaptar o formato para atender exatamente o orçamento do time.
+Caso queira ajustar o formato, carga horária ou quantidade de Reels 4K, consigo adaptar o escopo para atender exatamente a meta de vocês.
 
 Deixo novamente o link interativo aqui para facilitar:
 {{link_proposta}}
@@ -33,15 +38,15 @@ Me avise se fizer sentido alinharmos essa semana!`,
       funnel: "geral",
       channel: "ambos",
       subject:
-        "Última verificação de agenda ({{proxima_data_livre}}) — {{nome_empresa}}",
+        "Última verificação de agenda ({{proxima_data_livre}}) — {{nome_empresa}} | ÚLTIMO QUADRO",
       body: `Olá {{nome_contato}}, tudo bem?
 
-Estou fechando as últimas datas da nossa agenda em Belo Horizonte perto de {{proxima_data_livre}} e não queria deixar a {{nome_empresa}} sem resposta antes de liberar o espaço para outras solicitações.
+Estou fechando as últimas datas de produção da ÚLTIMO QUADRO em Belo Horizonte e Nova Lima perto de {{proxima_data_livre}} e não queria deixar a {{nome_empresa}} sem retorno antes de liberar a agenda.
 
-Se o evento ainda estiver nos planos, você pode selecionar o pacote e reservar diretamente pelo link abaixo:
+Se a produção ainda estiver nos planos, você pode selecionar o pacote e reservar diretamente pelo link abaixo:
 {{link_proposta}}
 
-Se decidir deixar para um próximo momento, sem problemas — fico à disposição!`,
+Se preferir deixar para o próximo ciclo, sem problemas — seguimos à disposição!`,
       createdAt: hoursAgo(280),
       updatedAt: hoursAgo(280),
     },
@@ -53,16 +58,16 @@ export function createInitialSeedData(): CrmStoreData {
     settings: {
       id: "default",
       monthlyGoal: 16000,
-      studioName: "Henrique Matos Studio",
+      studioName: BRAND_DEFAULTS.name,
       nextAvailableDate: "05/12/2026",
       whatsappProvider: "evolution",
       whatsappApiUrl: process.env.WHATSAPP_API_URL || "",
       whatsappApiKey: process.env.WHATSAPP_API_KEY || "",
       whatsappInstance: process.env.WHATSAPP_INSTANCE || "",
-      adminEmail: process.env.ADMIN_EMAIL || "henrickschecter@gmail.com",
-      pixKey: process.env.NEXT_PUBLIC_PIX_KEY || "henrickschecter@gmail.com",
-      pixRecipientName: "Henrique Matos",
-      pixCity: "BELO HORIZONTE",
+      adminEmail: process.env.ADMIN_EMAIL || BRAND_DEFAULTS.email,
+      pixKey: process.env.NEXT_PUBLIC_PIX_KEY || BRAND_DEFAULTS.email,
+      pixRecipientName: BRAND_DEFAULTS.pixRecipientName,
+      pixCity: BRAND_DEFAULTS.pixCity,
       updatedAt: hoursAgo(2),
     },
     partners: [
@@ -106,7 +111,7 @@ export function createInitialSeedData(): CrmStoreData {
         neighborhood: "Funcionários",
         address: "Av. Getúlio Vargas, 1420 — Funcionários, Belo Horizonte",
         website: "https://verticeeng.com.br",
-        funnel: "festas_corporativas",
+        funnel: "corporativo",
         stage: "contatado",
         estimatedValue: 1950,
         origin: "Indicação — Espaço de Eventos",
@@ -114,7 +119,7 @@ export function createInitialSeedData(): CrmStoreData {
         commissionPaid: false,
         paymentStatus: "pendente",
         notes:
-          "Confraternização anual para 120 colaboradores na Pampulha. Interessada no pacote Prime com aftermovie vertical para LinkedIn.",
+          "Confraternização anual para 120 colaboradores na Pampulha. Interessada no pacote Corporate Prime com aftermovie vertical para LinkedIn.",
         eventDate: "2026-12-11",
         visualizadaEm: null,
         visualizacoesProposta: 0,
@@ -126,7 +131,7 @@ export function createInitialSeedData(): CrmStoreData {
         lastRadarAlertAt: null,
         contractDocument: null,
         postSaleChecklist: [],
-        ultimaInteracaoEm: hoursAgo(56), // > 48h -> Elegível para Follow-up Dia 2 + Alerta Amarelo
+        ultimaInteracaoEm: hoursAgo(56),
         createdAt: hoursAgo(96),
         updatedAt: hoursAgo(56),
         interactions: [
@@ -134,7 +139,7 @@ export function createInitialSeedData(): CrmStoreData {
             id: "int-01a",
             leadId: "lead-bh-01",
             type: "sistema",
-            title: "Lead cadastrado no funil Festas Corporativas",
+            title: "Lead cadastrado na vertical Corporativo",
             description:
               "Indicação recebida via Rafael Drummond (Pampulha Lake House).",
             createdAt: hoursAgo(96),
@@ -145,7 +150,7 @@ export function createInitialSeedData(): CrmStoreData {
             type: "whatsapp",
             title: "Primeiro contato via WhatsApp",
             description:
-              "Enviada apresentação do estúdio e portfólio corporativo. Mariana pediu proposta para alinhar com a diretoria.",
+              "Enviada apresentação da Último Quadro. Mariana pediu proposta Corporate Prime para alinhar com a diretoria.",
             createdAt: hoursAgo(56),
           },
         ],
@@ -161,7 +166,7 @@ export function createInitialSeedData(): CrmStoreData {
         neighborhood: "Savassi",
         address: "Rua Pernambuco, 1080 — Savassi, Belo Horizonte",
         website: "https://casasavassi.adv.br",
-        funnel: "festas_corporativas",
+        funnel: "corporativo",
         stage: "sinal_pago",
         estimatedValue: 2550,
         origin: "Indicação — Espaço de Eventos",
@@ -174,11 +179,11 @@ export function createInitialSeedData(): CrmStoreData {
         cnpj: "34.819.204/0001-62",
         razaoSocial: "Mascarenhas & Associados Sociedade de Advogados",
         proposalPackage: "Corporate Prime",
-        proposalAddons: ["Hora Extra de Cobertura", "Entrega Real-Time"],
+        proposalAddons: ["Hora Extra", "Cobertura Real-Time"],
         visualizadaEm: hoursAgo(38),
         visualizacoesProposta: 3,
         propostaAprovadaEm: hoursAgo(20),
-        automacaoAtiva: false, // Trava de segurança ativa (Sinal Pago)
+        automacaoAtiva: false,
         respondeu: true,
         followupStep: 0,
         tags: [],
@@ -208,7 +213,7 @@ export function createInitialSeedData(): CrmStoreData {
             type: "proposta_aprovada",
             title: "Proposta aprovada online",
             description:
-              "Pacote Corporate Prime + Hora Extra + Entrega Real-Time (R$ 2.550). Data reservada: 04/12/2026.",
+              "Pacote Corporate Prime + Hora Extra + Cobertura Real-Time (R$ 2.550). Data reservada: 04/12/2026.",
             createdAt: hoursAgo(20),
           },
           {
@@ -216,8 +221,7 @@ export function createInitialSeedData(): CrmStoreData {
             leadId: "lead-bh-02",
             type: "pagamento",
             title: "Sinal de 50% confirmado",
-            description:
-              "PIX de R$ 1.275,00 recebido. NF-e de entrada emitida.",
+            description: "PIX de R$ 1.275,00 recebido. NFS-e emitida.",
             createdAt: hoursAgo(14),
           },
         ],
@@ -233,15 +237,15 @@ export function createInitialSeedData(): CrmStoreData {
         neighborhood: "Barro Preto",
         address: "Rua Mato Grosso, 539 — Barro Preto, Belo Horizonte",
         website: "https://atelieserena.com.br",
-        funnel: "lojas_barro_preto",
+        funnel: "moda",
         stage: "proposta_aberta",
-        estimatedValue: 2800,
-        origin: "Parceria — Modelo de Provador",
+        estimatedValue: 1290,
+        origin: "Parceria VIP — Modelo de Provador",
         partnerId: "partner-02",
         commissionPaid: false,
         paymentStatus: "pendente",
         notes:
-          "Catálogo Express coleção Alto Verão (35 looks + 4 reels verticais). Aguardando confirmação da grade com a confecção.",
+          "Campanha & Lookbook Prime coleção Alto Verão (25 looks + 3 Fashion Reels 4K). Aguardando confirmação da grade com a confecção.",
         eventDate: "2026-11-28",
         visualizadaEm: hoursAgo(152),
         visualizacoesProposta: 2,
@@ -253,7 +257,7 @@ export function createInitialSeedData(): CrmStoreData {
         lastRadarAlertAt: hoursAgo(152),
         contractDocument: null,
         postSaleChecklist: [],
-        ultimaInteracaoEm: hoursAgo(148), // > 5 dias -> Elegível para Follow-up Dia 5 (Último Toque) + Alerta Vermelho
+        ultimaInteracaoEm: hoursAgo(148),
         createdAt: hoursAgo(210),
         updatedAt: hoursAgo(148),
         interactions: [
@@ -261,7 +265,7 @@ export function createInitialSeedData(): CrmStoreData {
             id: "int-03a",
             leadId: "lead-bh-03",
             type: "sistema",
-            title: "Indicação via Isabela Ferraz",
+            title: "Indicação VIP via Isabela Ferraz",
             description:
               "Modelo de provador indicou a marca para campanha de alto verão.",
             createdAt: hoursAgo(210),
@@ -271,43 +275,35 @@ export function createInitialSeedData(): CrmStoreData {
             leadId: "lead-bh-03",
             type: "proposta_vista",
             title: "Proposta web visualizada",
-            description: "Camila visualizou a proposta comercial.",
+            description: "Camila visualizou a proposta de Moda & Provador.",
             createdAt: hoursAgo(152),
-          },
-          {
-            id: "int-03c",
-            leadId: "lead-bh-03",
-            type: "nota",
-            title: "Follow-up pendente de resposta",
-            description:
-              "Pediu para retornar após fechamento da grade de tecidos.",
-            createdAt: hoursAgo(148),
           },
         ],
       },
       {
         id: "lead-bh-04",
-        companyName: "Bela Trama Atacado & Confecções",
+        companyName: "Osteria Brasa & Vinho Lourdes",
         contactName: "Thiago Bittencourt",
-        contactRole: "Gerente Comercial",
+        contactRole: "Sócio-Proprietário",
         phone: "(31) 99208-6341",
-        email: "thiago@belatrama.com.br",
-        instagram: "@belatramabh",
-        neighborhood: "Barro Preto",
-        address: "Rua Araguari, 358 — Barro Preto, Belo Horizonte",
-        website: "https://belatrama.com.br",
-        funnel: "lojas_barro_preto",
+        email: "thiago@osteriabrasabh.com.br",
+        instagram: "@osteriabrasalourdes",
+        neighborhood: "Lourdes",
+        address: "Rua Curitiba, 2244 — Lourdes, Belo Horizonte",
+        website: "https://osteriabrasabh.com.br",
+        funnel: "gastronomia",
         stage: "fechado",
-        estimatedValue: 3600,
-        origin: "Parceria — Modelo de Provador",
-        partnerId: "partner-02",
+        estimatedValue: 1490,
+        origin: "OpenStreetMap BH",
+        partnerId: null,
         commissionPaid: false,
         paymentStatus: "quitado",
         notes:
-          "Diária completa Catálogo Express + Reels de provador no estúdio. Entrega final concluída e pagamento 100% quitado.",
+          "Pacote Chef's Table & Reels Prime (25 pratos assinatura + 3 Food Reels 4K/ASMR + otimização iFood). 100% quitado.",
         eventDate: "2026-11-12",
         cnpj: "19.442.780/0001-11",
-        razaoSocial: "Bela Trama Confecções Ltda",
+        razaoSocial: "Osteria Brasa Gastronomia Ltda",
+        proposalPackage: "Chef's Table & Reels Prime",
         visualizadaEm: hoursAgo(190),
         visualizacoesProposta: 4,
         propostaAprovadaEm: hoursAgo(170),
@@ -317,7 +313,7 @@ export function createInitialSeedData(): CrmStoreData {
         tags: [],
         lastRadarAlertAt: hoursAgo(190),
         contractDocument: null,
-        postSaleChecklist: buildPostSaleChecklist("lojas_barro_preto"),
+        postSaleChecklist: buildPostSaleChecklist("gastronomia"),
         ultimaInteracaoEm: hoursAgo(18),
         createdAt: hoursAgo(260),
         updatedAt: hoursAgo(18),
@@ -328,14 +324,14 @@ export function createInitialSeedData(): CrmStoreData {
             type: "pagamento",
             title: "Quitação final (100%) recebida",
             description:
-              "Parcela final de R$ 1.800,00 liquidada. Galeria e reels entregues via link.",
+              "Parcela final liquidada. Galeria Alta Res + iFood e 3 Food Reels 4K entregues.",
             createdAt: hoursAgo(18),
           },
         ],
       },
       {
         id: "lead-bh-05",
-        companyName: "Dra. Letícia Vasconcelos — Dermatologia",
+        companyName: "Dra. Letícia Vasconcelos — Dermatologia & Estética",
         contactName: "Letícia Vasconcelos",
         contactRole: "Médica Dermatologista",
         phone: "(31) 99473-5029",
@@ -344,15 +340,15 @@ export function createInitialSeedData(): CrmStoreData {
         neighborhood: "Lourdes",
         address: "Rua São Paulo, 2110 — Lourdes, Belo Horizonte",
         website: "https://draleticiavasconcelos.com.br",
-        funnel: "retratos_lifestyle",
+        funnel: "estetica",
         stage: "captado",
-        estimatedValue: 1650,
-        origin: "Google Places BH",
+        estimatedValue: 1890,
+        origin: "OpenStreetMap BH",
         partnerId: null,
         commissionPaid: false,
         paymentStatus: "pendente",
         notes:
-          "Clínica recém-reformada no Lourdes. Oportunidade de ensaio de posicionamento executivo, retratos editoriais e vídeo manifesto.",
+          "Clínica recém-reformada no Lourdes. Interesse potencial em Performance & Ads Prime (70 fotos Clean Skin + 3 criativos Meta Ads 4K com lapela).",
         visualizadaEm: null,
         visualizacoesProposta: 0,
         propostaAprovadaEm: null,
@@ -363,7 +359,7 @@ export function createInitialSeedData(): CrmStoreData {
         lastRadarAlertAt: null,
         contractDocument: null,
         postSaleChecklist: [],
-        ultimaInteracaoEm: hoursAgo(74), // > 48h -> Alerta Amarelo
+        ultimaInteracaoEm: hoursAgo(74),
         createdAt: hoursAgo(74),
         updatedAt: hoursAgo(74),
         interactions: [
@@ -371,9 +367,9 @@ export function createInitialSeedData(): CrmStoreData {
             id: "int-05a",
             leadId: "lead-bh-05",
             type: "sistema",
-            title: "Lead captado via Prospecção BH",
+            title: "Lead captado na vertical Estética & Wellness",
             description:
-              "Clínica identificada na região do Lourdes com forte presença digital.",
+              "Clínica identificada no Lourdes com forte investimento em tráfego pago.",
             createdAt: hoursAgo(74),
           },
         ],
@@ -382,72 +378,99 @@ export function createInitialSeedData(): CrmStoreData {
     templates: [
       {
         id: "tpl-rh-endomarketing",
-        name: "Abordagem RH / Endomarketing (Festas de Fim de Ano)",
-        funnel: "festas_corporativas",
+        name: "Corporativo — RH & Eventos B2B (Cobertura 360°)",
+        funnel: "corporativo",
         channel: "ambos",
         subject:
-          "Cobertura Fotográfica & Vídeo Corporativo — {{nome_empresa}} | Henrique Matos Studio",
+          "Cobertura Corporativa 360° & Reels 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
-Aqui é o Henrique Matos, fotógrafo e diretor audiovisual em Belo Horizonte especializado em eventos corporativos e Employer Branding.
+Aqui é o Henrique, diretor da ÚLTIMO QUADRO — produtora de fotografia autoral e audiovisual 4K em Belo Horizonte e Nova Lima.
 
-Acompanhei o momento da {{nome_empresa}} e sei o quanto a confraternização de fim de ano fortalece a cultura interna e o posicionamento da marca no LinkedIn.
+Acompanhei o momento da {{nome_empresa}} e sei o peso que um evento corporativo bem documentado tem para Employer Branding, endomarketing e LinkedIn.
 
-Trabalhamos com equipamento full-frame com backup duplo, emissão de Nota Fiscal e entrega de 15 fotos selecionadas já no dia seguinte (24h) para o time de RH e Comunicação usar imediatamente.
+Trabalhamos com equipamento Full-Frame 4K em backup duplo simultâneo, emissão de NFS-e e Prévia Expressa de 15 fotos já às 10h da manhã seguinte.
 
-Ainda tenho agenda aberta para {{proxima_data_livre}} e preparei uma proposta interativa exclusiva para a {{nome_empresa}} aqui:
+Tenho disponibilidade próxima de {{proxima_data_livre}} e montei uma proposta interativa exclusiva para a {{nome_empresa}}:
 {{link_proposta}}
 
-Podemos reservar essa data ou alinhar os detalhes em 5 minutos?`,
+Podemos alinhar os detalhes em 5 minutos?`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
-        id: "tpl-parceria-espacos",
-        name: "Parceria com Espaços de Eventos (15% comissão)",
-        funnel: "festas_corporativas",
+        id: "tpl-estetica-ads",
+        name: "Estética & Wellness — Performance & Criativos Meta Ads 4K",
+        funnel: "estetica",
         channel: "ambos",
         subject:
-          "Parceria Audiovisual Corporativa (15% de comissão) — {{nome_empresa}}",
+          "Retratos Clean Skin + Criativos 4K para Meta Ads — {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
-Sou o Henrique Matos, do estúdio Henrique Matos Fotografia & Audiovisual aqui em BH.
+Sou o Henrique da ÚLTIMO QUADRO (Fotografia Autoral & Audiovisual 4K em BH e Nova Lima).
 
-Atendemos empresas de médio e grande porte com cobertura corporativa ágil (prévia em 24h, aftermovie vertical e emissão de NF) e estamos selecionando gerentes de espaços de eventos estratégicos em Belo Horizonte para parceria recorrente.
+Produzimos acervos fotográficos com iluminação Clean Skin + vídeos criativos 4K com áudio lapela sem fio e Hooks (3s) desenhados especificamente para clínicas de estética e wellness escalarem no Instagram e Meta Ads.
 
-Como funciona na prática para a {{nome_empresa}}:
-- Repasse de 15% de comissão direta por indicação fechada (pago assim que o evento confirma).
-- Entrega de fotos em alta resolução do espaço montado para o seu portfólio comercial sem custo adicional.
-- Atendimento impecável que valoriza a experiência do seu cliente corporativo.
-
-Deixo aqui um modelo real da nossa proposta interativa para você conhecer o padrão de apresentação:
+Preparei uma proposta interativa sob medida para a {{nome_empresa}} com os pacotes Glow & Posicionamento e Performance & Ads Prime:
 {{link_proposta}}
 
-Tem disponibilidade em {{proxima_data_livre}} para um café rápido aí no espaço ou uma chamada de 10 minutos?`,
+Tenho agenda aberta perto de {{proxima_data_livre}} — faz sentido conversarmos rapidamente?`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
         id: "tpl-parceria-modelos",
-        name: "Parceria com Modelos de Provador (Barro Preto)",
-        funnel: "lojas_barro_preto",
+        name: "Moda & Provador — Parceria VIP Modelos (15% Pix)",
+        funnel: "moda",
         channel: "whatsapp",
         subject:
-          "Parceria Catálogo Express Barro Preto (15% comissão) — {{nome_contato}}",
-        body: `Oi {{nome_contato}}, tudo bem? Aqui é o Henrique Matos (fotógrafo e filmmaker aqui de BH).
+          "Parceria VIP Modelos de Provador BH (15% Pix) — ÚLTIMO QUADRO",
+        body: `Oi {{nome_contato}}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO aqui em BH!
 
-Vi seu trabalho como modelo de provador no Barro Preto e curti muito a naturalidade diante das câmeras!
+Curti muito seu trabalho como modelo de provador e queria te apresentar nossa Parceria VIP para marcas e atacados de moda em BH e Barro Preto:
+- 15% de comissão direta via Pix em toda loja que fechar produção com a Último Quadro;
+- Spoilers entregues no mesmo dia (até 6h) + Fashion Reels 4K em alta qualidade para valorizar também o seu portfólio.
 
-Estou expandindo nossa operação de Catálogo Express + Reels de alta conversão para confecções e marcas atacadistas da região e montando um grupo fechado de modelos parceiras.
-
-Na nossa parceria:
-- Você recebe 15% de comissão em toda loja ou marca da {{nome_empresa}} ou da sua rede que fechar produção comigo.
-- Além disso, você sempre recebe cortes verticais e retratos em alta resolução para atualizar seu book e redes.
-
-Montei um link rápido com nosso formato de atendimento para você enviar ou consultar quando surgir oportunidade:
+Deixo aqui nosso link de proposta interativa para você conhecer os pacotes de Moda & Provador (e até o Projeto Impulso Moda BH):
 {{link_proposta}}
 
-Podemos conversar perto de {{proxima_data_livre}} para te incluir na nossa lista de casting do mês?`,
+Podemos conversar perto de {{proxima_data_livre}} para te incluir no nosso casting parceiro?`,
+        createdAt: hoursAgo(300),
+        updatedAt: hoursAgo(300),
+      },
+      {
+        id: "tpl-gastronomia-ifood",
+        name: "Gastronomia & iFood — Estúdio Portátil + Food Reels 4K",
+        funnel: "gastronomia",
+        channel: "ambos",
+        subject:
+          "Fotografia Gastronômica (iFood) & Food Reels 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
+        body: `Olá {{nome_contato}}, tudo bem?
+
+Aqui é o Henrique, da ÚLTIMO QUADRO (BH & Nova Lima). Levamos um estúdio de iluminação portátil direto para o salão da {{nome_empresa}} para produzir fotos de apetite (Alta Res + otimizadas para iFood) e Food Reels 4K/ASMR.
+
+Montei uma proposta interativa transparente para vocês compararem os pacotes Menu & Delivery Essencial e Chef's Table & Reels Prime:
+{{link_proposta}}
+
+Tenho janela livre em {{proxima_data_livre}} para fazermos a produção fora do horário de pico. Faz sentido?`,
+        createdAt: hoursAgo(300),
+        updatedAt: hoursAgo(300),
+      },
+      {
+        id: "tpl-nightlife-promoters",
+        name: "Festas & Nightlife — Low-Light & Aftermovie 4K",
+        funnel: "nightlife",
+        channel: "whatsapp",
+        subject:
+          "Cobertura Noturna & Aftermovie 4K — {{nome_empresa}} | ÚLTIMO QUADRO",
+        body: `Fala {{nome_contato}}, tudo certo? Aqui é o Henrique da ÚLTIMO QUADRO (BH).
+
+Cobrimos bares, clubs e labels com equipamento Full-Frame Low-Light, flash criativo (shutter drag) e Aftermovies Verticais 4K editados no beat em até 48h — com prévia de 15 fotos já às 14h do dia seguinte pra manter o hype da casa no topo.
+
+Deixei a proposta interativa da {{nome_empresa}} pronta aqui:
+{{link_proposta}}
+
+Temos agenda aberta em {{proxima_data_livre}} (e também plano residente mensal). Bora conversar?`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
@@ -464,9 +487,9 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     address: "Rua Curitiba, 2244 — Lourdes, Belo Horizonte - MG",
     neighborhood: "Lourdes",
     website: "https://osterialourdes.com.br",
-    category: "Restaurante para Eventos",
+    category: "Restaurante & Gastronomia",
     rating: 4.8,
-    suggestedFunnel: "festas_corporativas",
+    suggestedFunnel: "gastronomia",
   },
   {
     placeId: "bh-place-02",
@@ -475,9 +498,9 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     address: "Rua Marília de Dirceu, 189 — Lourdes, Belo Horizonte - MG",
     neighborhood: "Lourdes",
     website: "https://casamariliaeventos.com.br",
-    category: "Espaço Corporativo & Restaurante",
+    category: "Lounge & Nightlife",
     rating: 4.9,
-    suggestedFunnel: "festas_corporativas",
+    suggestedFunnel: "nightlife",
   },
   {
     placeId: "bh-place-03",
@@ -486,9 +509,9 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     address: "Rua Guajajaras, 1520 — Barro Preto, Belo Horizonte - MG",
     neighborhood: "Barro Preto",
     website: "https://fionobremoda.com.br",
-    category: "Confecção & Atacado",
+    category: "Moda & Confecção",
     rating: 4.7,
-    suggestedFunnel: "lojas_barro_preto",
+    suggestedFunnel: "moda",
   },
   {
     placeId: "bh-place-04",
@@ -499,21 +522,10 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     website: "https://maisonverbena.com.br",
     category: "Moda Feminina Atacado",
     rating: 4.8,
-    suggestedFunnel: "lojas_barro_preto",
+    suggestedFunnel: "moda",
   },
   {
     placeId: "bh-place-05",
-    name: "Bela Trama Atacado & Confecções",
-    phone: "(31) 99208-6341",
-    address: "Rua Araguari, 358 — Barro Preto, Belo Horizonte - MG",
-    neighborhood: "Barro Preto",
-    website: "https://belatrama.com.br",
-    category: "Confecção & Moda",
-    rating: 4.9,
-    suggestedFunnel: "lojas_barro_preto",
-  },
-  {
-    placeId: "bh-place-06",
     name: "Villa Pampulha Centro de Convenções",
     phone: "(31) 3491-9050",
     address: "Av. Otacílio Negrão de Lima, 4120 — Pampulha, Belo Horizonte - MG",
@@ -521,10 +533,10 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     website: "https://villapampulhaeventos.com.br",
     category: "Espaço de Eventos Corporativos",
     rating: 4.8,
-    suggestedFunnel: "festas_corporativas",
+    suggestedFunnel: "corporativo",
   },
   {
-    placeId: "bh-place-07",
+    placeId: "bh-place-06",
     name: "Savassi Executive Hotel & Auditório",
     phone: "(31) 3261-8800",
     address: "Rua Antônio de Albuquerque, 790 — Savassi, Belo Horizonte - MG",
@@ -532,39 +544,28 @@ export const DEMO_BH_PLACES: PlaceCandidate[] = [
     website: "https://savassiexecutive.com.br",
     category: "Hotel Corporativo",
     rating: 4.6,
-    suggestedFunnel: "festas_corporativas",
+    suggestedFunnel: "corporativo",
   },
   {
-    placeId: "bh-place-08",
+    placeId: "bh-place-07",
     name: "Instituto Aura Estética Avançada",
     phone: "(31) 99514-6280",
     address: "Av. do Contorno, 6594 — Funcionários, Belo Horizonte - MG",
     neighborhood: "Funcionários",
     website: "https://institutoaurabh.com.br",
-    category: "Clínica & Lifestyle",
+    category: "Clínica de Estética & Wellness",
     rating: 4.9,
-    suggestedFunnel: "retratos_lifestyle",
+    suggestedFunnel: "estetica",
   },
   {
-    placeId: "bh-place-09",
-    name: "Studio Horizonte Arquitetura & Interiores",
-    phone: "(31) 99180-2344",
-    address: "Rua Cláudio Manoel, 620 — Funcionários, Belo Horizonte - MG",
-    neighborhood: "Funcionários",
-    website: "https://studiohorizontearq.com.br",
-    category: "Escritório de Arquitetura",
-    rating: 4.9,
-    suggestedFunnel: "retratos_lifestyle",
-  },
-  {
-    placeId: "bh-place-10",
-    name: "Mirante Belvedere Espaço Corporativo",
+    placeId: "bh-place-08",
+    name: "Mirante Vila da Serra Corporativo",
     phone: "(31) 3286-7410",
-    address: "Av. Luiz Paulo Franco, 950 — Belvedere, Belo Horizonte - MG",
-    neighborhood: "Belvedere",
-    website: "https://mirantebelvedere.com.br",
-    category: "Espaço de Eventos",
+    address: "Alameda Oscar Niemeyer, 950 — Vila da Serra, Nova Lima - MG",
+    neighborhood: "Vila da Serra",
+    website: "https://miranteviladaserra.com.br",
+    category: "Espaço Corporativo",
     rating: 4.7,
-    suggestedFunnel: "festas_corporativas",
+    suggestedFunnel: "corporativo",
   },
 ];

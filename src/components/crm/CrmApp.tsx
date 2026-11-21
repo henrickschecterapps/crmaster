@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Aperture,
   Database,
   Kanban,
   LayoutDashboard,
@@ -14,6 +13,7 @@ import {
   Sun,
   UserPlus,
 } from "lucide-react";
+import { BrandMark } from "@/components/BrandMark";
 import {
   CrmStoreData,
   FunnelId,
@@ -55,9 +55,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const [store, setStore] = useState<CrmStoreData>(initialData);
   const [status, setStatus] = useState<IntegrationStatus>(initialStatus);
   const [activeModule, setActiveModule] = useState<ActiveModule>("dashboard");
-  const [activeFunnel, setActiveFunnel] = useState<FunnelId>(
-    "festas_corporativas"
-  );
+  const [activeFunnel, setActiveFunnel] = useState<FunnelId>("corporativo");
   const [captureSubTab, setCaptureSubTab] = useState<
     "places" | "manual" | "csv"
   >("places");
@@ -351,18 +349,8 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:justify-between border-r border-[var(--border-hairline)] bg-[var(--bg-subtle)]/55 px-4 py-6">
         <div className="space-y-8">
           {/* Studio Identity */}
-          <div className="flex items-center gap-3 px-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-fg)] shadow-sm">
-              <Aperture className="h-5 w-5" strokeWidth={2.2} />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold tracking-tight text-[var(--text-primary)]">
-                Henrique Matos
-              </p>
-              <p className="truncate text-[11px] font-medium text-[var(--text-muted)]">
-                CRMaster · Studio BH
-              </p>
-            </div>
+          <div className="px-1">
+            <BrandMark />
           </div>
 
           {/* Nav Links */}
@@ -424,19 +412,18 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
         {/* Top Utility Header */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] bg-[var(--bg-canvas)]/80 px-4 py-3.5 backdrop-blur-xl sm:px-6 lg:px-8">
           {/* Mobile brand */}
-          <div className="flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)] text-[var(--accent-fg)]">
-              <Aperture className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
-              CRMaster BH
-            </span>
+          <div className="lg:hidden">
+            <BrandMark compact />
           </div>
 
-          <div className="hidden lg:flex items-center gap-2 text-xs text-[var(--text-muted)]">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span>
-              Estúdio de Fotografia &amp; Audiovisual · Belo Horizonte, MG
+          <div className="hidden lg:flex items-center gap-2.5 text-xs text-[var(--text-muted)]">
+            <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+            <span className="font-medium text-[var(--text-secondary)]">
+              A história termina. A imagem fica.
+            </span>
+            <span className="opacity-40">·</span>
+            <span className="font-mono-num text-[11px]">
+              Belo Horizonte &amp; Nova Lima · 24FPS
             </span>
           </div>
 

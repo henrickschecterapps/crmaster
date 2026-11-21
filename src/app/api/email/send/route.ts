@@ -28,23 +28,23 @@ function buildEmailHtml(params: {
     .join("");
 
   return `
-    <div style="background:#09090b;padding:36px 20px;font-family:'Plus Jakarta Sans',Arial,sans-serif;">
-      <div style="max-width:600px;margin:0 auto;background:#111114;border:1px solid #27272a;border-radius:16px;padding:32px;">
-        <div style="font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#e5a93b;margin-bottom:10px;font-weight:700;">
-          Henrique Matos — Fotografia &amp; Audiovisual BH
+    <div style="background:#0C0C0C;padding:36px 20px;font-family:'Montserrat',Arial,sans-serif;">
+      <div style="max-width:600px;margin:0 auto;background:#121212;border:1px solid rgba(245,245,245,0.1);border-radius:16px;padding:32px;">
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#CC551E;margin-bottom:8px;font-weight:800;">
+          ÚLTIMO QUADRO · Fotografia Autoral &amp; Audiovisual 4K
         </div>
-        <h2 style="margin:0 0 20px;color:#fafafa;font-size:20px;font-weight:600;">
-          Proposta Comercial — ${escapeHtml(params.companyName)}
+        <h2 style="margin:0 0 20px;color:#F5F5F5;font-size:20px;font-weight:700;">
+          Proposta Exclusiva — ${escapeHtml(params.companyName)}
         </h2>
         ${paragraphs}
         <div style="margin-top:26px;">
-          <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;background:#e5a93b;color:#09090b;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:10px;">
+          <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;background:#CC551E;color:#F5F5F5;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;padding:13px 24px;border-radius:10px;">
             Abrir Proposta Interativa
           </a>
         </div>
-        <hr style="border:none;border-top:1px solid #27272a;margin:28px 0 18px;" />
-        <p style="margin:0;color:#71717a;font-size:12px;">
-          Henrique Matos Studio · Belo Horizonte, MG · Fotografia Corporativa, Catálogo &amp; Audiovisual
+        <hr style="border:none;border-top:1px solid rgba(245,245,245,0.08);margin:28px 0 18px;" />
+        <p style="margin:0;color:#787878;font-size:11px;">
+          ÚLTIMO QUADRO · A história termina. A imagem fica. · Belo Horizonte &amp; Nova Lima, MG · (31) 98399-7195
         </p>
       </div>
     </div>
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.RESEND_API_KEY;
     const fromEmail =
       process.env.RESEND_FROM_EMAIL ||
-      "Henrique Matos Studio <onboarding@resend.dev>";
+      "ÚLTIMO QUADRO <onboarding@resend.dev>";
 
     let mode: "live" | "simulated" = "simulated";
     let providerId: string | undefined;

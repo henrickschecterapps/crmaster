@@ -10,7 +10,7 @@ create extension if not exists "pgcrypto";
 create table if not exists public.studio_settings (
   id text primary key default 'default',
   monthly_goal numeric(12, 2) not null default 16000.00,
-  studio_name text not null default 'Henrique Matos Studio',
+  studio_name text not null default 'ÚLTIMO QUADRO',
   next_available_date text not null default '05/12/2026',
   whatsapp_provider text not null default 'evolution',
   whatsapp_api_url text not null default '',
@@ -18,7 +18,7 @@ create table if not exists public.studio_settings (
   whatsapp_instance text not null default '',
   admin_email text not null default '',
   pix_key text not null default '',
-  pix_recipient_name text not null default 'Henrique Matos',
+  pix_recipient_name text not null default 'Ultimo Quadro',
   pix_city text not null default 'BELO HORIZONTE',
   updated_at timestamptz not null default now()
 );
@@ -59,7 +59,7 @@ create table if not exists public.leads (
   neighborhood text,
   address text,
   website text,
-  funnel text not null check (funnel in ('festas_corporativas', 'lojas_barro_preto', 'retratos_lifestyle')),
+  funnel text not null check (funnel in ('corporativo', 'estetica', 'nightlife', 'moda', 'gastronomia')),
   stage text not null check (stage in ('captado', 'contatado', 'proposta_aberta', 'follow_up', 'sinal_pago', 'fechado')),
   estimated_value numeric(12, 2) not null default 0,
   origin text not null default 'Cadastro Manual',

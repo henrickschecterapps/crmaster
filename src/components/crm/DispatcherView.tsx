@@ -349,10 +349,10 @@ export function DispatcherView({
           onClick={() =>
             setEditingTemplate({
               name: "",
-              funnel: "festas_corporativas",
+              funnel: "corporativo",
               channel: "ambos",
-              subject: "Proposta Exclusiva — {{nome_empresa}}",
-              body: "Olá {{nome_contato}}, tudo bem?\n\nPreparei uma proposta personalizada para a {{nome_empresa}}: {{link_proposta}}\n\nTenho agenda em {{proxima_data_livre}}.",
+              subject: "Proposta Exclusiva — {{nome_empresa}} | ÚLTIMO QUADRO",
+              body: "Olá {{nome_contato}}, tudo bem?\n\nPreparei uma proposta personalizada da ÚLTIMO QUADRO para a {{nome_empresa}}: {{link_proposta}}\n\nTenho agenda em {{proxima_data_livre}}.",
             })
           }
           className="btn-accent inline-flex items-center gap-1.5 self-start rounded-xl px-4 py-2.5 text-xs font-bold cursor-pointer"

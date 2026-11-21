@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Montserrat, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-const jakarta = Plus_Jakarta_Sans({
+const montserrat = Montserrat({
   subsets: ["latin"],
-  variable: "--font-jakarta",
-  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-montserrat",
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
   display: "swap",
 });
 
@@ -18,9 +18,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CRMaster — Henrique Matos Fotografia & Audiovisual BH",
+  title:
+    "ÚLTIMO QUADRO — CRM Comercial | Fotografia Autoral & Produção Audiovisual BH",
   description:
-    "CRM Comercial, Prospecção BH e Propostas Rastreáveis para o estúdio Henrique Matos em Belo Horizonte.",
+    "A história termina. A imagem fica. CRM comercial, prospecção BH & Nova Lima e propostas interativas da Último Quadro.",
 };
 
 export default function RootLayout({
@@ -32,10 +33,10 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       data-theme="dark"
-      className={`${jakarta.variable} ${jetbrainsMono.variable}`}
+      className={`${montserrat.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="antialiased selection:bg-[var(--accent-soft)] selection:text-[var(--text-primary)]">
+      <body className="antialiased selection:bg-[var(--accent)] selection:text-[#F5F5F5]">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

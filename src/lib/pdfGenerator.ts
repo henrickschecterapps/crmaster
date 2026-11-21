@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from "pdf-lib";
-import { Lead } from "@/types/crm";
+import { BRAND_DEFAULTS, getServiceVertical, Lead } from "@/types/crm";
 import { formatCurrencyExact, formatDateBr } from "@/lib/utils";
 
 function toWinAnsiSafe(text: string): string {
@@ -7,6 +7,7 @@ function toWinAnsiSafe(text: string): string {
     .replaceAll("—", "-")
     .replaceAll("–", "-")
     .replaceAll("•", "-")
+    .replaceAll("°", "o")
     .replaceAll("“", '"')
     .replaceAll("”", '"')
     .replaceAll("’", "'")
@@ -73,14 +74,17 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const darkBg = rgb(0.06, 0.06, 0.08);
-  const accent = rgb(0.84, 0.58, 0.14);
-  const ink = rgb(0.11, 0.11, 0.14);
-  const muted = rgb(0.4, 0.4, 0.46);
-  const border = rgb(0.86, 0.86, 0.89);
-  const softBox = rgb(0.96, 0.96, 0.97);
+  // Official ÚLTIMO QUADRO palette (#0C0C0C obsidian + #CC551E burnt orange + #4A4A4A film gray)
+  const darkBg = rgb(0.047, 0.047, 0.047);
+  const accent = rgb(0.8, 0.333, 0.118); // #CC551E
+  const filmGray = rgb(0.29, 0.29, 0.29); // #4A4A4A
+  const ink = rgb(0.08, 0.08, 0.09);
+  const muted = rgb(0.42, 0.42, 0.46);
+  const border = rgb(0.86, 0.86, 0.88);
+  const softBox = rgb(0.96, 0.96, 0.96);
 
-  const isPortrait = lead.funnel === "retratos_lifestyle";
+  const vertical = getServiceVertical(lead.funnel);
+  const isPortrait = Boolean(lead.cpf) && !lead.cnpj;
   const docType: "corporativo" | "retratos" = isPortrait
     ? "retratos"
     : "corporativo";
@@ -88,74 +92,91 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
   const margin = 44;
   const contentWidth = width - margin * 2;
 
-  // Top dark editorial header band
+  // Top cinema header band (#0C0C0C)
   page.drawRectangle({
     x: 0,
-    y: height - 96,
+    y: height - 102,
     width,
-    height: 96,
+    height: 102,
     color: darkBg,
   });
 
+  // Burnt orange 97% timeline accent bar (#CC551E)
   page.drawRectangle({
     x: 0,
-    y: height - 99,
+    y: height - 105,
     width,
     height: 3,
     color: accent,
   });
 
-  page.drawText("HENRIQUE MATOS STUDIO", {
+  // Mini 3-frame mark on top right
+  const markX = width - margin - 86;
+  const markY = height - 56;
+  page.drawRectangle({ x: markX, y: markY, width: 24, height: 14, borderColor: filmGray, borderWidth: 1.5 });
+  page.drawRectangle({ x: markX + 30, y: markY, width: 24, height: 14, borderColor: filmGray, borderWidth: 1.5 });
+  page.drawRectangle({ x: markX + 60, y: markY, width: 24, height: 14, borderColor: accent, borderWidth: 1.5 });
+  page.drawLine({
+    start: { x: markX, y: markY - 8 },
+    end: { x: markX + 82, y: markY - 8 },
+    thickness: 1.5,
+    color: filmGray,
+  });
+  page.drawCircle({ x: markX + 82, y: markY - 8, size: 2.5, color: accent });
+
+  page.drawText("ULTIMO QUADRO", {
     x: margin,
-    y: height - 42,
+    y: height - 40,
     size: 16,
     font: fontBold,
-    color: rgb(0.98, 0.98, 0.99),
+    color: rgb(0.96, 0.96, 0.96),
   });
 
   page.drawText(
-    toWinAnsiSafe("Fotografia & Audiovisual Profissional | Belo Horizonte - MG"),
+    toWinAnsiSafe(
+      `${BRAND_DEFAULTS.tagline} | ${BRAND_DEFAULTS.subtitle} - ${BRAND_DEFAULTS.location}`
+    ),
     {
       x: margin,
-      y: height - 60,
-      size: 9,
+      y: height - 58,
+      size: 8.5,
       font: fontRegular,
-      color: rgb(0.75, 0.75, 0.8),
+      color: rgb(0.72, 0.72, 0.72),
     }
   );
 
-  const badgeTitle = isPortrait
-    ? "TERMO DE CESSAO DE USO DE IMAGEM"
-    : "CONTRATO DE PRESTACAO DE SERVICOS";
+  page.drawText(
+    toWinAnsiSafe(
+      `${BRAND_DEFAULTS.whatsappDisplay}  |  ${BRAND_DEFAULTS.email}  |  VERTICAL ${vertical.index}: ${vertical.label.toUpperCase()}`
+    ),
+    {
+      x: margin,
+      y: height - 78,
+      size: 8.5,
+      font: fontBold,
+      color: accent,
+    }
+  );
 
-  page.drawText(badgeTitle, {
-    x: margin,
-    y: height - 80,
-    size: 9.5,
-    font: fontBold,
-    color: accent,
-  });
+  let y = height - 132;
 
-  let y = height - 128;
-
-  // Document Main Title
   const mainTitle = isPortrait
-    ? "TERMO DE CESSAO DE USO DE IMAGEM E CONDICOES DO ENSAIO"
-    : "CONTRATO DE PRESTACAO DE SERVICOS FOTOGRAFICOS E AUDIOVISUAIS";
+    ? "TERMO DE CESSAO DE USO DE IMAGEM E CONDICOES DE PRODUCAO"
+    : `CONTRATO DE PRESTACAO DE SERVICOS - ${vertical.title.toUpperCase()}`;
 
   page.drawText(toWinAnsiSafe(mainTitle), {
     x: margin,
     y,
-    size: 12,
+    size: 11.5,
     font: fontBold,
     color: ink,
   });
-  y -= 18;
+  y -= 17;
 
   const refDate = new Intl.DateTimeFormat("pt-BR").format(new Date());
   page.drawText(
     toWinAnsiSafe(
-      `Documento #${lead.id.toUpperCase()}  |  Emitido em ${refDate}  |  Belo Horizonte, MG`
+      `Documento #${lead.id.toUpperCase()}  |  Emitido em ${refDate}  |  Belo Horizonte & Nova Lima, MG`
     ),
     {
       x: margin,
@@ -165,7 +186,7 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
       color: muted,
     }
   );
-  y -= 20;
+  y -= 18;
 
   // Summary Info Box
   const boxHeight = isPortrait ? 96 : 112;
@@ -179,12 +200,13 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
     borderWidth: 1,
   });
 
-  const totalValue = lead.estimatedValue || 0;
+  const totalValue = lead.estimatedValue || vertical.defaultValue;
   const depositValue = totalValue * 0.5;
   const eventDateFormatted = lead.eventDate
     ? formatDateBr(lead.eventDate)
     : "A definir em comum acordo";
-  const packageName = lead.proposalPackage || "Corporate Prime";
+  const packageName =
+    lead.proposalPackage || vertical.packages[1]?.name || vertical.packages[0].name;
   const addonsList =
     lead.proposalAddons && lead.proposalAddons.length > 0
       ? lead.proposalAddons.join(", ")
@@ -202,27 +224,27 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
     page.drawText(toWinAnsiSafe(value), {
       x: margin + 12 + xOffset,
       y: boxY - 12,
-      size: 9.5,
+      size: 9.2,
       font: fontBold,
       color: ink,
     });
   };
 
   if (isPortrait) {
-    drawField("CONTRATANTE / MODELO", lead.contactName || lead.companyName, 0);
+    drawField("CONTRATANTE / RETRATADO(A)", lead.razaoSocial || lead.contactName, 0);
     drawField("CPF", lead.cpf || "Nao informado", 275);
     boxY -= 32;
-    drawField("DATA DO ENSAIO", eventDateFormatted, 0);
-    drawField("PACOTE ESCOLHIDO", packageName, 275);
+    drawField("DATA DA PRODUCAO", eventDateFormatted, 0);
+    drawField("PACOTE ESCOLHIDO", `${vertical.label} - ${packageName}`.slice(0, 40), 275);
     boxY -= 32;
     drawField("VALOR TOTAL", formatCurrencyExact(totalValue), 0);
     drawField("SINAL DE RESERVA (50%)", formatCurrencyExact(depositValue), 275);
   } else {
-    drawField("RAZAO SOCIAL", lead.razaoSocial || lead.companyName, 0);
+    drawField("RAZAO SOCIAL / MARCA", lead.razaoSocial || lead.companyName, 0);
     drawField("CNPJ", lead.cnpj || "Nao informado", 295);
     boxY -= 32;
     drawField("RESPONSAVEL / DECISOR", lead.contactName, 0);
-    drawField("DATA DO EVENTO", eventDateFormatted, 295);
+    drawField("DATA DA PRODUCAO", eventDateFormatted, 295);
     boxY -= 32;
     drawField(
       "PACOTE E ADICIONAIS",
@@ -238,50 +260,49 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
 
   y -= boxHeight + 22;
 
-  // Clauses
   const clauses = isPortrait
     ? [
         {
-          title: "1. OBJETO E CONDICOES DO ENSAIO",
-          body: `O presente Termo regula a realizacao de ensaio fotografico e/ou audiovisual de Retratos & Lifestyle pela contratada Henrique Matos Studio (Belo Horizonte - MG) para ${lead.contactName || lead.companyName}, conforme pacote "${packageName}" na data de ${eventDateFormatted}.`,
+          title: "1. OBJETO E CONDICOES DA PRODUCAO",
+          body: `O presente Termo regula a realizacao de producao fotografica e/ou audiovisual 4K pela ULTIMO QUADRO (${BRAND_DEFAULTS.location}) para ${lead.razaoSocial || lead.contactName}, vertical "${vertical.title}", pacote "${packageName}", agendada para ${eventDateFormatted}.`,
         },
         {
-          title: "2. INVESTIMENTO, RESERVA E PAGAMENTO",
-          body: `O valor total ajustado e de ${formatCurrencyExact(totalValue)}, dividido em 50% de sinal (${formatCurrencyExact(depositValue)}) via Pix no ato do aceite para bloqueio exclusivo da agenda, e 50% restantes (${formatCurrencyExact(depositValue)}) quitados na entrega da galeria digital tratada.`,
+          title: "2. INVESTIMENTO, RESERVA (50%) E QUITACAO",
+          body: `O investimento total e de ${formatCurrencyExact(totalValue)}, estruturado em 50% de sinal (${formatCurrencyExact(depositValue)}) via Pix no aceite para bloqueio exclusivo da data, e 50% finais (${formatCurrencyExact(depositValue)}) quitados na entrega da galeria final.`,
         },
         {
           title: "3. CESSAO E LICENCA DE USO DE IMAGEM",
-          body: `O(A) CONTRATANTE autoriza a captacao de sua imagem e voz durante o ensaio, recebendo licenca plena de uso pessoal, profissional e comercial das fotografias e videos entregues em redes sociais, sites, imprensa e materiais de posicionamento. Autoriza tambem a exibicao selecionada no portfolio do estudio Henrique Matos, salvo solicitacao expressa de sigilo por escrito.`,
+          body: `O(A) CONTRATANTE autoriza a captacao de sua imagem e voz, recebendo licenca plena de uso pessoal, profissional e comercial (Instagram, LinkedIn, site, Meta Ads e imprensa). Autoriza exibicao selecionada no portfolio da Ultimo Quadro, salvo solicitacao expressa de sigilo por escrito.`,
         },
         {
-          title: "4. SEGURANCA DE ARQUIVOS E PRAZOS DE ENTREGA",
-          body: `A captacao e realizada com equipamento profissional full-frame com gravacao simultanea em backup duplo. A selecao previa e disponibilizada em ate 48 horas e a galeria final tratada em alta resolucao e entregue em ate 5 dias uteis apos a selecao.`,
+          title: "4. PADRAO TECNICO, BACKUP DUPLO E PRAZOS",
+          body: `Producao realizada com equipamento profissional Full-Frame 4K com gravacao simultanea em backup duplo e iluminacao dedicada. Prazos da vertical: ${vertical.deliverySummary}.`,
         },
         {
           title: "5. REAGENDAMENTO E FORO",
-          body: `Solicitacoes de reagendamento devem ser comunicadas com antecedencia minima de 48 horas, sujeitas a disponibilidade de agenda. Fica eleito o foro da Comarca de Belo Horizonte/MG para dirimir quaisquer duvidas oriundas deste Termo.`,
+          body: `Solicitacoes de reagendamento devem ser comunicadas com antecedencia minima de 48 horas, sujeitas a disponibilidade de agenda. Fica eleito o foro da Comarca de Belo Horizonte/MG.`,
         },
       ]
     : [
         {
           title: "1. OBJETO DA PRESTACAO DE SERVICOS",
-          body: `A CONTRATADA (Henrique Matos Fotografia & Audiovisual, Belo Horizonte - MG) compromete-se a realizar a cobertura fotografica e audiovisual contratada por ${lead.razaoSocial || lead.companyName} (CNPJ: ${lead.cnpj || "a informar"}), sob o pacote "${packageName}"${lead.proposalAddons && lead.proposalAddons.length > 0 ? ` com adicionais: ${lead.proposalAddons.join(", ")}` : ""}, previsto para a data ${eventDateFormatted}.`,
+          body: `A CONTRATADA (ULTIMO QUADRO - Fotografia Autoral & Producao Audiovisual, Belo Horizonte & Nova Lima - MG) compromete-se a executar a producao contratada por ${lead.razaoSocial || lead.companyName} (CNPJ: ${lead.cnpj || "a informar"}), vertical "${vertical.title}", pacote "${packageName}"${lead.proposalAddons && lead.proposalAddons.length > 0 ? ` + adicionais: ${lead.proposalAddons.join(", ")}` : ""}, prevista para ${eventDateFormatted}.`,
         },
         {
           title: "2. VALORES, SINAL DE 50% E EMISSAO DE NFS-e",
-          body: `O investimento total e de ${formatCurrencyExact(totalValue)}. A reserva definitiva da data e confirmada mediante pagamento do sinal de 50% (${formatCurrencyExact(depositValue)}) via Pix ou transferencia. Os 50% finais (${formatCurrencyExact(depositValue)}) serao quitados apos a realizacao do evento com emissao regular de Nota Fiscal de Servicos Eletronica (NFS-e).`,
+          body: `O investimento total e de ${formatCurrencyExact(totalValue)}. A reserva definitiva da agenda ocorre mediante sinal de 50% (${formatCurrencyExact(depositValue)}) via Pix. Os 50% restantes (${formatCurrencyExact(depositValue)}) sao quitados na entrega final, com atendimento PJ formalizado e emissao de Nota Fiscal de Servicos Eletronica (NFS-e).`,
         },
         {
-          title: "3. PRAZOS DE ENTREGA (PREVIA 24H E GALERIA EM 3 DIAS UTEIS)",
-          body: `A CONTRATADA entregara uma previa expressa com 15 fotografias selecionadas e tratadas em ate 24 horas apos o encerramento do evento, destinadas a uso imediato em LinkedIn, imprensa e endomarketing. A galeria digital completa em alta resolucao (e video aftermovie vertical, quando incluso) sera entregue em ate 3 dias uteis.`,
+          title: "3. ENTREGAVEIS E PRAZOS EXPRESSOS",
+          body: `A ULTIMO QUADRO segue rigorosamente os prazos da vertical ${vertical.label}: ${vertical.deliverySummary}. Todos os arquivos sao entregues em galeria digital privada em alta resolucao e versoes otimizadas para redes sociais, imprensa ou trafego pago.`,
         },
         {
-          title: "4. EQUIPAMENTO FULL-FRAME E BACKUP DUPLO",
-          body: `Todos os registros sao captados com cameras profissionais full-frame dotadas de gravacao simultanea em dois cartoes de memoria independentes (backup duplo em tempo real), alem de redundancia em nuvem imediatamente apos o termino da cobertura, assegurando maxima integridade do material.`,
+          title: "4. RIGOR DE SET, FULL-FRAME 4K E BACKUP SIMULTANEO",
+          body: `Toda captacao e realizada com otica fixa luminosa (35/50/85mm), cameras Full-Frame 4K com gravacao simultanea em dois cartoes de memoria independentes (risco zero de perda de material) e redundancia em nuvem imediatamente apos a producao.`,
         },
         {
           title: "5. DIREITOS DE USO, CANCELAMENTO E FORO",
-          body: `A CONTRATANTE detem plena licenca corporativa de uso das imagens para comunicacao interna, Employer Branding, midias sociais e imprensa. Alteracoes de data devem ser comunicadas com 7 dias de antecedencia, sujeitas a agenda. Fica eleito o foro da Comarca de Belo Horizonte - MG.`,
+          body: `A CONTRATANTE recebe licenca comercial completa de uso do material em redes sociais, anuncios, endomarketing e imprensa. Reagendamentos devem ser comunicados com 7 dias de antecedencia, sujeitos a agenda. Foro eleito: Comarca de Belo Horizonte - MG.`,
         },
       ];
 
@@ -310,7 +331,7 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
   }
 
   // Signature & Electronic Acceptance Footer
-  const sigY = 104;
+  const sigY = 102;
   page.drawLine({
     start: { x: margin, y: sigY + 26 },
     end: { x: width - margin, y: sigY + 26 },
@@ -318,29 +339,30 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
     color: border,
   });
 
-  // Left signature line
   page.drawLine({
     start: { x: margin, y: sigY - 8 },
     end: { x: margin + 225, y: sigY - 8 },
     thickness: 0.8,
     color: ink,
   });
-  page.drawText("Henrique Matos Studio (CONTRATADA)", {
+  page.drawText("ULTIMO QUADRO (CONTRATADA)", {
     x: margin,
     y: sigY - 21,
     size: 8,
     font: fontBold,
     color: ink,
   });
-  page.drawText("Belo Horizonte - MG | Fotografia & Audiovisual", {
-    x: margin,
-    y: sigY - 32,
-    size: 7.5,
-    font: fontRegular,
-    color: muted,
-  });
+  page.drawText(
+    toWinAnsiSafe("Belo Horizonte & Nova Lima - MG | ultimoquadrofilmes@gmail.com"),
+    {
+      x: margin,
+      y: sigY - 32,
+      size: 7.3,
+      font: fontRegular,
+      color: muted,
+    }
+  );
 
-  // Right signature line
   const rightX = width - margin - 225;
   page.drawLine({
     start: { x: rightX, y: sigY - 8 },
@@ -350,9 +372,7 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
   });
   page.drawText(
     toWinAnsiSafe(
-      isPortrait
-        ? `${lead.contactName || lead.companyName} (CONTRATANTE)`
-        : `${lead.razaoSocial || lead.companyName} (CONTRATANTE)`
+      `${lead.razaoSocial || lead.contactName || lead.companyName} (CONTRATANTE)`
     ).slice(0, 44),
     {
       x: rightX,
@@ -364,20 +384,19 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
   );
   page.drawText(
     toWinAnsiSafe(
-      `Aceite digital registrado em ${refDate} via Proposta Web CRMaster`
+      `Aceite digital registrado em ${refDate} via Proposta Web Ultimo Quadro`
     ),
     {
       x: rightX,
       y: sigY - 32,
-      size: 7.5,
+      size: 7.3,
       font: fontRegular,
       color: muted,
     }
   );
 
-  // Bottom bar
   page.drawText(
-    "Documento gerado automaticamente pelo CRMaster - Henrique Matos Studio (Belo Horizonte, MG)",
+    "ULTIMO QUADRO - A historia termina. A imagem fica. | https://ultimo-quadro.vercel.app",
     {
       x: margin,
       y: 28,
@@ -396,8 +415,8 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
     .slice(0, 40);
 
   const fileName = isPortrait
-    ? `Termo-Uso-Imagem-${slug}.pdf`
-    : `Contrato-Servicos-${slug}.pdf`;
+    ? `Termo-Uso-Imagem-Ultimo-Quadro-${slug}.pdf`
+    : `Contrato-Ultimo-Quadro-${slug}.pdf`;
 
   return { bytes, fileName, docType };
 }

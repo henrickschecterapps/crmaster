@@ -2,8 +2,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Aperture,
-  Award,
   Calendar,
   Camera,
   Check,
@@ -13,6 +11,7 @@ import {
   Download,
   FileCheck2,
   FileText,
+  Film,
   MessageCircle,
   Moon,
   QrCode,
@@ -21,7 +20,14 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { Lead, PROPOSAL_ADDONS, PROPOSAL_PACKAGES } from "@/types/crm";
+import {
+  BRAND_DEFAULTS,
+  FunnelId,
+  getServiceVertical,
+  Lead,
+  SERVICES_CATALOG,
+  SOCIAL_MODA_PACKAGES,
+} from "@/types/crm";
 import {
   buildWhatsappUrl,
   cn,
@@ -32,6 +38,7 @@ import {
   formatDateBr,
 } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
+import { BrandMark } from "@/components/BrandMark";
 
 interface ProposalClientProps {
   lead: Lead;
@@ -42,9 +49,11 @@ interface ApprovedConfirmationData {
   whatsappUrl: string;
   total: number;
   deposit: number;
+  verticalTitle: string;
   packageName: string;
   addons: string[];
   eventDate: string;
+  isPortrait: boolean;
   pdfUrl: string;
   pdfFileName: string;
   pix: {
@@ -59,28 +68,28 @@ interface ApprovedConfirmationData {
 
 const DIFFERENTIALS = [
   {
-    icon: Award,
-    title: "Foco em Employer Branding",
+    icon: ShieldCheck,
+    title: "Backup Simultâneo",
     description:
-      "Direção documental e retratos estratégicos pensados para fortalecer sua marca empregadora no LinkedIn, imprensa e endomarketing.",
+      "Equipamento profissional Full-Frame 4K com gravação simultânea em cartões duplos durante toda a produção. Risco zero de perda de material.",
   },
   {
-    icon: ShieldCheck,
-    title: "Equipamento Full-Frame com Backup Duplo",
+    icon: Film,
+    title: "Direção & Luz Dedicada",
     description:
-      "Câmeras profissionais full-frame com gravação simultânea em dois cartões de memória e backup em nuvem logo após o evento.",
+      "Iluminação portátil, ótica fixa luminosa (35/50/85mm) e direção de postura e cena para resultados limpos, fiéis e de alto impacto comercial.",
   },
   {
     icon: Clock,
-    title: "Prévia Express em 24h",
+    title: "Entrega Expressa",
     description:
-      "15 fotos curadas e tratadas entregues no dia seguinte para o time de RH e Comunicação publicar enquanto o evento ainda repercute.",
+      "Prévias editadas entregues no mesmo dia ou na manhã seguinte para manter o timing perfeito no Instagram, LinkedIn, imprensa e tráfego pago.",
   },
   {
     icon: FileCheck2,
-    title: "Emissão de Nota Fiscal (NF-e)",
+    title: "Atendimento PJ & NFS-e",
     description:
-      "Atendimento 100% formalizado para empresas de BH com contrato digital, NF-e de serviços e pagamento facilitado (PIX ou boleto).",
+      "Emissão de Nota Fiscal de Serviços (NFS-e), contrato digital objetivo e pagamento estruturado em 50% na reserva e 50% na entrega.",
   },
 ];
 
@@ -90,21 +99,45 @@ export function ProposalClient({
 }: ProposalClientProps) {
   const { theme, toggleTheme } = useTheme();
   const trackedRef = useRef(false);
-  const isPortrait = lead.funnel === "retratos_lifestyle";
+
+  const [selectedVerticalId, setSelectedVerticalId] = useState<FunnelId>(
+    lead.funnel
+  );
+  const [useSocialModa, setUseSocialModa] = useState(false);
+
+  const currentVertical = useMemo(
+    () => getServiceVertical(selectedVerticalId),
+    [selectedVerticalId]
+  );
+
+  const activePackages = useMemo(() => {
+    if (selectedVerticalId === "moda" && useSocialModa) {
+      return SOCIAL_MODA_PACKAGES;
+    }
+    return currentVertical.packages;
+  }, [selectedVerticalId, useSocialModa, currentVertical]);
 
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
-    "corporate_prime"
+    activePackages[1]?.id ?? activePackages[0].id
   );
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
 
-  // Approval modal state
+  // Reset selected package & addons whenever vertical or Social Moda toggle changes
+  useEffect(() => {
+    const featured = activePackages.find((p) => p.featured) ?? activePackages[0];
+    setSelectedPackageId(featured.id);
+    setSelectedAddonIds([]);
+  }, [activePackages]);
+
+  // Approval modal state (supports both PJ CNPJ and PF CPF)
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [docMode, setDocMode] = useState<"cnpj" | "cpf">(
+    lead.cpf && !lead.cnpj ? "cpf" : "cnpj"
+  );
   const [cnpj, setCnpj] = useState(lead.cnpj || "");
   const [cpf, setCpf] = useState(lead.cpf || "");
   const [razaoSocial, setRazaoSocial] = useState(
-    isPortrait
-      ? lead.contactName || lead.companyName
-      : lead.razaoSocial || lead.companyName
+    lead.razaoSocial || lead.companyName
   );
   const [eventDate, setEventDate] = useState(lead.eventDate || "");
   const [submitting, setSubmitting] = useState(false);
@@ -113,7 +146,7 @@ export function ProposalClient({
     useState<ApprovedConfirmationData | null>(null);
   const [copiedPix, setCopiedPix] = useState(false);
 
-  // Automatic open tracking + Real-time Radar alert (with 10-min debounce on server)
+  // Automatic open tracking + Real-time Radar alert (10-min debounce on server)
   useEffect(() => {
     if (trackedRef.current) return;
     trackedRef.current = true;
@@ -137,14 +170,15 @@ export function ProposalClient({
 
   const selectedPackage = useMemo(
     () =>
-      PROPOSAL_PACKAGES.find((p) => p.id === selectedPackageId) ??
-      PROPOSAL_PACKAGES[1],
-    [selectedPackageId]
+      activePackages.find((p) => p.id === selectedPackageId) ??
+      activePackages[0],
+    [activePackages, selectedPackageId]
   );
 
   const selectedAddons = useMemo(
-    () => PROPOSAL_ADDONS.filter((a) => selectedAddonIds.includes(a.id)),
-    [selectedAddonIds]
+    () =>
+      currentVertical.addons.filter((a) => selectedAddonIds.includes(a.id)),
+    [currentVertical.addons, selectedAddonIds]
   );
 
   const totalValue = useMemo(() => {
@@ -175,6 +209,7 @@ export function ProposalClient({
     e.preventDefault();
     setErrorMsg("");
 
+    const isPortrait = docMode === "cpf";
     if (isPortrait) {
       if (cpf.replace(/\D/g, "").length < 11) {
         setErrorMsg("Informe um CPF válido com 11 dígitos.");
@@ -229,9 +264,10 @@ export function ProposalClient({
       const addonsText =
         addonNames.length > 0 ? addonNames.join(", ") : "Nenhum adicional";
 
-      const confirmationMessage = `Olá Henrique! Acabamos de aprovar a proposta online para *${lead.companyName}* e segue o comprovante do sinal de 50% via Pix.
+      const confirmationMessage = `Olá ÚLTIMO QUADRO! Acabamos de aprovar a proposta online para *${lead.companyName}* e segue o comprovante do sinal de 50% via Pix.
 
 *Resumo da Reserva:*
+- Vertical: ${currentVertical.title}
 - Pacote: ${selectedPackage.name} (${formatCurrency(selectedPackage.price)})
 - Adicionais: ${addonsText}
 - Valor Total: *${formatCurrencyExact(totalValue)}*
@@ -249,11 +285,13 @@ export function ProposalClient({
         whatsappUrl: waUrl,
         total: totalValue,
         deposit: depositValue,
+        verticalTitle: currentVertical.title,
         packageName: selectedPackage.name,
         addons: addonNames,
         eventDate,
+        isPortrait,
         pdfUrl: json.pdfUrl || `/api/proposals/${lead.id}/pdf`,
-        pdfFileName: json.pdfFileName || "Contrato-Henrique-Matos.pdf",
+        pdfFileName: json.pdfFileName || "Contrato-Ultimo-Quadro.pdf",
         pix: json.pix,
       });
 
@@ -268,27 +306,15 @@ export function ProposalClient({
 
   return (
     <div className="min-h-[100dvh] pb-20">
-      {/* Minimal Studio Header */}
-      <header className="sticky top-0 z-30 border-b border-[var(--border-hairline)] bg-[var(--bg-canvas)]/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-[var(--accent-fg)]">
-              <Aperture className="h-5 w-5" strokeWidth={2.2} />
-            </div>
-            <div>
-              <p className="text-sm font-extrabold tracking-tight text-[var(--text-primary)]">
-                Henrique Matos
-              </p>
-              <p className="text-[11px] font-medium text-[var(--text-muted)]">
-                Fotografia &amp; Audiovisual Corporativo · Belo Horizonte
-              </p>
-            </div>
-          </div>
+      {/* Official ÚLTIMO QUADRO Cinema Header */}
+      <header className="sticky top-0 z-30 border-b border-[var(--border-hairline)] bg-[var(--bg-canvas)]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
+          <BrandMark showTagline />
 
           <div className="flex items-center gap-2.5">
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--accent)]">
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 font-mono-num text-[11px] font-semibold text-[var(--accent)]">
               <Camera className="h-3 w-3" />
-              Proposta Interativa
+              24FPS · PROPOSTA INTERATIVA
             </span>
             <button
               type="button"
@@ -307,7 +333,7 @@ export function ProposalClient({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 lg:px-8 space-y-12">
-        {/* PHASE 2: Dedicated Confirmation Screen with Static Pix BR Code + Contract PDF Download */}
+        {/* Confirmation Screen with Static Pix BR Code + Contract PDF Download */}
         {approvedInfo ? (
           <section className="space-y-6">
             <div className="glass-panel rounded-3xl border border-emerald-500/40 p-6 sm:p-8 space-y-3">
@@ -319,8 +345,12 @@ export function ProposalClient({
                 Data pré-reservada para {lead.companyName}
               </h1>
               <p className="max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
-                Seu {isPortrait ? "Termo de Uso de Imagem" : "Contrato de Prestação de Serviços"}{" "}
-                já foi gerado em PDF. Para efetivar o bloqueio exclusivo da data{" "}
+                Seu{" "}
+                {approvedInfo.isPortrait
+                  ? "Termo de Uso de Imagem"
+                  : "Contrato de Prestação de Serviços"}{" "}
+                da <strong>ÚLTIMO QUADRO</strong> já foi gerado em PDF. Para
+                efetivar o bloqueio exclusivo da data{" "}
                 <strong className="font-mono-num text-[var(--text-primary)]">
                   {formatDateBr(approvedInfo.eventDate)}
                 </strong>
@@ -407,10 +437,10 @@ export function ProposalClient({
                 </div>
               </div>
 
-              {/* Right: Summary & Instant PDF Contract Download (5 cols) */}
+              {/* Right: Summary & Instant PDF Download (5 cols) */}
               <div className="glass-panel rounded-3xl p-6 space-y-5 lg:col-span-5">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                  <p className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--accent)]">
                     Resumo &amp; Documentação
                   </p>
                   <h3 className="mt-1 text-base font-bold text-[var(--text-primary)]">
@@ -419,13 +449,19 @@ export function ProposalClient({
                 </div>
 
                 <div className="space-y-2.5 border-y border-[var(--border-hairline)] py-4 text-xs">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[var(--text-muted)]">Vertical</span>
+                    <span className="font-semibold text-[var(--text-primary)] text-right">
+                      {approvedInfo.verticalTitle}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Pacote</span>
                     <span className="font-semibold text-[var(--text-primary)]">
                       {approvedInfo.packageName}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Adicionais</span>
                     <span className="font-medium text-[var(--text-secondary)] text-right">
                       {approvedInfo.addons.length > 0
@@ -455,13 +491,12 @@ export function ProposalClient({
                   </div>
                 </div>
 
-                {/* Instant PDF Download Card */}
                 <div className="rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-soft)]/50 p-4 space-y-3">
                   <div className="flex items-start gap-3">
                     <FileText className="h-5 w-5 text-[var(--accent)] shrink-0 mt-0.5" />
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-[var(--text-primary)]">
-                        {isPortrait
+                        {approvedInfo.isPortrait
                           ? "Termo de Cessão de Uso de Imagem (PDF)"
                           : "Contrato de Prestação de Serviços (PDF)"}
                       </p>
@@ -487,38 +522,36 @@ export function ProposalClient({
             {/* Asymmetric Editorial Hero */}
             <section className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-end">
               <div className="lg:col-span-8 space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3.5 py-1.5 font-mono-num text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                   <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
-                  Preparada especialmente para {lead.contactName}
+                  {currentVertical.kicker}
                 </div>
                 <h1 className="text-3xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-5xl leading-[1.08]">
                   Proposta Exclusiva para {lead.companyName}
                 </h1>
-                <p className="max-w-2xl text-base leading-relaxed text-[var(--text-secondary)]">
-                  Cobertura fotográfica e audiovisual de alto padrão em Belo
-                  Horizonte desenhada para transformar seu projeto em ativos
-                  reais de marca, Employer Branding e comunicação institucional.
+                <p className="max-w-2xl text-sm sm:text-base leading-relaxed text-[var(--text-secondary)]">
+                  {currentVertical.subheadline}
                 </p>
               </div>
 
               <div className="lg:col-span-4">
                 <div className="glass-panel rounded-3xl p-5 space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Cliente</span>
-                    <span className="font-semibold text-[var(--text-primary)]">
+                    <span className="font-semibold text-[var(--text-primary)] truncate">
                       {lead.companyName}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[var(--text-muted)]">Contato</span>
                     <span className="font-medium text-[var(--text-secondary)]">
                       {lead.contactName}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[var(--text-muted)]">Praça</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[var(--text-muted)]">Atuação</span>
                     <span className="font-medium text-[var(--text-secondary)]">
-                      Belo Horizonte, MG
+                      BH &amp; Nova Lima — MG
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2.5">
@@ -531,39 +564,49 @@ export function ProposalClient({
               </div>
             </section>
 
-            {/* Differentials Bento Grid */}
+            {/* Vertical Selector + 4 Vertical Pillars */}
             <section className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-                  Padrão de Entrega Corporativa
-                </p>
-                <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl">
-                  Por que empresas de BH escolhem o Estúdio Henrique Matos
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {DIFFERENTIALS.map((item) => {
-                  const Icon = item.icon;
+              <div className="flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 glass-panel">
+                {SERVICES_CATALOG.map((svc) => {
+                  const active = svc.id === selectedVerticalId;
                   return (
-                    <div
-                      key={item.title}
-                      className="glass-panel rounded-3xl p-6 flex items-start gap-4"
+                    <button
+                      key={svc.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedVerticalId(svc.id);
+                        setUseSocialModa(false);
+                      }}
+                      className={cn(
+                        "rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer",
+                        active
+                          ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      )}
                     >
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
-                        <Icon className="h-5 w-5" strokeWidth={1.9} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">
-                          {item.title}
-                        </h3>
-                        <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-secondary)]">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
+                      <span className="font-mono-num mr-1.5 opacity-75">
+                        {svc.index}
+                      </span>
+                      {svc.shortLabel}
+                    </button>
                   );
                 })}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {currentVertical.pillars.map((p) => (
+                  <div
+                    key={p.num}
+                    className="glass-panel rounded-2xl px-4 py-3.5"
+                  >
+                    <p className="font-mono-num text-[11px] font-bold text-[var(--accent)]">
+                      {p.num}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-[var(--text-primary)]">
+                      {p.label}
+                    </p>
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -572,18 +615,38 @@ export function ProposalClient({
               <div className="lg:col-span-8 space-y-8">
                 {/* Packages */}
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-                      Passo 1 · Escolha seu Pacote
-                    </p>
-                    <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
-                      Selecione o formato ideal para o seu evento
-                    </h2>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+                        Passo 01 · {currentVertical.title}
+                      </p>
+                      <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
+                        Selecione o pacote ideal para sua produção
+                      </h2>
+                    </div>
+
+                    {selectedVerticalId === "moda" && (
+                      <button
+                        type="button"
+                        onClick={() => setUseSocialModa((prev) => !prev)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all cursor-pointer self-start",
+                          useSocialModa
+                            ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                            : "btn-ghost text-[var(--text-secondary)]"
+                        )}
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {useSocialModa
+                          ? "Projeto Impulso Moda BH Ativo (65% OFF)"
+                          : "Ver Cota Social Moda BH (65% OFF)"}
+                      </button>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {PROPOSAL_PACKAGES.map((pkg) => {
-                      const isSelected = selectedPackageId === pkg.id;
+                    {activePackages.map((pkg) => {
+                      const isSelected = selectedPackage.id === pkg.id;
                       return (
                         <button
                           key={pkg.id}
@@ -598,8 +661,8 @@ export function ProposalClient({
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-base font-extrabold text-[var(--text-primary)]">
-                                {pkg.name}
+                              <span className="font-mono-num text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                {pkg.tier}
                               </span>
                               {pkg.badge && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent-fg)]">
@@ -609,17 +672,22 @@ export function ProposalClient({
                               )}
                             </div>
 
-                            <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                              {pkg.summary}
+                            <h3 className="mt-2 text-base font-extrabold text-[var(--text-primary)]">
+                              {pkg.name}
+                            </h3>
+                            <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                              {pkg.format}
                             </p>
 
-                            <div className="mt-5 flex items-baseline gap-1.5">
+                            <div className="mt-5 flex items-baseline gap-2">
                               <span className="font-mono-num text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
                                 {formatCurrency(pkg.price)}
                               </span>
-                              <span className="text-xs text-[var(--text-muted)]">
-                                / evento
-                              </span>
+                              {pkg.originalPrice && (
+                                <span className="font-mono-num text-xs line-through text-[var(--text-muted)]">
+                                  {formatCurrency(pkg.originalPrice)}
+                                </span>
+                              )}
                             </div>
 
                             <ul className="mt-5 space-y-2.5 border-t border-[var(--border-hairline)] pt-4">
@@ -681,16 +749,16 @@ export function ProposalClient({
                 {/* Add-ons */}
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-                      Passo 2 · Personalize com Adicionais
+                    <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+                      Passo 02 · Adicionais da Vertical (Opcional)
                     </p>
                     <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
-                      Turbine a cobertura do seu evento (opcional)
+                      Personalize o escopo da sua produção
                     </h2>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                    {PROPOSAL_ADDONS.map((addon) => {
+                    {currentVertical.addons.map((addon) => {
                       const checked = selectedAddonIds.includes(addon.id);
                       return (
                         <label
@@ -726,14 +794,50 @@ export function ProposalClient({
                     })}
                   </div>
                 </div>
+
+                {/* Differentials Bento Grid */}
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <p className="font-mono-num text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+                      Posicionamento &amp; Método · 97% Clímax
+                    </p>
+                    <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
+                      Padrão Técnico ÚLTIMO QUADRO
+                    </h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                    {DIFFERENTIALS.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <div
+                          key={item.title}
+                          className="glass-panel rounded-3xl p-5 flex items-start gap-3.5"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                            <Icon className="h-5 w-5" strokeWidth={1.9} />
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-bold text-[var(--text-primary)]">
+                              {item.title}
+                            </h3>
+                            <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Right: Sticky Dynamic Pricing Summary (4 cols) */}
               <aside className="lg:col-span-4 lg:sticky lg:top-24">
                 <div className="glass-panel rounded-3xl p-6 space-y-5">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
-                      Investimento Personalizado
+                    <p className="font-mono-num text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
+                      Investimento Transparente
                     </p>
                     <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">
                       Resumo da Proposta
@@ -803,11 +907,8 @@ export function ProposalClient({
                   </button>
 
                   <p className="text-center text-[11px] leading-relaxed text-[var(--text-muted)]">
-                    Gera automaticamente o{" "}
-                    {isPortrait
-                      ? "Termo de Uso de Imagem em PDF"
-                      : "Contrato em PDF"}{" "}
-                    e o QR Code Pix do sinal de 50% na hora.
+                    Gera automaticamente o Contrato/Termo em PDF e o QR Code Pix
+                    do sinal de 50% na hora · {BRAND_DEFAULTS.whatsappDisplay}
                   </p>
                 </div>
               </aside>
@@ -819,7 +920,7 @@ export function ProposalClient({
       {/* Quick Approval & Reservation Modal */}
       {showApprovalModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           onClick={() => setShowApprovalModal(false)}
         >
           <form
@@ -829,7 +930,7 @@ export function ProposalClient({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                <p className="font-mono-num text-[11px] font-bold uppercase tracking-wider text-[var(--accent)]">
                   Confirmação, PDF &amp; Pix Automático
                 </p>
                 <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">
@@ -865,8 +966,36 @@ export function ProposalClient({
               </div>
             </div>
 
+            {/* PJ / PF Switch */}
+            <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[var(--bg-subtle)] p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setDocMode("cnpj")}
+                className={cn(
+                  "rounded-xl py-2 font-bold transition-all cursor-pointer",
+                  docMode === "cnpj"
+                    ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                    : "text-[var(--text-secondary)]"
+                )}
+              >
+                Empresa (CNPJ · Contrato)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocMode("cpf")}
+                className={cn(
+                  "rounded-xl py-2 font-bold transition-all cursor-pointer",
+                  docMode === "cpf"
+                    ? "bg-[var(--accent)] text-[var(--accent-fg)]"
+                    : "text-[var(--text-secondary)]"
+                )}
+              >
+                Pessoa Física (CPF · Termo)
+              </button>
+            </div>
+
             <div className="space-y-3.5">
-              {isPortrait ? (
+              {docMode === "cpf" ? (
                 <>
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
@@ -929,7 +1058,7 @@ export function ProposalClient({
 
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                  {isPortrait ? "Data do Ensaio *" : "Data do Evento *"}
+                  Data da Produção / Evento *
                 </label>
                 <div className="relative">
                   <Calendar className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -966,7 +1095,7 @@ export function ProposalClient({
                 <QrCode className="h-4 w-4" />
                 {submitting
                   ? "Gerando PDF & Pix..."
-                  : "Confirmar, Gerar Contrato & Pix"}
+                  : "Confirmar, Gerar PDF & Pix"}
               </button>
             </div>
           </form>

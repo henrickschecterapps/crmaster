@@ -4,6 +4,7 @@ import {
   FunnelId,
   FUNNELS,
   Lead,
+  normalizeFunnelId,
   Partner,
   PostSaleChecklistItem,
   StageId,
@@ -184,8 +185,9 @@ export function interpolateTemplate(
     .replaceAll("{{proxima_data_livre}}", variables.proxima_data_livre);
 }
 
-export function getFunnelLabel(funnelId: FunnelId): string {
-  return FUNNELS.find((f) => f.id === funnelId)?.label ?? funnelId;
+export function getFunnelLabel(funnelId: FunnelId | string): string {
+  const normalized = normalizeFunnelId(funnelId);
+  return FUNNELS.find((f) => f.id === normalized)?.label ?? normalized;
 }
 
 export function getStageLabel(stageId: StageId): string {
@@ -222,26 +224,34 @@ function addMonthsYmd(base: Date, months: number): string {
 }
 
 export function buildPostSaleChecklist(
-  funnel: FunnelId,
+  rawFunnel: FunnelId | string,
   referenceDateIso?: string
 ): PostSaleChecklistItem[] {
+  const funnel = normalizeFunnelId(rawFunnel);
   const base = referenceDateIso ? new Date(referenceDateIso) : new Date();
   if (Number.isNaN(base.getTime())) {
     base.setTime(Date.now());
   }
 
-  if (funnel === "lojas_barro_preto") {
+  if (funnel === "moda") {
     return [
       {
         id: generateId("chk"),
-        title: "Entregar catálogo completo tratado (+2 dias)",
-        dueDate: addDaysYmd(base, 2),
+        title: "Entregar Spoiler Express (10–15 fotos no mesmo dia)",
+        dueDate: addDaysYmd(base, 0),
         completed: false,
         category: "entrega",
       },
       {
         id: generateId("chk"),
-        title: "Alerta de Recompra de Estoque / Nova Coleção (+15 dias)",
+        title: "Entregar galeria completa e Fashion Reels 4K (+2 dias úteis)",
+        dueDate: addBusinessDaysYmd(base, 2),
+        completed: false,
+        category: "entrega",
+      },
+      {
+        id: generateId("chk"),
+        title: "Alerta de Recompra / Novo Drop de Coleção (+15 dias)",
         dueDate: addDaysYmd(base, 15),
         completed: false,
         category: "recorrencia",
@@ -249,44 +259,103 @@ export function buildPostSaleChecklist(
     ];
   }
 
-  if (funnel === "retratos_lifestyle") {
+  if (funnel === "estetica") {
     return [
       {
         id: generateId("chk"),
-        title: "Enviar prévia selecionada para aprovação (+2 dias)",
-        dueDate: addDaysYmd(base, 2),
+        title: "Enviar Prévia Expressa de 12 fotos Clean Skin (+1 dia)",
+        dueDate: addDaysYmd(base, 1),
         completed: false,
         category: "entrega",
       },
       {
         id: generateId("chk"),
-        title: "Entregar galeria final em alta resolução (+5 dias)",
+        title: "Entregar 70 fotos + Reels & Criativos 4K Meta Ads (+3 dias úteis)",
+        dueDate: addBusinessDaysYmd(base, 3),
+        completed: false,
+        category: "entrega",
+      },
+      {
+        id: generateId("chk"),
+        title: "Pedir depoimento no Google (+5 dias)",
         dueDate: addDaysYmd(base, 5),
-        completed: false,
-        category: "entrega",
-      },
-      {
-        id: generateId("chk"),
-        title: "Pedir depoimento no Google (+7 dias)",
-        dueDate: addDaysYmd(base, 7),
         completed: false,
         category: "prova_social",
       },
       {
         id: generateId("chk"),
-        title: "Alerta de Recorrência — Atualização de Posicionamento (+6 meses)",
-        dueDate: addMonthsYmd(base, 6),
+        title: "Ofertar Plano Trimestral de Criativos Ads (+75 dias)",
+        dueDate: addDaysYmd(base, 75),
         completed: false,
         category: "recorrencia",
       },
     ];
   }
 
-  // Corporativo padrão (Festas Corporativas)
+  if (funnel === "nightlife") {
+    return [
+      {
+        id: generateId("chk"),
+        title: "Enviar Prévia Expressa de 15 fotos até 14h (+1 dia)",
+        dueDate: addDaysYmd(base, 1),
+        completed: false,
+        category: "entrega",
+      },
+      {
+        id: generateId("chk"),
+        title: "Entregar Galeria Completa + Aftermovie 4K no beat (+48h)",
+        dueDate: addDaysYmd(base, 2),
+        completed: false,
+        category: "entrega",
+      },
+      {
+        id: generateId("chk"),
+        title: "Propor Plano Residente Mensal (4 ou 8 noites/mês) (+20 dias)",
+        dueDate: addDaysYmd(base, 20),
+        completed: false,
+        category: "recorrencia",
+      },
+    ];
+  }
+
+  if (funnel === "gastronomia") {
+    return [
+      {
+        id: generateId("chk"),
+        title: "Enviar Prévia Expressa de 10 fotos (+1 dia)",
+        dueDate: addDaysYmd(base, 1),
+        completed: false,
+        category: "entrega",
+      },
+      {
+        id: generateId("chk"),
+        title: "Entregar Galeria Alta Res + otimizada iFood & Food Reels (+3 dias úteis)",
+        dueDate: addBusinessDaysYmd(base, 3),
+        completed: false,
+        category: "entrega",
+      },
+      {
+        id: generateId("chk"),
+        title: "Pedir avaliação no Google (+5 dias)",
+        dueDate: addDaysYmd(base, 5),
+        completed: false,
+        category: "prova_social",
+      },
+      {
+        id: generateId("chk"),
+        title: "Alerta de Recorrência — Novo Cardápio / Assinatura Mensal (+60 dias)",
+        dueDate: addDaysYmd(base, 60),
+        completed: false,
+        category: "recorrencia",
+      },
+    ];
+  }
+
+  // Corporativo 360° (default)
   return [
     {
       id: generateId("chk"),
-      title: "Enviar prévia de 15 fotos selecionadas (+1 dia)",
+      title: "Enviar Prévia Expressa de 15 fotos até as 10h (+1 dia)",
       dueDate: addDaysYmd(base, 1),
       completed: false,
       category: "entrega",
@@ -300,8 +369,8 @@ export function buildPostSaleChecklist(
     },
     {
       id: generateId("chk"),
-      title: "Entregar galeria digital completa (+3 dias)",
-      dueDate: addDaysYmd(base, 3),
+      title: "Entregar galeria completa + Aftermovie Vertical 48h (+3 dias úteis)",
+      dueDate: addBusinessDaysYmd(base, 3),
       completed: false,
       category: "entrega",
     },

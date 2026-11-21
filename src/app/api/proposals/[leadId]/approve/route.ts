@@ -39,14 +39,14 @@ export async function POST(
     const pixKey =
       store.settings.pixKey ||
       process.env.NEXT_PUBLIC_PIX_KEY ||
-      "henrickschecter@gmail.com";
+      "ultimoquadrofilmes@gmail.com";
 
     const pixCopyPaste = generateStaticPixPayload({
       pixKey,
-      recipientName: store.settings.pixRecipientName || "Henrique Matos",
+      recipientName: store.settings.pixRecipientName || "Ultimo Quadro",
       city: store.settings.pixCity || "BELO HORIZONTE",
       amount: depositAmount,
-      txId: `HM${updated.id.slice(-8)}`,
+      txId: `UQ${updated.id.slice(-8)}`,
       description: `SINAL 50 ${updated.companyName.slice(0, 18)}`,
     });
 
@@ -59,7 +59,7 @@ export async function POST(
       pdfFileName: updated.contractDocument?.fileName,
       pix: {
         key: pixKey,
-        recipientName: store.settings.pixRecipientName || "Henrique Matos",
+        recipientName: store.settings.pixRecipientName || "Ultimo Quadro",
         city: store.settings.pixCity || "BELO HORIZONTE",
         depositAmount,
         copyPaste: pixCopyPaste,

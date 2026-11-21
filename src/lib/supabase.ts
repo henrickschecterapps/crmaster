@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { IntegrationStatus, StudioSettings } from "@/types/crm";
+import { BRAND_DEFAULTS, IntegrationStatus, StudioSettings } from "@/types/crm";
 import { resolveWhatsappConfig } from "@/lib/whatsappQueue";
 import { getFirebaseProjectId, isFirebaseConfigured } from "@/lib/firebase";
 
@@ -50,14 +50,11 @@ export function getIntegrationStatus(
     whatsappApiLive: Boolean(waConfig),
     whatsappProvider:
       waConfig?.provider ?? settings?.whatsappProvider ?? "evolution",
-    whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5531998427100",
+    whatsappNumber:
+      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || BRAND_DEFAULTS.whatsappNumber,
     adminEmail:
-      settings?.adminEmail ||
-      process.env.ADMIN_EMAIL ||
-      "henrickschecter@gmail.com",
+      settings?.adminEmail || process.env.ADMIN_EMAIL || BRAND_DEFAULTS.email,
     pixKey:
-      settings?.pixKey ||
-      process.env.NEXT_PUBLIC_PIX_KEY ||
-      "henrickschecter@gmail.com",
+      settings?.pixKey || process.env.NEXT_PUBLIC_PIX_KEY || BRAND_DEFAULTS.email,
   };
 }

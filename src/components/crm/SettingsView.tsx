@@ -72,7 +72,7 @@ export function SettingsView({
   const [adminEmail, setAdminEmail] = useState(settings.adminEmail || "");
   const [pixKey, setPixKey] = useState(settings.pixKey || "");
   const [pixRecipientName, setPixRecipientName] = useState(
-    settings.pixRecipientName || "Henrique Matos"
+    settings.pixRecipientName || "Ultimo Quadro"
   );
   const [pixCity, setPixCity] = useState(settings.pixCity || "BELO HORIZONTE");
 
@@ -89,7 +89,7 @@ export function SettingsView({
     setWhatsappInstance(settings.whatsappInstance || "");
     setAdminEmail(settings.adminEmail || "");
     setPixKey(settings.pixKey || "");
-    setPixRecipientName(settings.pixRecipientName || "Henrique Matos");
+    setPixRecipientName(settings.pixRecipientName || "Ultimo Quadro");
     setPixCity(settings.pixCity || "BELO HORIZONTE");
   }, [settings]);
 

@@ -19,10 +19,12 @@ const BH_NEIGHBORHOOD_COORDS: Record<string, { lat: number; lon: number; label: 
   mangabeiras: { lat: -19.9517, lon: -43.9128, label: "Mangabeiras" },
   prado: { lat: -19.9212, lon: -43.9648, label: "Prado" },
   "cidade nova": { lat: -19.8842, lon: -43.9277, label: "Cidade Nova" },
+  "vila da serra": { lat: -19.9781, lon: -43.9445, label: "Vila da Serra" },
+  "nova lima": { lat: -19.9857, lon: -43.8469, label: "Nova Lima" },
 };
 
 function inferFunnelFromQuery(text: string): FunnelId {
-  const lower = text.toLowerCase();
+  const lower = normalizeSearch(text);
   if (
     lower.includes("barro preto") ||
     lower.includes("confec") ||
@@ -30,26 +32,50 @@ function inferFunnelFromQuery(text: string): FunnelId {
     lower.includes("roupa") ||
     lower.includes("clothes") ||
     lower.includes("boutique") ||
-    lower.includes("loja") ||
     lower.includes("atacado")
   ) {
-    return "lojas_barro_preto";
+    return "moda";
   }
   if (
     lower.includes("clinica") ||
-    lower.includes("clínica") ||
     lower.includes("estetica") ||
-    lower.includes("estética") ||
-    lower.includes("arquitetura") ||
-    lower.includes("medico") ||
-    lower.includes("médico") ||
+    lower.includes("spa") ||
+    lower.includes("wellness") ||
+    lower.includes("fitness") ||
+    lower.includes("pilates") ||
+    lower.includes("dermato") ||
     lower.includes("beauty") ||
     lower.includes("dentist") ||
-    lower.includes("retrato")
+    lower.includes("medico")
   ) {
-    return "retratos_lifestyle";
+    return "estetica";
   }
-  return "festas_corporativas";
+  if (
+    lower.includes("nightlife") ||
+    lower.includes("balada") ||
+    lower.includes("club") ||
+    lower.includes("boate") ||
+    lower.includes("pub") ||
+    lower.includes("lounge") ||
+    lower.includes("casa de show") ||
+    lower.includes("festa")
+  ) {
+    return "nightlife";
+  }
+  if (
+    lower.includes("restaurante") ||
+    lower.includes("gastronomia") ||
+    lower.includes("hamburgueria") ||
+    lower.includes("cafe") ||
+    lower.includes("pizzaria") ||
+    lower.includes("ifood") ||
+    lower.includes("delivery") ||
+    lower.includes("bistro") ||
+    lower.includes("bar")
+  ) {
+    return "gastronomia";
+  }
+  return "corporativo";
 }
 
 function normalizeSearch(value: string): string {
@@ -200,7 +226,7 @@ async function searchOpenStreetMapBH(
         signal: controller.signal,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "CRMasterBH/1.0 (Henrique Matos Studio)",
+          "User-Agent": "UltimoQuadroCRM/1.0 (Belo Horizonte & Nova Lima)",
         },
         body: `data=${encodeURIComponent(overpassQuery)}`,
       });
@@ -294,7 +320,7 @@ async function searchOpenStreetMapBH(
       const res = await fetch(nomUrl, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "CRMasterBH/1.0 (Henrique Matos Studio)",
+          "User-Agent": "UltimoQuadroCRM/1.0 (Belo Horizonte & Nova Lima)",
           "Accept-Language": "pt-BR,pt;q=0.9",
         },
       });

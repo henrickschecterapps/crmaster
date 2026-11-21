@@ -10,11 +10,14 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import {
+  BRAND_DEFAULTS,
   ContractDocumentRef,
   CrmStoreData,
   InteractionType,
   Lead,
   LeadInteraction,
+  normalizeFunnelId,
+  normalizeTemplateFunnelId,
   Partner,
   PostSaleChecklistItem,
   ScriptTemplate,
@@ -49,6 +52,11 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
   const settings: StudioSettings = {
     ...defaults.settings,
     ...raw.settings,
+    studioName:
+      !raw.settings?.studioName ||
+      raw.settings.studioName === "Henrique Matos Studio"
+        ? BRAND_DEFAULTS.name
+        : raw.settings.studioName,
     whatsappProvider: raw.settings?.whatsappProvider ?? "evolution",
     whatsappApiUrl:
       raw.settings?.whatsappApiUrl ?? process.env.WHATSAPP_API_URL ?? "",
@@ -59,20 +67,26 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
     adminEmail:
       raw.settings?.adminEmail ||
       process.env.ADMIN_EMAIL ||
-      "henrickschecter@gmail.com",
+      BRAND_DEFAULTS.email,
     pixKey:
       raw.settings?.pixKey ||
       process.env.NEXT_PUBLIC_PIX_KEY ||
-      "henrickschecter@gmail.com",
-    pixRecipientName: raw.settings?.pixRecipientName || "Henrique Matos",
-    pixCity: raw.settings?.pixCity || "BELO HORIZONTE",
+      BRAND_DEFAULTS.email,
+    pixRecipientName:
+      !raw.settings?.pixRecipientName ||
+      raw.settings.pixRecipientName === "Henrique Matos"
+        ? BRAND_DEFAULTS.pixRecipientName
+        : raw.settings.pixRecipientName,
+    pixCity: raw.settings?.pixCity || BRAND_DEFAULTS.pixCity,
   };
 
   const leads: Lead[] = (raw.leads ?? []).map((lead) => {
+    const normalizedFunnel = normalizeFunnelId(lead.funnel);
     const isClosedOrPaid =
       lead.stage === "sinal_pago" || lead.stage === "fechado";
     return {
       ...lead,
+      funnel: normalizedFunnel,
       automacaoAtiva:
         typeof lead.automacaoAtiva === "boolean"
           ? lead.automacaoAtiva
@@ -86,14 +100,19 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
       postSaleChecklist: Array.isArray(lead.postSaleChecklist)
         ? lead.postSaleChecklist
         : lead.stage === "fechado"
-        ? buildPostSaleChecklist(lead.funnel, lead.updatedAt)
+        ? buildPostSaleChecklist(normalizedFunnel, lead.updatedAt)
         : [],
       interactions: Array.isArray(lead.interactions) ? lead.interactions : [],
     };
   });
 
-  // Backfill Phase 2 follow-up templates if upgrading from Phase 1 store
-  const existingTemplates = Array.isArray(raw.templates) ? raw.templates : [];
+  // Backfill Phase 2 follow-up templates and normalize legacy funnel tags
+  const existingTemplates = (Array.isArray(raw.templates) ? raw.templates : []).map(
+    (tpl) => ({
+      ...tpl,
+      funnel: normalizeTemplateFunnelId(tpl.funnel),
+    })
+  );
   const p2Templates = createPhase2FollowupTemplates();
   const templates = [...existingTemplates];
   for (const tpl of p2Templates) {
@@ -900,7 +919,8 @@ export async function approveProposal(
       ? lead.stage
       : "follow_up";
 
-  const isPortrait = lead.funnel === "retratos_lifestyle";
+  const isPortrait =
+    Boolean(payload.cpf) && !payload.cnpj;
   const slug = (lead.companyName || lead.id)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

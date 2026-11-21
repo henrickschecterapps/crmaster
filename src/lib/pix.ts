@@ -59,11 +59,11 @@ export interface PixPayloadParams {
 export function generateStaticPixPayload(params: PixPayloadParams): string {
   const key = params.pixKey.trim();
   const merchantName = sanitizeEmvText(
-    params.recipientName || "Henrique Matos",
+    params.recipientName || "Ultimo Quadro",
     25
   );
   const merchantCity = sanitizeEmvText(params.city || "BELO HORIZONTE", 15);
-  const txId = sanitizeTxId(params.txId || "HMSTUDIO");
+  const txId = sanitizeTxId(params.txId || "UQSTUDIO");
 
   const gui = tlv("00", "br.gov.bcb.pix");
   const keyField = tlv("01", key);
