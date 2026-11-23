@@ -134,6 +134,28 @@ export function ClientWorkspaceAdmin({
   const [productionStage, setProductionStage] = useState<ProductionStageId>(
     lead.productionStage || "pre_producao"
   );
+  const [milestoneDates, setMilestoneDates] = useState<
+    Partial<Record<ProductionStageId, string>>
+  >(lead.milestoneDates ?? {});
+  const [proposalValidUntil, setProposalValidUntil] = useState(
+    lead.proposalValidUntil || ""
+  );
+  const [customEnabled, setCustomEnabled] = useState(
+    Boolean(lead.customProposal?.enabled)
+  );
+  const [customTitle, setCustomTitle] = useState(
+    lead.customProposal?.title || ""
+  );
+  const [customSubtitle, setCustomSubtitle] = useState(
+    lead.customProposal?.subtitle || ""
+  );
+  const [customPrice, setCustomPrice] = useState(
+    String(lead.customProposal?.price ?? lead.estimatedValue ?? "")
+  );
+  const [customDeliverablesText, setCustomDeliverablesText] = useState(
+    (lead.customProposal?.deliverables ?? []).join("\n")
+  );
+
   const [meetings, setMeetings] = useState<ClientMeeting[]>(
     lead.meetings ?? []
   );
@@ -159,6 +181,8 @@ export function ClientWorkspaceAdmin({
   const [newDelivType, setNewDelivType] =
     useState<DeliverableType>("galeria_fotos");
   const [newDelivUrl, setNewDelivUrl] = useState("");
+  const [newDelivVersion, setNewDelivVersion] = useState("V1");
+  const [newDelivThumb, setNewDelivThumb] = useState("");
   const [newDelivDesc, setNewDelivDesc] = useState("");
 
   const [newNote, setNewNote] = useState("");
@@ -261,6 +285,20 @@ export function ClientWorkspaceAdmin({
       postSaleChecklist: checklist,
       portalPin: cleanedPin.length === 4 ? cleanedPin : null,
       productionStage,
+      milestoneDates,
+      proposalValidUntil: proposalValidUntil.trim() || null,
+      customProposal: customEnabled
+        ? {
+            enabled: true,
+            title: customTitle.trim() || `Escopo Sob Medida ${companyName}`,
+            subtitle: customSubtitle.trim(),
+            price: Number(customPrice) || numericValue,
+            deliverables: customDeliverablesText
+              .split("\n")
+              .map((l) => l.trim())
+              .filter(Boolean),
+          }
+        : null,
     });
     if (updated) {
       setPortalPin(cleanedPin.length === 4 ? cleanedPin : "");
@@ -460,6 +498,8 @@ export function ClientWorkspaceAdmin({
       title: newDelivTitle.trim(),
       type: newDelivType,
       url: newDelivUrl.trim(),
+      version: newDelivVersion.trim() || "V1",
+      thumbnailUrl: newDelivThumb.trim() || undefined,
       description: newDelivDesc.trim(),
       status: "pronto_aprovacao",
       createdAt: now,
@@ -470,7 +510,7 @@ export function ClientWorkspaceAdmin({
       { deliverables: nextDeliverables },
       {
         type: "entrega",
-        title: `Entrega publicada no Portal: ${created.title}`,
+        title: `Entrega publicada no Portal (${created.version}): ${created.title}`,
         description: created.url,
       },
       true
@@ -478,6 +518,7 @@ export function ClientWorkspaceAdmin({
     if (updated) {
       setNewDelivTitle("");
       setNewDelivUrl("");
+      setNewDelivThumb("");
       setNewDelivDesc("");
       notify("Material publicado na Central de Entregas do Cliente.", "success");
     }
@@ -680,73 +721,116 @@ export function ClientWorkspaceAdmin({
           </div>
         )}
 
-        {/* Quick KPI Strip (Double-Bezel + Hairline Dividers) */}
+        {/* Quick KPI + Client Engagement Thermometer + Contextual WhatsApp Strip */}
         <div className="double-bezel stagger-in">
-          <div className="double-bezel-core grid grid-cols-2 divide-y divide-[var(--border-hairline)] lg:grid-cols-4 lg:divide-y-0 lg:divide-x">
-            <div className="p-4">
-              <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--text-muted)]">
-                Valor do Projeto
-              </p>
-              <p className="mt-1 text-xl font-bold font-mono-num text-[var(--text-primary)]">
-                {formatCurrency(numericValue)}
-              </p>
-              <p className="text-[11px] text-[var(--text-secondary)]">
-                Sinal 50%: {formatCurrency(signalValue)}
-              </p>
+          <div className="double-bezel-core divide-y divide-[var(--border-hairline)]">
+            <div className="grid grid-cols-2 divide-y divide-[var(--border-hairline)] lg:grid-cols-4 lg:divide-y-0 lg:divide-x">
+              <div className="p-4">
+                <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--text-muted)]">
+                  Valor do Projeto
+                </p>
+                <p className="mt-1 text-xl font-bold font-mono-num text-[var(--text-primary)]">
+                  {formatCurrency(numericValue)}
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  Sinal 50%: {formatCurrency(signalValue)}
+                </p>
+              </div>
+              <div className="p-4">
+                <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--text-muted)]">
+                  Sinais do Cliente no Portal
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--text-primary)] font-mono-num">
+                  {lead.visualizacoesProposta} acesso(s) ·{" "}
+                  {lead.briefing ? "Briefing OK" : "Sem briefing"}
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  {lead.visualizadaEm
+                    ? `Último acesso: ${formatDateTimeBr(lead.visualizadaEm)}`
+                    : "Ainda não abriu o portal"}
+                </p>
+              </div>
+              <div className="p-4">
+                <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--text-muted)]">
+                  Pendências do Portal
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--text-primary)] font-mono-num">
+                  {meetings.length} reunião(ões) · {deliverables.length} entrega(s)
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  {(lead.paymentNotices?.length ?? 0) > 0
+                    ? `${lead.paymentNotices?.length} aviso(s) de Pix enviado(s)`
+                    : pendingMeetingsCount > 0
+                    ? `${pendingMeetingsCount} reunião aguardando confirmação`
+                    : adjustmentDeliverablesCount > 0
+                    ? `${adjustmentDeliverablesCount} ajuste(s) solicitado(s)`
+                    : "Tudo em dia no portal"}
+                </p>
+              </div>
+              <div className="p-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSendPortalEmail}
+                  disabled={sendingEmail || !email.trim()}
+                  className="btn-ghost inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                  {sendingEmail ? "Enviando..." : "E-mail Portal"}
+                </button>
+                <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
+                  {portalPin.length === 4 ? `PIN ${portalPin}` : "Sem PIN"}
+                </span>
+              </div>
             </div>
-            <div className="p-4">
-              <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--text-muted)]">
-                Status do Portal
-              </p>
-              <p className="mt-1 text-sm font-bold text-[var(--text-primary)]">
-                {lead.propostaAprovadaEm
-                  ? "Escopo Aprovado"
-                  : "Proposta em Aberto"}
-              </p>
-              <p className="text-[11px] text-[var(--text-secondary)] font-mono-num">
-                {portalPin.length === 4 ? `PIN Ativo (${portalPin})` : "Sem PIN (Link Direto)"}
-              </p>
-            </div>
-            <div className="p-4">
-              <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--text-muted)]">
-                Reuniões &amp; Entregas
-              </p>
-              <p className="mt-1 text-sm font-bold text-[var(--text-primary)] font-mono-num">
-                {meetings.length} reunião(ões) · {deliverables.length} entrega(s)
-              </p>
-              <p className="text-[11px] text-[var(--text-secondary)]">
-                {pendingMeetingsCount > 0
-                  ? `${pendingMeetingsCount} aguardando sua confirmação`
-                  : adjustmentDeliverablesCount > 0
-                  ? `${adjustmentDeliverablesCount} ajuste(s) solicitado(s)`
-                  : "Tudo em dia no portal"}
-              </p>
-            </div>
-            <div className="p-4 flex flex-wrap items-center gap-2">
-              {phone && (
+
+            {/* Contextual WhatsApp 1-Click Templates */}
+            {phone && (
+              <div className="flex flex-wrap items-center gap-2 bg-[var(--bg-subtle)]/50 px-4 py-2.5 text-xs">
+                <span className="font-mono-num text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mr-1">
+                  WHATSAPP 1-CLIQUE:
+                </span>
                 <a
                   href={buildWhatsappUrl(
                     phone,
-                    `Olá ${contactName}! Segue o link do Portal Exclusivo da ${companyName} na ${studioSettings.studioName}: ${portalUrl}`
+                    `Olá ${contactName}! Preparei o Portal Exclusivo da ${companyName} na ${studioSettings.studioName} com a proposta personalizada, contrato e agenda:\n${portalUrl}${
+                      portalPin.length === 4
+                        ? `\n\nCódigo PIN de acesso: ${portalPin}`
+                        : ""
+                    }`
                   )}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold"
+                  className="btn-accent inline-flex min-h-[32px] items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-bold"
                 >
-                  <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  WhatsApp
+                  <MessageCircle className="h-3 w-3" />
+                  Enviar Portal{portalPin.length === 4 ? " + PIN" : ""}
                 </a>
-              )}
-              <button
-                type="button"
-                onClick={handleSendPortalEmail}
-                disabled={sendingEmail || !email.trim()}
-                className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-              >
-                <Send className="h-3.5 w-3.5" aria-hidden="true" />
-                {sendingEmail ? "Enviando..." : "E-mail Portal"}
-              </button>
-            </div>
+                <a
+                  href={buildWhatsappUrl(
+                    phone,
+                    `Olá ${contactName}! Acabamos de confirmar nossa reunião no Portal do Projeto (${companyName}). Você já pode adicionar à sua agenda pelo link:\n${portalUrl}`
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-ghost inline-flex min-h-[32px] items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-semibold"
+                >
+                  <Calendar className="h-3 w-3 text-[var(--accent-text)]" />
+                  Avisar Reunião Confirmada
+                </a>
+                <a
+                  href={buildWhatsappUrl(
+                    phone,
+                    `Olá ${contactName}! Ótima notícia: acabamos de subir uma nova entrega em 4K da ${companyName} no seu Portal Exclusivo. Confira e aprove por aqui:\n${portalUrl}`
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-ghost inline-flex min-h-[32px] items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-semibold"
+                >
+                  <Video className="h-3 w-3 text-[var(--accent-text)]" />
+                  Avisar Entrega 4K no Portal
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1070,29 +1154,131 @@ export function ClientWorkspaceAdmin({
                   {PRODUCTION_STAGES.map((ps, idx) => {
                     const active = productionStage === ps.id;
                     return (
-                      <button
+                      <div
                         key={ps.id}
-                        type="button"
-                        onClick={() => handleProductionStageChange(ps.id)}
                         className={cn(
-                          "rounded-lg border p-3 text-left transition-colors",
+                          "rounded-lg border p-3 transition-colors space-y-2",
                           active
                             ? "border-[var(--accent-border)] bg-[var(--accent-soft)]"
-                            : "border-[var(--border-hairline)] hover:bg-[var(--bg-surface-hover)]"
+                            : "border-[var(--border-hairline)]"
                         )}
                       >
-                        <p className="font-mono-num text-[10px] font-bold text-[var(--accent-text)]">
-                          0{idx + 1}
-                        </p>
-                        <p className="mt-0.5 text-xs font-bold text-[var(--text-primary)]">
-                          {ps.shortLabel}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[var(--text-muted)] line-clamp-2">
-                          {ps.description}
-                        </p>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleProductionStageChange(ps.id)}
+                          className="w-full text-left"
+                        >
+                          <p className="font-mono-num text-[10px] font-bold text-[var(--accent-text)]">
+                            0{idx + 1}
+                          </p>
+                          <p className="mt-0.5 text-xs font-bold text-[var(--text-primary)]">
+                            {ps.shortLabel}
+                          </p>
+                        </button>
+                        <input
+                          type="date"
+                          aria-label={`Data prevista para ${ps.shortLabel}`}
+                          value={milestoneDates[ps.id] || ""}
+                          onChange={(e) =>
+                            setMilestoneDates((prev) => ({
+                              ...prev,
+                              [ps.id]: e.target.value,
+                            }))
+                          }
+                          className="input-field min-h-[32px] w-full rounded-md px-2 font-mono-num text-[11px]"
+                        />
+                      </div>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Bespoke Proposal & Validity Editor */}
+            <div className="double-bezel stagger-in xl:col-span-12">
+              <div className="double-bezel-core p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                      Proposta Sob Medida &amp; Validade (Exclusiva deste Cliente)
+                    </h2>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Ative para exibir um pacote personalizado acima dos pacotes padrão da vertical, ou defina uma data de validade.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="cfg-proposal-valid"
+                        className="text-[11px] font-semibold text-[var(--text-secondary)]"
+                      >
+                        Válida até:
+                      </label>
+                      <input
+                        id="cfg-proposal-valid"
+                        type="date"
+                        value={proposalValidUntil}
+                        onChange={(e) => setProposalValidUntil(e.target.value)}
+                        className="input-field min-h-[36px] rounded-lg px-2.5 font-mono-num text-xs"
+                      />
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={customEnabled}
+                        onChange={(e) => setCustomEnabled(e.target.checked)}
+                        className="h-4 w-4 accent-[var(--accent)]"
+                      />
+                      Ativar Pacote Sob Medida
+                    </label>
+                  </div>
+                </div>
+
+                {customEnabled && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 border-t border-[var(--border-hairline)] pt-4">
+                    <input
+                      type="text"
+                      value={customTitle}
+                      onChange={(e) => setCustomTitle(e.target.value)}
+                      placeholder="Título (ex.: Diária Completa Cardápio + Reels)"
+                      className="input-field min-h-[40px] rounded-lg px-3 text-xs"
+                    />
+                    <input
+                      type="text"
+                      value={customSubtitle}
+                      onChange={(e) => setCustomSubtitle(e.target.value)}
+                      placeholder="Subtítulo curto (ex.: 6h de produção + 2 vídeos 4K)"
+                      className="input-field min-h-[40px] rounded-lg px-3 text-xs"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={customPrice}
+                      onChange={(e) => setCustomPrice(e.target.value)}
+                      placeholder="Valor personalizado (R$)"
+                      className="input-field min-h-[40px] rounded-lg px-3 font-mono-num text-xs"
+                    />
+                    <textarea
+                      rows={4}
+                      value={customDeliverablesText}
+                      onChange={(e) => setCustomDeliverablesText(e.target.value)}
+                      placeholder="Liste os entregáveis (1 item por linha)..."
+                      className="input-field sm:col-span-3 rounded-lg px-3 py-2 text-xs"
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSaveAll()}
+                    className="btn-accent min-h-[38px] inline-flex items-center gap-2 rounded-lg px-4 text-xs font-bold"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Salvar Cronograma &amp; Proposta no Portal
+                  </button>
                 </div>
               </div>
             </div>
@@ -1313,8 +1499,22 @@ export function ClientWorkspaceAdmin({
                     type="url"
                     value={newDelivUrl}
                     onChange={(e) => setNewDelivUrl(e.target.value)}
-                    placeholder="https://drive.google.com/... ou Frame.io / Vimeo"
+                    placeholder="https://drive.google.com/... ou YouTube / Vimeo / Frame.io"
                     className="input-field min-h-[40px] sm:col-span-2 rounded-lg px-3 font-mono-num text-xs"
+                  />
+                  <input
+                    type="text"
+                    value={newDelivVersion}
+                    onChange={(e) => setNewDelivVersion(e.target.value)}
+                    placeholder="Versão (ex.: V1, V2, Final)"
+                    className="input-field min-h-[40px] rounded-lg px-3 font-mono-num text-xs"
+                  />
+                  <input
+                    type="url"
+                    value={newDelivThumb}
+                    onChange={(e) => setNewDelivThumb(e.target.value)}
+                    placeholder="URL de capa / thumbnail (opcional)"
+                    className="input-field min-h-[40px] rounded-lg px-3 font-mono-num text-xs"
                   />
                   <input
                     type="text"

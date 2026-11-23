@@ -3,6 +3,7 @@ import { getStoreData, updateLead } from "@/lib/repository";
 import {
   ClientBriefing,
   ClientMeeting,
+  ClientPaymentNotice,
   MEETING_TYPES,
   MeetingType,
 } from "@/types/crm";
@@ -22,6 +23,21 @@ type PortalActionPayload =
       time: string;
       format: "online" | "presencial";
       notes?: string;
+    }
+  | {
+      action: "reschedule_meeting";
+      pin?: string;
+      meetingId: string;
+      date: string;
+      time: string;
+      reason?: string;
+    }
+  | {
+      action: "report_payment";
+      pin?: string;
+      kind: "sinal_50" | "quitacao";
+      amount: number;
+      transactionRef?: string;
     }
   | {
       action: "save_briefing";
@@ -128,6 +144,98 @@ export async function POST(
       return NextResponse.json({
         meeting: newMeeting,
         meetings: updated?.meetings ?? updatedMeetings,
+      });
+    }
+
+    if (body.action === "reschedule_meeting") {
+      if (!body.meetingId || !body.date || !body.time) {
+        return NextResponse.json(
+          { error: "Informe a nova data e horário para reagendamento." },
+          { status: 400 }
+        );
+      }
+      const existingMeetings = lead.meetings ?? [];
+      const target = existingMeetings.find((m) => m.id === body.meetingId);
+      if (!target) {
+        return NextResponse.json(
+          { error: "Reunião não encontrada." },
+          { status: 404 }
+        );
+      }
+
+      const nextMeetings = existingMeetings.map((m) =>
+        m.id === body.meetingId
+          ? {
+              ...m,
+              date: body.date,
+              time: body.time,
+              status: "solicitada" as const,
+              notes: body.reason?.trim()
+                ? `${m.notes ? `${m.notes} | ` : ""}Reagendamento: ${body.reason.trim()}`
+                : m.notes,
+            }
+          : m
+      );
+
+      const updated = await updateLead(
+        lead.id,
+        { meetings: nextMeetings },
+        {
+          type: "reuniao",
+          title: `Reagendamento solicitado: ${target.title}`,
+          description: `Nova sugestão: ${body.date} às ${body.time}. ${body.reason?.trim() || ""}`.trim(),
+        },
+        true
+      );
+
+      if (adminEmail) {
+        await sendEmailNotification({
+          to: adminEmail,
+          subject: `[Portal ÚLTIMO QUADRO] Pedido de reagendamento: ${lead.companyName}`,
+          text: `${lead.contactName} (${lead.companyName}) pediu para reagendar "${target.title}" para ${body.date} às ${body.time}. Motivo: ${body.reason?.trim() || "Não informado"}.`,
+          html: `<p><strong>${lead.contactName}</strong> (${lead.companyName}) solicitou reagendamento de <strong>${target.title}</strong> para <strong>${body.date} às ${body.time}</strong>.</p><p>Motivo: ${body.reason?.trim() || "Não informado"}</p>`,
+        }).catch(() => {});
+      }
+
+      return NextResponse.json({
+        meetings: updated?.meetings ?? nextMeetings,
+      });
+    }
+
+    if (body.action === "report_payment") {
+      const notice: ClientPaymentNotice = {
+        id: generateId("pay"),
+        kind: body.kind === "quitacao" ? "quitacao" : "sinal_50",
+        amount: Number(body.amount) || 0,
+        transactionRef: (body.transactionRef || "").trim(),
+        reportedAt: now,
+      };
+      const nextNotices = [notice, ...(lead.paymentNotices ?? [])];
+      const kindLabel =
+        notice.kind === "quitacao" ? "Quitação (50% restante)" : "Sinal (50%)";
+
+      const updated = await updateLead(
+        lead.id,
+        { paymentNotices: nextNotices },
+        {
+          type: "pagamento",
+          title: `Cliente informou Pix realizado (${kindLabel})`,
+          description: `Valor: R$ ${notice.amount.toLocaleString("pt-BR")} · Ref: ${notice.transactionRef || "Não informada"}. Confira o extrato para confirmar o status.`,
+        },
+        true
+      );
+
+      if (adminEmail) {
+        await sendEmailNotification({
+          to: adminEmail,
+          subject: `[Portal ÚLTIMO QUADRO] Pix informado: ${lead.companyName} (R$ ${notice.amount.toLocaleString("pt-BR")})`,
+          text: `${lead.contactName} (${lead.companyName}) clicou em "Já fiz o Pix" (${kindLabel} - R$ ${notice.amount.toLocaleString("pt-BR")}). Referência/Comprovante: ${notice.transactionRef || "Não informado"}.`,
+          html: `<p><strong>${lead.contactName}</strong> (${lead.companyName}) informou o pagamento via Pix no Portal:</p><ul><li><strong>Tipo:</strong> ${kindLabel}</li><li><strong>Valor:</strong> R$ ${notice.amount.toLocaleString("pt-BR")}</li><li><strong>Referência:</strong> ${notice.transactionRef || "Não informada"}</li></ul>`,
+        }).catch(() => {});
+      }
+
+      return NextResponse.json({
+        paymentNotices: updated?.paymentNotices ?? nextNotices,
       });
     }
 

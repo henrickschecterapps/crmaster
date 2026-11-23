@@ -107,6 +107,13 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
         : [],
       portalPin: lead.portalPin ?? null,
       productionStage: lead.productionStage ?? "pre_producao",
+      milestoneDates: lead.milestoneDates ?? {},
+      proposalValidUntil: lead.proposalValidUntil ?? null,
+      customProposal: lead.customProposal ?? null,
+      acceptanceCertificate: lead.acceptanceCertificate ?? null,
+      paymentNotices: Array.isArray(lead.paymentNotices)
+        ? lead.paymentNotices
+        : [],
       meetings: Array.isArray(lead.meetings) ? lead.meetings : [],
       deliverables: Array.isArray(lead.deliverables) ? lead.deliverables : [],
       briefing: lead.briefing ?? null,

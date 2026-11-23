@@ -88,11 +88,38 @@ export interface ClientDeliverable {
   title: string;
   type: DeliverableType;
   url: string;
+  version?: string; // Ex.: V1, V2, Final
+  thumbnailUrl?: string;
   description?: string;
   status: DeliverableStatus;
   clientFeedback?: string;
   updatedAt: string;
   createdAt: string;
+}
+
+export interface CustomProposalScope {
+  enabled: boolean;
+  title: string;
+  subtitle?: string;
+  price: number;
+  deliverables: string[];
+  notes?: string;
+}
+
+export interface AcceptanceCertificate {
+  signerName: string;
+  signerDocument: string;
+  acceptedAt: string;
+  ipAddress: string;
+  hash: string;
+}
+
+export interface ClientPaymentNotice {
+  id: string;
+  kind: "sinal_50" | "quitacao";
+  amount: number;
+  transactionRef?: string;
+  reportedAt: string;
 }
 
 export interface ClientBriefing {
@@ -272,6 +299,11 @@ export interface Lead {
   postSaleChecklist: PostSaleChecklistItem[];
   portalPin?: string | null;
   productionStage?: ProductionStageId;
+  milestoneDates?: Partial<Record<ProductionStageId, string>>;
+  proposalValidUntil?: string | null; // YYYY-MM-DD
+  customProposal?: CustomProposalScope | null;
+  acceptanceCertificate?: AcceptanceCertificate | null;
+  paymentNotices?: ClientPaymentNotice[];
   meetings?: ClientMeeting[];
   deliverables?: ClientDeliverable[];
   briefing?: ClientBriefing | null;

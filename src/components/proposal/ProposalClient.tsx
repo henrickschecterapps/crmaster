@@ -45,6 +45,8 @@ import { BrandMark } from "@/components/BrandMark";
 interface ProposalClientProps {
   lead: Lead;
   studioWhatsapp: string;
+  embedded?: boolean;
+  onApproved?: (updatedLead: Lead) => void;
 }
 
 interface ApprovedConfirmationData {
@@ -213,13 +215,13 @@ const DIFFERENTIALS = [
 export function ProposalClient({
   lead,
   studioWhatsapp,
+  embedded = false,
+  onApproved,
 }: ProposalClientProps) {
   const { theme, toggleTheme } = useTheme();
   const trackedRef = useRef(false);
 
-  const [selectedVerticalId, setSelectedVerticalId] = useState<FunnelId>(
-    lead.funnel
-  );
+  const selectedVerticalId: FunnelId = lead.funnel;
   const [useSocialModa, setUseSocialModa] = useState(false);
 
   const currentVertical = useMemo(
@@ -230,11 +232,43 @@ export function ProposalClient({
   const storyboard = VERTICAL_STORYBOARD[selectedVerticalId];
 
   const activePackages = useMemo(() => {
-    if (selectedVerticalId === "moda" && useSocialModa) {
-      return SOCIAL_MODA_PACKAGES;
+    const basePackages =
+      selectedVerticalId === "moda" && useSocialModa
+        ? SOCIAL_MODA_PACKAGES
+        : currentVertical.packages;
+
+    if (lead.customProposal?.enabled && lead.customProposal.title) {
+      const customPkg = {
+        id: "custom_bespoke_scope",
+        tier: "PROPOSTA SOB MEDIDA",
+        name: lead.customProposal.title,
+        format:
+          lead.customProposal.subtitle ||
+          `Escopo exclusivo desenhado para ${lead.companyName}`,
+        price: Number(lead.customProposal.price) || lead.estimatedValue || 0,
+        originalPrice: undefined as number | undefined,
+        badge: "EXCLUSIVO",
+        featured: true,
+        features:
+          lead.customProposal.deliverables.length > 0
+            ? lead.customProposal.deliverables
+            : ["Escopo customizado conforme briefing comercial"],
+      };
+      return [
+        customPkg,
+        ...basePackages.map((p) => ({ ...p, featured: false })),
+      ];
     }
-    return currentVertical.packages;
-  }, [selectedVerticalId, useSocialModa, currentVertical]);
+
+    return basePackages;
+  }, [
+    selectedVerticalId,
+    useSocialModa,
+    currentVertical,
+    lead.customProposal,
+    lead.companyName,
+    lead.estimatedValue,
+  ]);
 
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
     activePackages[1]?.id ?? activePackages[0].id
@@ -437,6 +471,9 @@ export function ProposalClient({
       });
 
       setShowApprovalModal(false);
+      if (json.lead && onApproved) {
+        onApproved(json.lead as Lead);
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setErrorMsg("Erro de conexão ao registrar aprovação. Tente novamente.");
@@ -446,52 +483,54 @@ export function ProposalClient({
   };
 
   return (
-    <div className="min-h-[100dvh] pb-28 lg:pb-20">
-      <div className="cinema-grain" aria-hidden="true" />
+    <div className={cn(embedded ? "pb-24 lg:pb-10" : "min-h-[100dvh] pb-28 lg:pb-20")}>
+      {!embedded && <div className="cinema-grain" aria-hidden="true" />}
 
-      <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
-          <BrandMark showTagline />
+      {!embedded && (
+        <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
+            <BrandMark showTagline />
 
-          <div className="flex items-center gap-2">
-            <a
-              href={quickQuestionWhatsappUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="badge-success hidden sm:inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold hover:opacity-85"
-            >
-              <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-              Falar no WhatsApp
-            </a>
-            <span className="badge-accent hidden md:inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono-num text-[11px] font-semibold">
-              <Camera className="h-3 w-3" aria-hidden="true" />
-              24FPS · PROPOSTA INTERATIVA
-            </span>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
-              aria-label={
-                theme === "dark"
-                  ? "Mudar para modo claro"
-                  : "Mudar para modo escuro"
-              }
-            >
-              {theme === "dark" ? (
-                <Sun
-                  className="h-4 w-4 text-[var(--accent-text)]"
-                  aria-hidden="true"
-                />
-              ) : (
-                <Moon
-                  className="h-4 w-4 text-[var(--text-primary)]"
-                  aria-hidden="true"
-                />
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                href={quickQuestionWhatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="badge-success hidden sm:inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold hover:opacity-85"
+              >
+                <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                Falar no WhatsApp
+              </a>
+              <span className="badge-accent hidden md:inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono-num text-[11px] font-semibold">
+                <Camera className="h-3 w-3" aria-hidden="true" />
+                24FPS · PROPOSTA INTERATIVA
+              </span>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="btn-ghost flex h-10 w-10 items-center justify-center rounded-lg"
+                aria-label={
+                  theme === "dark"
+                    ? "Mudar para modo claro"
+                    : "Mudar para modo escuro"
+                }
+              >
+                {theme === "dark" ? (
+                  <Sun
+                    className="h-4 w-4 text-[var(--accent-text)]"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Moon
+                    className="h-4 w-4 text-[var(--text-primary)]"
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 lg:px-8 space-y-10">
         {approvedInfo ? (
@@ -722,45 +761,22 @@ export function ProposalClient({
                       50% reserva · 50% entrega
                     </span>
                   </div>
+                  {lead.proposalValidUntil && (
+                    <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2.5">
+                      <span className="text-[var(--text-muted)]">
+                        Validade da Proposta
+                      </span>
+                      <span className="badge-warning rounded-md px-2 py-0.5 font-mono-num text-[11px] font-bold">
+                        Até {formatDateBr(lead.proposalValidUntil)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
 
-            {/* Vertical Selector + Cinema 24FPS Storyboard Showcase */}
+            {/* Exclusive Cinema 24FPS Storyboard Showcase (Locked to Client Vertical) */}
             <section className="space-y-4">
-              <div
-                className="flex flex-wrap items-center gap-1.5 rounded-xl p-1.5 surface-card"
-                role="tablist"
-                aria-label="Frentes de produção audiovisual"
-              >
-                {SERVICES_CATALOG.map((svc) => {
-                  const active = svc.id === selectedVerticalId;
-                  return (
-                    <button
-                      key={svc.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => {
-                        setSelectedVerticalId(svc.id);
-                        setUseSocialModa(false);
-                      }}
-                      className={cn(
-                        "min-h-[40px] rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
-                        active
-                          ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
-                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                      )}
-                    >
-                      <span className="font-mono-num mr-1.5 opacity-80">
-                        {svc.index}
-                      </span>
-                      {svc.shortLabel}
-                    </button>
-                  );
-                })}
-              </div>
-
               {/* Cinema Storyboard & Technical Direction Strip */}
               <div className="surface-card rounded-xl p-5 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-3">

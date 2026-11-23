@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getStoreData } from "@/lib/repository";
 import { getIntegrationStatus } from "@/lib/supabase";
+import { generatePixQrDataUrl, generateStaticPixPayload } from "@/lib/pix";
 import { ClientPortalView } from "@/components/portal/ClientPortalView";
 import { UltimoQuadroIcon } from "@/components/BrandMark";
 
@@ -46,6 +47,35 @@ export default async function ClientPortalPage(props: {
     );
   }
 
+  // Generate real Pix BR Code + QR Code for the next pending installment (50% signal or 50% balance)
+  const nextInstallmentAmount =
+    lead.paymentStatus === "quitado"
+      ? 0
+      : Number(((lead.estimatedValue || 0) * 0.5).toFixed(2));
+  const pixKind: "sinal_50" | "quitacao" =
+    lead.paymentStatus === "sinal_pago" ? "quitacao" : "sinal_50";
+
+  let pixCopyPaste = "";
+  let pixQrDataUrl = "";
+  if (nextInstallmentAmount > 0 && status.pixKey) {
+    try {
+      pixCopyPaste = generateStaticPixPayload({
+        pixKey: status.pixKey,
+        recipientName: store.settings.pixRecipientName || "Ultimo Quadro",
+        city: store.settings.pixCity || "BELO HORIZONTE",
+        amount: nextInstallmentAmount,
+        txId: `UQ${lead.id.slice(-8)}`,
+        description:
+          pixKind === "quitacao"
+            ? `QUITACAO ${lead.companyName.slice(0, 16)}`
+            : `SINAL 50 ${lead.companyName.slice(0, 16)}`,
+      });
+      pixQrDataUrl = await generatePixQrDataUrl(pixCopyPaste);
+    } catch {
+      // Fallback to raw key
+    }
+  }
+
   // Strip sensitive internal admin fields before passing to the client component
   const sanitizedLead = {
     ...lead,
@@ -63,6 +93,10 @@ export default async function ClientPortalPage(props: {
       studioWhatsapp={status.whatsappNumber}
       pixKey={status.pixKey}
       pixRecipientName={store.settings.pixRecipientName}
+      pixCopyPaste={pixCopyPaste}
+      pixQrDataUrl={pixQrDataUrl}
+      pixNextAmount={nextInstallmentAmount}
+      pixNextKind={pixKind}
     />
   );
 }

@@ -3,10 +3,22 @@ import {
   approveProposal,
   getStoreData,
   ProposalApprovalPayload,
+  updateLead,
 } from "@/lib/repository";
 import { generatePixQrDataUrl, generateStaticPixPayload } from "@/lib/pix";
+import { AcceptanceCertificate } from "@/types/crm";
 
 export const dynamic = "force-dynamic";
+
+async function computeAcceptanceHash(input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 24)
+    .toUpperCase();
+}
 
 export async function POST(
   req: NextRequest,
@@ -26,13 +38,36 @@ export async function POST(
       );
     }
 
-    const updated = await approveProposal(leadId, body);
-    if (!updated) {
+    const updatedBase = await approveProposal(leadId, body);
+    if (!updatedBase) {
       return NextResponse.json(
         { error: "Lead não encontrado." },
         { status: 404 }
       );
     }
+
+    const ipAddress =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+    const acceptedAt = new Date().toISOString();
+    const signerDocument = body.cnpj || body.cpf || "";
+    const hash = await computeAcceptanceHash(
+      `${leadId}|${body.razaoSocial}|${signerDocument}|${body.totalValue}|${acceptedAt}|${ipAddress}`
+    );
+    const acceptanceCertificate: AcceptanceCertificate = {
+      signerName: body.razaoSocial,
+      signerDocument,
+      acceptedAt,
+      ipAddress,
+      hash,
+    };
+
+    const updated =
+      (await updateLead(leadId, { acceptanceCertificate })) ?? {
+        ...updatedBase,
+        acceptanceCertificate,
+      };
 
     const store = await getStoreData();
     const depositAmount = Number((body.totalValue * 0.5).toFixed(2));
