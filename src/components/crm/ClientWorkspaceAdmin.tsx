@@ -36,8 +36,10 @@ import {
   Search,
   Send,
   Trash2,
+  Upload,
   Video,
 } from "lucide-react";
+import { uploadStudioImage } from "@/lib/imageUpload";
 import {
   ClientDeliverable,
   ClientMeeting,
@@ -204,7 +206,31 @@ export function ClientWorkspaceAdmin({
   const [newDelivUrl, setNewDelivUrl] = useState("");
   const [newDelivVersion, setNewDelivVersion] = useState("V1");
   const [newDelivThumb, setNewDelivThumb] = useState("");
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   const [newDelivDesc, setNewDelivDesc] = useState("");
+
+  const handleUploadThumb = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingThumb(true);
+    try {
+      const uploaded = await uploadStudioImage({
+        file,
+        folder: "thumbnails",
+        leadId: lead.id,
+      });
+      setNewDelivThumb(uploaded.url);
+      notify("Capa da entrega enviada com sucesso.", "success");
+    } catch (err) {
+      notify(
+        err instanceof Error ? err.message : "Erro ao enviar capa.",
+        "error"
+      );
+    } finally {
+      setUploadingThumb(false);
+      e.target.value = "";
+    }
+  };
 
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1776,13 +1802,29 @@ export function ClientWorkspaceAdmin({
                     placeholder="Versão (ex.: V1, V2, Final)"
                     className="input-field min-h-[40px] rounded-lg px-3 font-mono-num text-xs"
                   />
-                  <input
-                    type="url"
-                    value={newDelivThumb}
-                    onChange={(e) => setNewDelivThumb(e.target.value)}
-                    placeholder="URL de capa / thumbnail (opcional)"
-                    className="input-field min-h-[40px] rounded-lg px-3 font-mono-num text-xs"
-                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={newDelivThumb}
+                      onChange={(e) => setNewDelivThumb(e.target.value)}
+                      placeholder="Capa (URL ou suba foto)"
+                      className="input-field min-h-[40px] flex-1 rounded-lg px-3 font-mono-num text-xs"
+                    />
+                    <label
+                      className="btn-ghost min-h-[40px] inline-flex cursor-pointer items-center justify-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold shrink-0"
+                      title="Subir foto de capa da galeria ou computador"
+                    >
+                      <Upload className="h-3.5 w-3.5 text-[var(--accent-text)]" />
+                      <span>{uploadingThumb ? "..." : "Foto"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingThumb}
+                        onChange={handleUploadThumb}
+                        className="sr-only"
+                      />
+                    </label>
+                  </div>
                   <input
                     type="text"
                     value={newDelivDesc}
@@ -2132,6 +2174,50 @@ export function ClientWorkspaceAdmin({
                     Baixar Contrato PDF Atualizado
                   </a>
                 </div>
+
+                {(lead.paymentNotices?.length ?? 0) > 0 && (
+                  <div className="space-y-2 border-t border-[var(--border-hairline)] pt-4">
+                    <h3 className="text-xs font-bold text-[var(--status-success)]">
+                      Comprovantes &amp; Avisos de Pix do Cliente
+                    </h3>
+                    <div className="divide-y divide-[var(--border-hairline)]">
+                      {lead.paymentNotices!.map((pn) => (
+                        <div key={pn.id} className="py-2.5 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">
+                              {pn.kind === "quitacao"
+                                ? "Quitação (50%)"
+                                : "Sinal (50%)"}{" "}
+                              · {formatCurrency(pn.amount)}
+                            </span>
+                            <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
+                              {formatDateTimeBr(pn.reportedAt)}
+                            </span>
+                          </div>
+                          {pn.transactionRef && (
+                            <p className="text-[11px] text-[var(--text-secondary)]">
+                              Ref: {pn.transactionRef}
+                            </p>
+                          )}
+                          {pn.receiptUrl && (
+                            <a
+                              href={pn.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block overflow-hidden rounded-lg border border-[var(--border-hairline)]"
+                            >
+                              <img
+                                src={pn.receiptUrl}
+                                alt="Comprovante Pix enviado pelo cliente"
+                                className="max-h-40 w-full object-contain bg-black/20"
+                              />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Checklist */}
                 <div className="space-y-2 border-t border-[var(--border-hairline)] pt-4">

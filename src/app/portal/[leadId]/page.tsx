@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getStoreData } from "@/lib/repository";
+import { getLeadById, getSettingsOnly } from "@/lib/repository";
 import { getIntegrationStatus } from "@/lib/supabase";
 import { generatePixQrDataUrl, generateStaticPixPayload } from "@/lib/pix";
 import { ClientPortalView } from "@/components/portal/ClientPortalView";
@@ -14,9 +14,11 @@ export default async function ClientPortalPage(props: {
   params: Promise<{ leadId: string }>;
 }) {
   const { leadId } = await props.params;
-  const store = await getStoreData();
-  const lead = store.leads.find((l) => l.id === leadId) ?? null;
-  const status = getIntegrationStatus(store.settings);
+  const [lead, settings] = await Promise.all([
+    getLeadById(leadId),
+    getSettingsOnly(),
+  ]);
+  const status = getIntegrationStatus(settings);
 
   if (!lead) {
     return (
@@ -61,8 +63,8 @@ export default async function ClientPortalPage(props: {
     try {
       pixCopyPaste = generateStaticPixPayload({
         pixKey: status.pixKey,
-        recipientName: store.settings.pixRecipientName || "Ultimo Quadro",
-        city: store.settings.pixCity || "BELO HORIZONTE",
+        recipientName: settings.pixRecipientName || "Ultimo Quadro",
+        city: settings.pixCity || "BELO HORIZONTE",
         amount: nextInstallmentAmount,
         txId: `UQ${lead.id.slice(-8)}`,
         description:
@@ -89,10 +91,10 @@ export default async function ClientPortalPage(props: {
     <ClientPortalView
       lead={sanitizedLead}
       pinProtected={Boolean(lead.portalPin)}
-      studioName={store.settings.studioName}
+      studioName={settings.studioName}
       studioWhatsapp={status.whatsappNumber}
       pixKey={status.pixKey}
-      pixRecipientName={store.settings.pixRecipientName}
+      pixRecipientName={settings.pixRecipientName}
       pixCopyPaste={pixCopyPaste}
       pixQrDataUrl={pixQrDataUrl}
       pixNextAmount={nextInstallmentAmount}

@@ -565,6 +565,50 @@ export async function getStoreData(): Promise<CrmStoreData> {
   return readLocalStore();
 }
 
+export async function getSettingsOnly(): Promise<StudioSettings> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        const snap = await getDoc(
+          doc(db, FIRESTORE_COLLECTIONS.settings, "default")
+        );
+        if (snap.exists()) {
+          const hydrated = hydrateStoreData({
+            settings: snap.data() as StudioSettings,
+            partners: [],
+            leads: [],
+            templates: [],
+          });
+          return hydrated.settings;
+        }
+      }
+    } catch {
+      // Fall through to full store
+    }
+  }
+  const store = await getStoreData();
+  return store.settings;
+}
+
+export async function getPartnersOnly(): Promise<Partner[]> {
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        const snap = await getDocs(
+          collection(db, FIRESTORE_COLLECTIONS.partners)
+        );
+        return snap.docs.map((d) => d.data() as Partner);
+      }
+    } catch {
+      // Fall through to full store
+    }
+  }
+  const store = await getStoreData();
+  return store.partners;
+}
+
 export async function getLeadById(leadId: string): Promise<Lead | null> {
   if (isFirebaseConfigured()) {
     try {

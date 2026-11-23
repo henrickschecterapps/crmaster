@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Activity,
+  Bell,
   BellRing,
   Bot,
   CheckCircle2,
@@ -13,6 +14,7 @@ import {
   EyeOff,
   Lock,
   Mail,
+  Palette,
   Play,
   QrCode,
   RefreshCw,
@@ -21,6 +23,7 @@ import {
   Smartphone,
   Upload,
 } from "lucide-react";
+import { STUDIO_SKINS, useTheme } from "@/components/ThemeProvider";
 import {
   CronExecutionLog,
   IntegrationStatus,
@@ -94,6 +97,128 @@ export function SettingsView({
   const [queueJobs, setQueueJobs] = useState<WhatsappQueueJob[]>([]);
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [processingQueue, setProcessingQueue] = useState(false);
+  const { skin, density, setSkin, setDensity } = useTheme();
+  const [pushDevicesCount, setPushDevicesCount] = useState(0);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding)
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  useEffect(() => {
+    fetch("/api/push/subscribe", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json && typeof json.devicesCount === "number") {
+          setPushDevicesCount(json.devicesCount);
+        }
+      })
+      .catch(() => {});
+
+    if ("serviceWorker" in navigator && "PushManager" in window) {
+      navigator.serviceWorker.ready
+        .then((reg) => reg.pushManager.getSubscription())
+        .then((sub) => setPushSubscribed(Boolean(sub)))
+        .catch(() => {});
+    }
+  }, []);
+
+  const handleTogglePush = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      onNotify(
+        "Seu navegador não suporta Web Push (no iPhone, instale o App na Tela de Início primeiro).",
+        "error"
+      );
+      return;
+    }
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        await fetch("/api/push/subscribe", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: existing.endpoint }),
+        });
+        await existing.unsubscribe();
+        setPushSubscribed(false);
+        setPushDevicesCount((c) => Math.max(0, c - 1));
+        onNotify("Notificações Push desativadas neste dispositivo.", "info");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        onNotify("Permissão de notificação negada pelo navegador.", "error");
+        return;
+      }
+
+      const keyRes = await fetch("/api/push/subscribe", { cache: "no-store" });
+      const keyJson = await keyRes.json();
+      if (!keyJson?.publicKey) {
+        onNotify("Não foi possível obter a chave VAPID.", "error");
+        return;
+      }
+
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyJson.publicKey),
+      });
+
+      const subJson = subscription.toJSON();
+      const saveRes = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subJson),
+      });
+      if (saveRes.ok) {
+        const saved = await saveRes.json();
+        setPushSubscribed(true);
+        setPushDevicesCount(saved.devicesCount ?? 1);
+        onNotify(
+          "Notificações Push ativadas neste dispositivo!",
+          "success"
+        );
+      }
+    } catch {
+      onNotify("Falha ao configurar notificações Push.", "error");
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setPushLoading(true);
+    try {
+      const res = await fetch("/api/push/subscribe", { method: "PUT" });
+      const json = await res.json();
+      if (res.ok && json.sent > 0) {
+        onNotify(
+          `Notificação de teste enviada para ${json.sent} dispositivo(s).`,
+          "success"
+        );
+      } else {
+        onNotify(
+          "Nenhum dispositivo ativo para receber Push. Ative primeiro acima.",
+          "info"
+        );
+      }
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
   const [restoringBackup, setRestoringBackup] = useState(false);
 
   const handleRestoreBackupFile = async (
@@ -1014,7 +1139,147 @@ export function SettingsView({
           </section>
         </div>
 
-        {/* Card 4: Full Database Backup & Restore (.json) */}
+        {/* Card 4: Studio Skins, Densidade & Notificações Push no Celular */}
+        <div
+          className="double-bezel stagger-in xl:col-span-7"
+          style={{ ["--stagger" as string]: 3 }}
+        >
+          <section className="double-bezel-core h-full p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Palette
+                  className="h-4 w-4 text-[var(--accent-text)]"
+                  aria-hidden="true"
+                />
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  Studio Skins &amp; Densidade Visual
+                </h2>
+              </div>
+              <div className="dock-shell inline-flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDensity("comfortable")}
+                  className={cn(
+                    "min-h-[30px] rounded-md px-2.5 text-[11px] font-semibold transition-colors",
+                    density === "comfortable"
+                      ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
+                      : "text-[var(--text-secondary)]"
+                  )}
+                >
+                  Confortável (Toque)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDensity("compact")}
+                  className={cn(
+                    "min-h-[30px] rounded-md px-2.5 text-[11px] font-semibold transition-colors",
+                    density === "compact"
+                      ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
+                      : "text-[var(--text-secondary)]"
+                  )}
+                >
+                  Compacta (Desktop)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {STUDIO_SKINS.map((s) => {
+                const active = skin === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSkin(s.id)}
+                    className={cn(
+                      "flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all",
+                      active
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                        : "border-[var(--border-hairline)] hover:bg-[var(--bg-surface-hover)]"
+                    )}
+                  >
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15"
+                      style={{ backgroundColor: s.swatchBg }}
+                    >
+                      <span
+                        className="h-3.5 w-3.5 rounded-full"
+                        style={{ backgroundColor: s.swatchAccent }}
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[var(--text-primary)]">
+                        {s.label}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                        {s.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+
+        {/* Card 5: Web Push Mobile Notifications */}
+        <div
+          className="double-bezel stagger-in xl:col-span-5"
+          style={{ ["--stagger" as string]: 4 }}
+        >
+          <section className="double-bezel-core h-full p-6 flex flex-col justify-between space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Bell
+                    className="h-4 w-4 text-[var(--accent-text)]"
+                    aria-hidden="true"
+                  />
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Notificações Push no Celular
+                  </h2>
+                </div>
+                <span className="badge-accent rounded-md px-2 py-0.5 font-mono-num text-[10px] font-bold">
+                  {pushDevicesCount} DISP.
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+                Receba alertas nativos na tela bloqueada quando um cliente abrir
+                o Portal, aprovar proposta, clicar em &quot;Já fiz o Pix&quot; ou pedir
+                reunião. No iPhone, instale primeiro na Tela de Início.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={pushLoading}
+                onClick={handleTogglePush}
+                className={cn(
+                  "min-h-[42px] flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-4 text-xs font-bold disabled:opacity-60",
+                  pushSubscribed ? "btn-ghost" : "btn-accent"
+                )}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {pushSubscribed
+                  ? "Desativar neste Dispositivo"
+                  : "Ativar Push neste Dispositivo"}
+              </button>
+              {pushDevicesCount > 0 && (
+                <button
+                  type="button"
+                  disabled={pushLoading}
+                  onClick={handleTestPush}
+                  className="btn-ghost min-h-[42px] rounded-lg px-3.5 text-xs font-semibold"
+                >
+                  Testar
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Card 6: Full Database Backup & Restore (.json) */}
         <div
           className="double-bezel stagger-in xl:col-span-12"
           style={{ ["--stagger" as string]: 3 }}

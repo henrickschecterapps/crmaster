@@ -38,6 +38,7 @@ import {
   getPartnerCommission,
   getStageLabel,
 } from "@/lib/utils";
+import { AnimatedCurrency } from "@/components/MotionPrimitives";
 
 type PeriodFilter = "all" | "month" | "prev_month";
 
@@ -477,9 +478,11 @@ export function DashboardView({
                   Faturamento Confirmado (Sinais + Quitados)
                 </div>
                 <div className="mt-4 flex flex-wrap items-baseline gap-3">
-                  <span className="font-mono-num text-4xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-5xl">
-                    {formatCurrency(metrics.confirmedTotal)}
-                  </span>
+                  <AnimatedCurrency
+                    value={metrics.confirmedTotal}
+                    formatter={formatCurrency}
+                    className="font-mono-num text-4xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-5xl"
+                  />
                   <span className="badge-success rounded-md px-2.5 py-0.5 font-mono-num text-xs font-semibold">
                     {goalProgress.toFixed(1)}% da meta
                   </span>

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Bell,
@@ -12,8 +13,10 @@ import {
   Handshake,
   Kanban,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Moon,
+  Palette,
   Plus,
   RefreshCw,
   Search,
@@ -21,6 +24,7 @@ import {
   Settings,
   Sun,
   UserPlus,
+  X,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import {
@@ -41,7 +45,16 @@ import {
   getLeadStagnation,
   getStageLabel,
 } from "@/lib/utils";
-import { useTheme } from "@/components/ThemeProvider";
+import { STUDIO_SKINS, useTheme } from "@/components/ThemeProvider";
+import {
+  DraggableBottomSheet,
+  MotionViewContainer,
+  triggerHaptic,
+} from "@/components/MotionPrimitives";
+import {
+  loadOfflineStoreSnapshot,
+  saveOfflineStoreSnapshot,
+} from "@/lib/offlineCache";
 import { DashboardView } from "@/components/crm/DashboardView";
 import { KanbanView } from "@/components/crm/KanbanView";
 import { AgendaView } from "@/components/crm/AgendaView";
@@ -71,9 +84,10 @@ const LOCAL_MIRROR_KEY = "crmaster_store_mirror_v1";
 
 export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, skin, setSkin, toggleTheme } = useTheme();
   const openClientPage = useCallback(
     (lead: Lead) => {
+      triggerHaptic(10);
       router.push(`/clientes/${lead.id}`);
     },
     [router]
@@ -86,6 +100,8 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const [captureSubTab] = useState<"places" | "manual" | "csv">("places");
   const [dispatchLeadId, setDispatchLeadId] = useState<string | null>(null);
   const [showPortalInbox, setShowPortalInbox] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
+  const [showMobileFabMenu, setShowMobileFabMenu] = useState(false);
   const [showQuickNewLead, setShowQuickNewLead] = useState(false);
   const [quickNewLeadFunnel, setQuickNewLeadFunnel] =
     useState<FunnelId>("corporativo");
@@ -213,7 +229,17 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     } catch {
       // Ignore quota errors
     }
+    saveOfflineStoreSnapshot(store).catch(() => {});
   }, [store]);
+
+  // Instant Local-First hydration from IndexedDB when offline or slow network
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      loadOfflineStoreSnapshot().then((snap) => {
+        if (snap?.data) setStore(snap.data);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -700,7 +726,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             </div>
           </div>
 
-          {/* Center: Unified macOS/Vercel-style Module Dock (Desktop) */}
+          {/* Center: Unified macOS/Vercel-style Module Dock (Desktop) with Spring Pill */}
           <nav
             aria-label="Navegação Principal"
             className="dock-shell hidden lg:flex items-center gap-1"
@@ -712,37 +738,53 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveModule(item.id)}
+                  onClick={() => {
+                    triggerHaptic(8);
+                    setActiveModule(item.id);
+                  }}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "inline-flex min-h-[36px] items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                    "relative inline-flex min-h-[36px] items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                     active
-                      ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--accent-border)] shadow-sm"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] border border-transparent"
+                      ? "text-[var(--text-primary)]"
+                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   )}
                 >
-                  <Icon
-                    className={cn(
-                      "h-3.5 w-3.5 shrink-0",
-                      active
-                        ? "text-[var(--accent-text)]"
-                        : "text-[var(--text-muted)]"
-                    )}
-                    aria-hidden="true"
-                  />
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span
-                      className={cn(
-                        "rounded-md px-1.5 py-0.2 font-mono-num text-[10px] font-bold",
-                        active
-                          ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
-                          : "bg-[var(--bg-subtle)] text-[var(--text-muted)]"
-                      )}
-                    >
-                      {item.badge}
-                    </span>
+                  {active && (
+                    <motion.span
+                      layoutId="desktop-dock-active-pill"
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 32,
+                      }}
+                      className="absolute inset-0 rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--accent-border)] shadow-sm"
+                    />
                   )}
+                  <span className="relative z-10 inline-flex items-center gap-2">
+                    <Icon
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        active
+                          ? "text-[var(--accent-text)]"
+                          : "text-[var(--text-muted)]"
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span>{item.label}</span>
+                    {item.badge !== undefined && (
+                      <span
+                        className={cn(
+                          "rounded-md px-1.5 py-0.2 font-mono-num text-[10px] font-bold",
+                          active
+                            ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                            : "bg-[var(--bg-subtle)] text-[var(--text-muted)]"
+                        )}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -1015,138 +1057,319 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
         </div>
       )}
 
-      {/* Full-Width Workspace Container */}
-      <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-10 max-w-[1720px] w-full mx-auto">
-        {activeModule === "dashboard" && (
-          <DashboardView
-            leads={store.leads}
-            partners={store.partners}
-            settings={store.settings}
-            onUpdateMonthlyGoal={handleUpdateMonthlyGoal}
-            onSelectLead={openClientPage}
-            onJumpToFunnel={(funnel) => {
-              setActiveFunnel(funnel);
-              setActiveModule("kanban");
-            }}
-          />
-        )}
+      {/* Full-Width Workspace Container with Fluid Spring Transitions */}
+      <main className="flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:pb-10 max-w-[1720px] w-full mx-auto">
+        <MotionViewContainer viewKey={activeModule}>
+          {activeModule === "dashboard" && (
+            <DashboardView
+              leads={store.leads}
+              partners={store.partners}
+              settings={store.settings}
+              onUpdateMonthlyGoal={handleUpdateMonthlyGoal}
+              onSelectLead={openClientPage}
+              onJumpToFunnel={(funnel) => {
+                setActiveFunnel(funnel);
+                setActiveModule("kanban");
+              }}
+            />
+          )}
 
-        {activeModule === "kanban" && (
-          <KanbanView
-            leads={store.leads}
-            partners={store.partners}
-            activeFunnel={activeFunnel}
-            onChangeFunnel={setActiveFunnel}
-            onMoveStage={handleMoveStage}
-            onBulkAction={handleBulkAction}
-            onSelectLead={openClientPage}
-            onQuickDispatch={(lead) => {
-              setDispatchLeadId(lead.id);
-              setActiveModule("dispatcher");
-            }}
-            onOpenNewLead={(funnel) => openQuickNewLead(funnel)}
-            onNotify={notify}
-          />
-        )}
+          {activeModule === "kanban" && (
+            <KanbanView
+              leads={store.leads}
+              partners={store.partners}
+              activeFunnel={activeFunnel}
+              onChangeFunnel={setActiveFunnel}
+              onMoveStage={handleMoveStage}
+              onBulkAction={handleBulkAction}
+              onSelectLead={openClientPage}
+              onQuickDispatch={(lead) => {
+                setDispatchLeadId(lead.id);
+                setActiveModule("dispatcher");
+              }}
+              onOpenNewLead={(funnel) => openQuickNewLead(funnel)}
+              onNotify={notify}
+            />
+          )}
 
-        {activeModule === "agenda" && (
-          <AgendaView leads={store.leads} onSelectLead={openClientPage} />
-        )}
+          {activeModule === "agenda" && (
+            <AgendaView leads={store.leads} onSelectLead={openClientPage} />
+          )}
 
-        {activeModule === "capture" && (
-          <CaptureView
-            leads={store.leads}
-            partners={store.partners}
-            integrationStatus={status}
-            initialSubTab={captureSubTab}
-            defaultFunnel={activeFunnel}
-            onCreateLead={handleCreateLead}
-            onCreateLeadsBulk={handleCreateLeadsBulk}
-            onNotify={notify}
-          />
-        )}
+          {activeModule === "capture" && (
+            <CaptureView
+              leads={store.leads}
+              partners={store.partners}
+              integrationStatus={status}
+              initialSubTab={captureSubTab}
+              defaultFunnel={activeFunnel}
+              onCreateLead={handleCreateLead}
+              onCreateLeadsBulk={handleCreateLeadsBulk}
+              onNotify={notify}
+            />
+          )}
 
-        {activeModule === "dispatcher" && (
-          <DispatcherView
-            leads={store.leads}
-            templates={store.templates}
-            settings={store.settings}
-            integrationStatus={status}
-            initialLeadId={dispatchLeadId}
-            onUpdateLead={async (leadId, patch, interaction, touch) => {
-              await handleUpdateLead(leadId, patch, interaction, touch);
-            }}
-            onSyncLead={(updatedLead) =>
-              setStore((prev) => ({
-                ...prev,
-                leads: prev.leads.map((l) =>
-                  l.id === updatedLead.id ? updatedLead : l
-                ),
-              }))
-            }
-            onSaveTemplate={handleSaveTemplate}
-            onDeleteTemplate={handleDeleteTemplate}
-            onUpdateNextDate={handleUpdateNextDate}
-            onNotify={notify}
-          />
-        )}
+          {activeModule === "dispatcher" && (
+            <DispatcherView
+              leads={store.leads}
+              templates={store.templates}
+              settings={store.settings}
+              integrationStatus={status}
+              initialLeadId={dispatchLeadId}
+              onUpdateLead={async (leadId, patch, interaction, touch) => {
+                await handleUpdateLead(leadId, patch, interaction, touch);
+              }}
+              onSyncLead={(updatedLead) =>
+                setStore((prev) => ({
+                  ...prev,
+                  leads: prev.leads.map((l) =>
+                    l.id === updatedLead.id ? updatedLead : l
+                  ),
+                }))
+              }
+              onSaveTemplate={handleSaveTemplate}
+              onDeleteTemplate={handleDeleteTemplate}
+              onUpdateNextDate={handleUpdateNextDate}
+              onNotify={notify}
+            />
+          )}
 
-        {activeModule === "partners" && (
-          <PartnersView
-            partners={store.partners}
-            leads={store.leads}
-            onCreatePartner={handleCreatePartner}
-            onUpdatePartner={handleUpdatePartner}
-            onDeletePartner={handleDeletePartner}
-            onUpdateLead={async (leadId, patch, interaction, touch) => {
-              await handleUpdateLead(leadId, patch, interaction, touch);
-            }}
-            onSelectLead={openClientPage}
-            onNotify={notify}
-          />
-        )}
+          {activeModule === "partners" && (
+            <PartnersView
+              partners={store.partners}
+              leads={store.leads}
+              onCreatePartner={handleCreatePartner}
+              onUpdatePartner={handleUpdatePartner}
+              onDeletePartner={handleDeletePartner}
+              onUpdateLead={async (leadId, patch, interaction, touch) => {
+                await handleUpdateLead(leadId, patch, interaction, touch);
+              }}
+              onSelectLead={openClientPage}
+              onNotify={notify}
+            />
+          )}
 
-        {activeModule === "settings" && (
-          <SettingsView
-            settings={store.settings}
-            leads={store.leads}
-            integrationStatus={status}
-            onUpdateSettings={handleUpdateSettings}
-            onRefreshStore={() => refreshStore(false)}
-            onNotify={notify}
-          />
-        )}
+          {activeModule === "settings" && (
+            <SettingsView
+              settings={store.settings}
+              leads={store.leads}
+              integrationStatus={status}
+              onUpdateSettings={handleUpdateSettings}
+              onRefreshStore={() => refreshStore(false)}
+              onNotify={notify}
+            />
+          )}
+        </MotionViewContainer>
       </main>
 
-      {/* Fixed Mobile Bottom Navigation Bar */}
+      {/* Native Mobile Floating Action Button (FAB) + Radial Quick Actions */}
+      <div className="fixed bottom-20 right-4 z-30 flex flex-col items-end gap-2 lg:hidden">
+        <AnimatePresence>
+          {showMobileFabMenu && (
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 420, damping: 28 }}
+              className="flex flex-col items-end gap-2"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(10);
+                  setShowMobileFabMenu(false);
+                  setActiveModule("capture");
+                }}
+                className="modal-surface inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold text-[var(--text-primary)] shadow-lg"
+              >
+                <UserPlus className="h-3.5 w-3.5 text-[var(--accent-text)]" />
+                Captar Overture BH
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(10);
+                  setShowMobileFabMenu(false);
+                  setActiveModule("agenda");
+                }}
+                className="modal-surface inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold text-[var(--text-primary)] shadow-lg"
+              >
+                <Calendar className="h-3.5 w-3.5 text-[var(--accent-text)]" />
+                Agenda do Estúdio
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(14);
+                  setShowMobileFabMenu(false);
+                  openQuickNewLead(activeFunnel);
+                }}
+                className="btn-accent inline-flex min-h-[40px] items-center gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-lg"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Novo Lead
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.92 }}
+          onClick={() => {
+            triggerHaptic(12);
+            setShowMobileFabMenu((prev) => !prev);
+          }}
+          className="btn-accent flex h-13 w-13 items-center justify-center rounded-full shadow-xl border border-white/15"
+          aria-label={showMobileFabMenu ? "Fechar menu rápido" : "Ações rápidas"}
+          aria-expanded={showMobileFabMenu}
+        >
+          {showMobileFabMenu ? (
+            <X className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Plus className="h-5 w-5" aria-hidden="true" />
+          )}
+        </motion.button>
+      </div>
+
+      {/* Native Mobile Bottom Navigation (4 Primary Tabs: Painel, Kanban, Agenda, Mais) */}
       <nav
         aria-label="Navegação Mobile"
         className="glass-bar safe-bottom fixed bottom-0 inset-x-0 z-30 border-t border-[var(--border-hairline)] lg:hidden"
       >
-        <div className="grid grid-cols-7 gap-0.5 px-1 pt-1.5">
-          {navItems.map((item) => {
+        <div className="grid grid-cols-4 gap-1 px-2 pt-1.5">
+          {(
+            [
+              { id: "dashboard", label: "Painel", icon: LayoutDashboard },
+              { id: "kanban", label: "Kanban", icon: Kanban },
+              { id: "agenda", label: "Agenda", icon: Calendar },
+            ] as const
+          ).map((tab) => {
+            const Icon = tab.icon;
+            const active = activeModule === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  triggerHaptic(8);
+                  setShowMobileMore(false);
+                  setActiveModule(tab.id);
+                }}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex min-h-[50px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-semibold transition-colors",
+                  active
+                    ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
+              >
+                <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(10);
+              setShowMobileMore((prev) => !prev);
+            }}
+            className={cn(
+              "flex min-h-[50px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-semibold transition-colors",
+              showMobileMore ||
+                ["capture", "dispatcher", "partners", "settings"].includes(
+                  activeModule
+                )
+                ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            )}
+          >
+            <LayoutGrid className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
+            <span>Mais</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Draggable iOS-Style Bottom Sheet for Secondary Modules + Quick Studio Skins */}
+      <DraggableBottomSheet
+        open={showMobileMore}
+        title="Módulos & Studio Skins"
+        onClose={() => setShowMobileMore(false)}
+      >
+        <div className="grid grid-cols-2 gap-2.5">
+          {(
+            [
+              { id: "capture", label: "Captação BH", icon: UserPlus },
+              { id: "dispatcher", label: "Disparador", icon: Send },
+              { id: "partners", label: "Parceiros", icon: Handshake },
+              { id: "settings", label: "Config & Push", icon: Settings },
+            ] as const
+          ).map((item) => {
             const Icon = item.icon;
             const active = activeModule === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setActiveModule(item.id)}
-                aria-current={active ? "page" : undefined}
+                onClick={() => {
+                  triggerHaptic(10);
+                  setActiveModule(item.id);
+                  setShowMobileMore(false);
+                }}
                 className={cn(
-                  "flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[10px] font-semibold transition-colors",
+                  "flex min-h-[52px] items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-xs font-bold transition-colors",
                   active
-                    ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                    : "border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[var(--text-primary)]"
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate max-w-full">{item.shortLabel}</span>
+                <Icon className="h-4 w-4 text-[var(--accent-text)] shrink-0" />
+                <span>{item.label}</span>
               </button>
             );
           })}
         </div>
-      </nav>
+
+        <div className="border-t border-[var(--border-hairline)] pt-3 space-y-2">
+          <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            <Palette className="h-3.5 w-3.5 text-[var(--accent-text)]" />
+            Studio Skin Rápida
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {STUDIO_SKINS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  triggerHaptic(8);
+                  setSkin(s.id);
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 rounded-xl border p-2 text-[10px] font-semibold",
+                  skin === s.id
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-primary)]"
+                    : "border-[var(--border-hairline)] text-[var(--text-secondary)]"
+                )}
+              >
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20"
+                  style={{ backgroundColor: s.swatchBg }}
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: s.swatchAccent }}
+                  />
+                </span>
+                <span className="truncate max-w-full">
+                  {s.label.split(" ")[0]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </DraggableBottomSheet>
 
       {showCommandPalette && (
         <CommandPaletteModal

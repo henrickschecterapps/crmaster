@@ -43,6 +43,7 @@ import {
   getFunnelLabel,
   getLeadStagnation,
 } from "@/lib/utils";
+import { triggerHaptic } from "@/components/MotionPrimitives";
 
 interface KanbanViewProps {
   leads: Lead[];
@@ -94,6 +95,7 @@ export function KanbanView({
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<StageId | null>(null);
   const [copiedLeadId, setCopiedLeadId] = useState<string | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStage, setBulkStage] = useState<StageId>("contatado");
   const [bulkPartnerId, setBulkPartnerId] = useState<string>("");
@@ -800,6 +802,25 @@ export function KanbanView({
                           key={lead.id}
                           draggable
                           style={{ ["--stagger" as string]: cardIdx }}
+                          onTouchStart={(e) => {
+                            if (e.touches[0]) {
+                              setTouchStartX(e.touches[0].clientX);
+                            }
+                          }}
+                          onTouchEnd={(e) => {
+                            if (touchStartX === null || !e.changedTouches[0]) {
+                              return;
+                            }
+                            const dx = e.changedTouches[0].clientX - touchStartX;
+                            setTouchStartX(null);
+                            if (dx > 95 && stageIdx < STAGE_ORDER.length - 1) {
+                              triggerHaptic(14);
+                              handleStepStage(lead, 1);
+                            } else if (dx < -95 && stageIdx > 0) {
+                              triggerHaptic(14);
+                              handleStepStage(lead, -1);
+                            }
+                          }}
                           onDragStart={(e) => {
                             setDraggingLeadId(lead.id);
                             e.dataTransfer.effectAllowed = "move";

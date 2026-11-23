@@ -80,6 +80,61 @@
   --elevation-modal: 0 24px 56px -20px rgba(12, 12, 12, 0.22);
 }
 
+/* Studio Skin 2: Midnight Cinema (deep grading blue + cyan highlight) */
+[data-skin="midnight"] {
+  --bg-canvas: #060a14;
+  --bg-subtle: #0b1120;
+  --bg-surface-solid: #0f172a;
+  --bg-surface-hover: #152038;
+  --bg-elevated: #172440;
+  --bg-input: #0a101f;
+  --bg-bar: rgba(6, 10, 20, 0.88);
+  --bezel-outer: rgba(56, 189, 248, 0.035);
+  --border-hairline: rgba(148, 163, 184, 0.14);
+  --border-strong: rgba(148, 163, 184, 0.28);
+  --accent: #0ea5e9;
+  --accent-btn: #0284c7;
+  --accent-btn-hover: #0ea5e9;
+  --accent-text: #38bdf8;
+  --accent-soft: rgba(56, 189, 248, 0.14);
+  --accent-border: rgba(56, 189, 248, 0.42);
+  --accent-fg: #f8fafc;
+}
+
+/* Studio Skin 3: Graphite Linear (neutral technical studio charcoal + warm copper) */
+[data-skin="graphite"] {
+  --bg-canvas: #111215;
+  --bg-subtle: #16181c;
+  --bg-surface-solid: #1a1c21;
+  --bg-surface-hover: #21242b;
+  --bg-elevated: #242830;
+  --bg-input: #14161a;
+  --bg-bar: rgba(17, 18, 21, 0.88);
+  --bezel-outer: rgba(255, 255, 255, 0.03);
+  --border-hairline: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.24);
+  --accent: #d97736;
+  --accent-btn: #c26528;
+  --accent-btn-hover: #d97736;
+  --accent-text: #f0a168;
+  --accent-soft: rgba(217, 119, 54, 0.16);
+  --accent-border: rgba(240, 161, 104, 0.42);
+  --accent-fg: #ffffff;
+}
+
+/* Compact UI density mode for large monitors */
+[data-density="compact"] {
+  font-size: 14.5px;
+}
+
+[data-density="compact"] .double-bezel {
+  padding: 0.2rem;
+}
+
+[data-density="compact"] .double-bezel-core {
+  border-radius: 0.625rem;
+}
+
 @layer base {
   * {
     border-color: var(--border-hairline);

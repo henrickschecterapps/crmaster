@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStoreData, updateLead } from "@/lib/repository";
+import { getLeadById, getSettingsOnly, updateLead } from "@/lib/repository";
 import {
   ClientBriefing,
   ClientMeeting,
@@ -9,6 +9,7 @@ import {
 } from "@/types/crm";
 import { generateId } from "@/lib/utils";
 import { sendEmailNotification } from "@/lib/email";
+import { sendAdminPushNotification } from "@/lib/webPush";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ type PortalActionPayload =
       kind: "sinal_50" | "quitacao";
       amount: number;
       transactionRef?: string;
+      receiptUrl?: string;
     }
   | {
       action: "save_briefing";
@@ -58,8 +60,10 @@ export async function POST(
 ) {
   try {
     const { leadId } = await context.params;
-    const store = await getStoreData();
-    const lead = store.leads.find((l) => l.id === leadId);
+    const [lead, settings] = await Promise.all([
+      getLeadById(leadId),
+      getSettingsOnly(),
+    ]);
 
     if (!lead) {
       return NextResponse.json(
@@ -94,7 +98,7 @@ export async function POST(
 
     const now = new Date().toISOString();
     const adminEmail =
-      store.settings.adminEmail || process.env.ADMIN_EMAIL || "";
+      settings.adminEmail || process.env.ADMIN_EMAIL || "";
 
     if (body.action === "request_meeting") {
       if (!body.date || !body.time) {
@@ -140,6 +144,13 @@ export async function POST(
           html: `<p><strong>${lead.contactName}</strong> (${lead.companyName}) solicitou uma reunião pelo Portal do Cliente:</p><ul><li><strong>Tipo:</strong> ${meetingTitle}</li><li><strong>Data/Hora:</strong> ${body.date} às ${body.time}</li><li><strong>Formato:</strong> ${newMeeting.format}</li><li><strong>Observações:</strong> ${newMeeting.notes || "Nenhuma"}</li></ul>`,
         }).catch(() => {});
       }
+
+      await sendAdminPushNotification({
+        title: `Nova Reunião: ${lead.companyName}`,
+        body: `${meetingTitle} sugerida para ${body.date} às ${body.time}.`,
+        url: `/clientes/${lead.id}`,
+        tag: `meeting-${lead.id}`,
+      }).catch(() => {});
 
       return NextResponse.json({
         meeting: newMeeting,
@@ -208,6 +219,7 @@ export async function POST(
         kind: body.kind === "quitacao" ? "quitacao" : "sinal_50",
         amount: Number(body.amount) || 0,
         transactionRef: (body.transactionRef || "").trim(),
+        receiptUrl: (body.receiptUrl || "").trim() || undefined,
         reportedAt: now,
       };
       const nextNotices = [notice, ...(lead.paymentNotices ?? [])];
@@ -233,6 +245,13 @@ export async function POST(
           html: `<p><strong>${lead.contactName}</strong> (${lead.companyName}) informou o pagamento via Pix no Portal:</p><ul><li><strong>Tipo:</strong> ${kindLabel}</li><li><strong>Valor:</strong> R$ ${notice.amount.toLocaleString("pt-BR")}</li><li><strong>Referência:</strong> ${notice.transactionRef || "Não informada"}</li></ul>`,
         }).catch(() => {});
       }
+
+      await sendAdminPushNotification({
+        title: `Pix Informado: ${lead.companyName}`,
+        body: `${kindLabel} · R$ ${notice.amount.toLocaleString("pt-BR")}. Confira o extrato.`,
+        url: `/clientes/${lead.id}`,
+        tag: `pix-${lead.id}`,
+      }).catch(() => {});
 
       return NextResponse.json({
         paymentNotices: updated?.paymentNotices ?? nextNotices,
@@ -315,6 +334,13 @@ export async function POST(
           html: `<p><strong>${lead.contactName}</strong> (${lead.companyName}) respondeu sobre a entrega <strong>${target.title}</strong>:</p><p><strong>Status:</strong> ${body.decision}</p><p><strong>Comentário:</strong> ${(body.feedback || "").trim() || "Nenhum"}</p>`,
         }).catch(() => {});
       }
+
+      await sendAdminPushNotification({
+        title: `${actionLabel}`,
+        body: `${lead.companyName}: ${(body.feedback || "").trim() || "Ver detalhes no CRM."}`,
+        url: `/clientes/${lead.id}`,
+        tag: `deliv-${lead.id}`,
+      }).catch(() => {});
 
       return NextResponse.json({
         deliverables: updated?.deliverables ?? nextDeliverables,

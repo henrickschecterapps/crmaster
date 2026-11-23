@@ -21,8 +21,10 @@ import {
   Send,
   ShieldCheck,
   ThumbsUp,
+  Upload,
   Video,
 } from "lucide-react";
+import { uploadStudioImage } from "@/lib/imageUpload";
 import {
   ClientBriefing,
   ClientDeliverable,
@@ -157,8 +159,36 @@ export function ClientPortalView({
 
   // Pix payment report state
   const [pixRef, setPixRef] = useState("");
+  const [pixReceiptUrl, setPixReceiptUrl] = useState("");
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [reportingPix, setReportingPix] = useState(false);
   const [copiedPixCode, setCopiedPixCode] = useState(false);
+
+  const handleUploadReceipt = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingReceipt(true);
+    try {
+      const uploaded = await uploadStudioImage({
+        file,
+        folder: "receipts",
+        leadId: lead.id,
+        pin: verifiedPin || undefined,
+      });
+      setPixReceiptUrl(uploaded.url);
+      showBanner("Comprovante anexado! Agora clique em 'Já fiz o Pix'.", "success");
+    } catch (err) {
+      showBanner(
+        err instanceof Error ? err.message : "Erro ao enviar imagem.",
+        "error"
+      );
+    } finally {
+      setUploadingReceipt(false);
+      e.target.value = "";
+    }
+  };
 
   // Deliverable feedback
   const [feedbackById, setFeedbackById] = useState<Record<string, string>>({});
@@ -307,6 +337,7 @@ export function ClientPortalView({
           kind: pixNextKind,
           amount: pixNextAmount,
           transactionRef: pixRef.trim(),
+          receiptUrl: pixReceiptUrl || undefined,
         }),
       });
       const json = await res.json();
@@ -316,6 +347,7 @@ export function ClientPortalView({
       }
       setPaymentNotices(json.paymentNotices || []);
       setPixRef("");
+      setPixReceiptUrl("");
       showBanner(
         "Aviso de pagamento enviado! Nossa equipe conferirá o extrato e atualizará o status no portal.",
         "success"
@@ -915,12 +947,29 @@ export function ClientPortalView({
                           type="text"
                           value={pixRef}
                           onChange={(e) => setPixRef(e.target.value)}
-                          placeholder="ID da transação ou link do comprovante (opcional)"
+                          placeholder="ID da transação ou observação (opcional)"
                           className="input-field min-h-[40px] flex-1 rounded-lg px-3 text-xs"
                         />
+                        <label className="btn-ghost min-h-[40px] inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold">
+                          <Upload className="h-3.5 w-3.5 text-[var(--accent-text)]" />
+                          <span>
+                            {uploadingReceipt
+                              ? "Enviando..."
+                              : pixReceiptUrl
+                              ? "Foto Anexada"
+                              : "Anexar Print"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={uploadingReceipt}
+                            onChange={handleUploadReceipt}
+                            className="sr-only"
+                          />
+                        </label>
                         <button
                           type="submit"
-                          disabled={reportingPix}
+                          disabled={reportingPix || uploadingReceipt}
                           className="badge-success min-h-[40px] inline-flex items-center justify-center gap-1.5 rounded-lg px-4 text-xs font-bold disabled:opacity-60"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />

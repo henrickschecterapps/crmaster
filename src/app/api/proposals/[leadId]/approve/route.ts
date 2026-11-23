@@ -6,6 +6,7 @@ import {
   updateLead,
 } from "@/lib/repository";
 import { generatePixQrDataUrl, generateStaticPixPayload } from "@/lib/pix";
+import { sendAdminPushNotification } from "@/lib/webPush";
 import { AcceptanceCertificate } from "@/types/crm";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,13 @@ export async function POST(
         ...updatedBase,
         acceptanceCertificate,
       };
+
+    await sendAdminPushNotification({
+      title: `Proposta Aprovada: ${updated.companyName}`,
+      body: `Escopo ${body.packageName} · R$ ${body.totalValue.toLocaleString("pt-BR")} · Data ${body.eventDate}.`,
+      url: `/clientes/${updated.id}`,
+      tag: `approved-${updated.id}`,
+    }).catch(() => {});
 
     const store = await getStoreData();
     const depositAmount = Number((body.totalValue * 0.5).toFixed(2));

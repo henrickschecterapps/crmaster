@@ -119,6 +119,7 @@ export interface ClientPaymentNotice {
   kind: "sinal_50" | "quitacao";
   amount: number;
   transactionRef?: string;
+  receiptUrl?: string;
   reportedAt: string;
 }
 

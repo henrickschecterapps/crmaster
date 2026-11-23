@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ArrowLeft } from "lucide-react";
-import { getStoreData } from "@/lib/repository";
+import {
+  getLeadById,
+  getPartnersOnly,
+  getSettingsOnly,
+} from "@/lib/repository";
 import { getIntegrationStatus } from "@/lib/supabase";
 import {
   ADMIN_SESSION_COOKIE,
@@ -20,24 +24,27 @@ export default async function ClientAdminPage(props: {
   params: Promise<{ leadId: string }>;
 }) {
   const { leadId } = await props.params;
-  const store = await getStoreData();
+  const settings = await getSettingsOnly();
 
-  if (isAdminAuthEnabled(store.settings)) {
+  if (isAdminAuthEnabled(settings)) {
     const cookieStore = await cookies();
     const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    const valid = await verifyAdminSessionToken(token, store.settings);
+    const valid = await verifyAdminSessionToken(token, settings);
     if (!valid) {
       return (
         <LoginGate
-          studioName={store.settings.studioName}
-          requireEmail={Boolean(store.settings.adminEmail)}
+          studioName={settings.studioName}
+          requireEmail={Boolean(settings.adminEmail)}
         />
       );
     }
   }
 
-  const lead = store.leads.find((l) => l.id === leadId) ?? null;
-  const status = getIntegrationStatus(store.settings);
+  const [lead, partners] = await Promise.all([
+    getLeadById(leadId),
+    getPartnersOnly(),
+  ]);
+  const status = getIntegrationStatus(settings);
 
   if (!lead) {
     return (
@@ -69,8 +76,8 @@ export default async function ClientAdminPage(props: {
   return (
     <ClientWorkspaceAdmin
       initialLead={lead}
-      initialPartners={store.partners}
-      studioSettings={store.settings}
+      initialPartners={partners}
+      studioSettings={settings}
       integrationStatus={status}
     />
   );

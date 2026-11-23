@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStoreData, trackProposalView, updateLead } from "@/lib/repository";
 import { buildWhatsappUrl, formatCurrency } from "@/lib/utils";
 import { sendEmailNotification } from "@/lib/email";
+import { sendAdminPushNotification } from "@/lib/webPush";
 import {
   resolveWhatsappConfig,
   sendWhatsappViaApi,
@@ -113,6 +114,13 @@ export async function POST(
       });
       radarEmailSent = emailRes.ok;
     }
+
+    await sendAdminPushNotification({
+      title: `Radar: ${updated.companyName} abriu o Portal`,
+      body: `${updated.contactName} visualizou a proposta (${updated.visualizacoesProposta}x · ${formatCurrency(updated.estimatedValue)}).`,
+      url: `/clientes/${updated.id}`,
+      tag: `radar-${updated.id}`,
+    }).catch(() => {});
 
     const waConfig = resolveWhatsappConfig(store.settings);
     const adminWhatsapp =

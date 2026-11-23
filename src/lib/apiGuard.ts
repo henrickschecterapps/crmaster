@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStoreData } from "@/lib/repository";
+import { getSettingsOnly } from "@/lib/repository";
 import {
   ADMIN_SESSION_COOKIE,
   isAdminAuthEnabled,
@@ -8,17 +8,17 @@ import {
 
 /**
  * Verifies admin session against both ENV (CRM_ADMIN_PASSWORD) and Firestore-stored adminPasswordHash.
- * Returns a 401 NextResponse if unauthorized, or null if authorized.
+ * Uses single-document getSettingsOnly() to avoid scanning all leads on every API request.
  */
 export async function requireAdminApiAuth(
   req: NextRequest
 ): Promise<NextResponse | null> {
-  const store = await getStoreData();
-  if (!isAdminAuthEnabled(store.settings)) {
+  const settings = await getSettingsOnly();
+  if (!isAdminAuthEnabled(settings)) {
     return null;
   }
   const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  const valid = await verifyAdminSessionToken(token, store.settings);
+  const valid = await verifyAdminSessionToken(token, settings);
   if (!valid) {
     return NextResponse.json(
       { error: "Sessão administrativa necessária. Faça login no CRM." },
