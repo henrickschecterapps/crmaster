@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateSettings } from "@/lib/repository";
 import { getIntegrationStatus } from "@/lib/supabase";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 import { StudioSettings } from "@/types/crm";
 import {
   ADMIN_GUARD_COOKIE,
@@ -13,6 +14,8 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function PATCH(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   try {
     const body = (await req.json()) as Partial<StudioSettings> & {
       newAdminPassword?: string;

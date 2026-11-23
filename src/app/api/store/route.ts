@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getStoreData, resetDemoData } from "@/lib/repository";
 import { getIntegrationStatus } from "@/lib/supabase";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,13 +10,17 @@ const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   const data = await getStoreData();
   const status = getIntegrationStatus(data.settings);
   return NextResponse.json({ data, status }, { headers: NO_STORE_HEADERS });
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   const data = await resetDemoData();
   const status = getIntegrationStatus(data.settings);
   return NextResponse.json({ data, status }, { headers: NO_STORE_HEADERS });

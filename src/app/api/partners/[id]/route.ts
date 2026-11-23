@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deletePartner, updatePartner } from "@/lib/repository";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 import { Partner } from "@/types/crm";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,8 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   try {
     const { id } = await context.params;
     const body = (await req.json()) as Partial<Omit<Partner, "id" | "createdAt">>;
@@ -28,9 +31,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   const { id } = await context.params;
   const ok = await deletePartner(id);
   if (!ok) {

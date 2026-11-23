@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLeadById, updateLead } from "@/lib/repository";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,35 @@ const IGNORED_IG_HANDLES = new Set([
   "tv",
 ]);
 
+function isBlockedHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    h === "localhost" ||
+    h === "::1" ||
+    h === "0.0.0.0" ||
+    h.endsWith(".local") ||
+    h.endsWith(".internal") ||
+    h.endsWith(".localhost")
+  ) {
+    return true;
+  }
+  // Block IPv4 private, loopback, link-local (AWS/GCP metadata 169.254.169.254)
+  const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+  }
+  // Block IPv6 private/link-local
+  if (h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80")) {
+    return true;
+  }
+  return false;
+}
+
 function normalizeWebsiteUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -50,6 +80,8 @@ function normalizeWebsiteUrl(raw: string): string | null {
   try {
     const u = new URL(withProto);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (isBlockedHostname(u.hostname)) return null;
+    if (!u.hostname.includes(".")) return null;
     return u.origin;
   } catch {
     return null;
@@ -123,14 +155,18 @@ function extractContactsFromHtml(html: string): {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
+
   try {
     const body = (await req.json()) as {
       leadId?: string;
       website?: string;
+      url?: string;
       companyName?: string;
     };
 
-    let targetWebsite = body.website || "";
+    let targetWebsite = body.website || body.url || "";
     const lead = body.leadId ? await getLeadById(body.leadId) : null;
     if (!targetWebsite && lead?.website) {
       targetWebsite = lead.website;

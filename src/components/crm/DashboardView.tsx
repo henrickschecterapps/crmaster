@@ -106,12 +106,29 @@ export function DashboardView({
     let confirmedTotal = 0;
     let confirmedSinais = 0;
     let confirmedQuitados = 0;
+    let accountsReceivable = 0; // Saldo 50% garantido de contratos com sinal pago
     let pipelineTotal = 0;
     let pipelineCount = 0;
+    let wonCount = 0;
+    let lostCount = 0;
     let stagnant48Count = 0;
     let stagnant5dCount = 0;
     let commissionsPayable = 0;
     let commissionsPaid = 0;
+
+    const originStatsMap = new Map<
+      string,
+      { origin: string; total: number; won: number; revenue: number }
+    >();
+
+    const dueActions: Array<{
+      lead: Lead;
+      title: string;
+      dueAt: string;
+      overdue: boolean;
+    }> = [];
+
+    const nowMs = Date.now();
 
     const stagnantLeads: Array<{
       lead: Lead;
@@ -124,8 +141,36 @@ export function DashboardView({
     >();
 
     for (const lead of filteredLeads) {
+      const originKey = (lead.origin || "Outros").split("(")[0].trim() || "Outros";
+      const orig = originStatsMap.get(originKey) ?? {
+        origin: originKey,
+        total: 0,
+        won: 0,
+        revenue: 0,
+      };
+      orig.total += 1;
+
+      if (lead.archived) {
+        lostCount += 1;
+        originStatsMap.set(originKey, orig);
+        continue;
+      }
+
       const confirmed = getConfirmedRevenue(lead);
       confirmedTotal += confirmed;
+
+      const isWon =
+        lead.paymentStatus === "quitado" ||
+        lead.paymentStatus === "sinal_pago" ||
+        lead.stage === "sinal_pago" ||
+        lead.stage === "fechado";
+
+      if (isWon) {
+        wonCount += 1;
+        orig.won += 1;
+        orig.revenue += lead.estimatedValue;
+      }
+      originStatsMap.set(originKey, orig);
 
       if (lead.paymentStatus === "quitado" || lead.stage === "fechado") {
         confirmedQuitados += lead.estimatedValue;
@@ -134,11 +179,22 @@ export function DashboardView({
         lead.stage === "sinal_pago"
       ) {
         confirmedSinais += lead.estimatedValue * 0.5;
+        accountsReceivable += lead.estimatedValue * 0.5;
       }
 
       if (lead.stage !== "fechado") {
         pipelineTotal += lead.estimatedValue;
         pipelineCount += 1;
+      }
+
+      if (lead.nextAction && !lead.nextAction.completed && lead.nextAction.dueAt) {
+        const dueMs = new Date(lead.nextAction.dueAt).getTime();
+        dueActions.push({
+          lead,
+          title: lead.nextAction.title,
+          dueAt: lead.nextAction.dueAt,
+          overdue: Number.isFinite(dueMs) && dueMs < nowMs,
+        });
       }
 
       const stagnation = getLeadStagnation(lead);
@@ -181,25 +237,45 @@ export function DashboardView({
     stagnantLeads.sort(
       (a, b) => b.stagnation.hoursSince - a.stagnation.hoursSince
     );
+    dueActions.sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 
     const viewedProposals = filteredLeads
-      .filter((l) => l.visualizadaEm)
+      .filter((l) => !l.archived && l.visualizadaEm)
       .sort(
         (a, b) =>
           new Date(b.visualizadaEm || 0).getTime() -
           new Date(a.visualizadaEm || 0).getTime()
       );
 
+    const closedTotal = wonCount + lostCount;
+    const conversionRate =
+      closedTotal > 0 ? Math.round((wonCount / closedTotal) * 100) : 0;
+    const netRevenue = Math.max(
+      0,
+      confirmedTotal - (commissionsPaid + commissionsPayable)
+    );
+    const avgTicket = wonCount > 0 ? Math.round((confirmedQuitados + confirmedSinais * 2) / wonCount) : 0;
+
     return {
       confirmedTotal,
       confirmedSinais,
       confirmedQuitados,
+      accountsReceivable,
+      netRevenue,
+      wonCount,
+      lostCount,
+      conversionRate,
+      avgTicket,
       pipelineTotal,
       pipelineCount,
       stagnantTotal: stagnantLeads.length,
       stagnant48Count,
       stagnant5dCount,
       stagnantLeads,
+      dueActions,
+      originStats: Array.from(originStatsMap.values()).sort(
+        (a, b) => b.revenue - a.revenue || b.total - a.total
+      ),
       commissionsPayable,
       commissionsPaid,
       partnerBreakdown: Array.from(partnerBreakdown.values()),
@@ -208,9 +284,10 @@ export function DashboardView({
   }, [filteredLeads, partners]);
 
   const stageSummary = useMemo(() => {
-    const totalCount = Math.max(1, filteredLeads.length);
+    const activeLeads = filteredLeads.filter((l) => !l.archived);
+    const totalCount = Math.max(1, activeLeads.length);
     return STAGES.map((s) => {
-      const sLeads = filteredLeads.filter((l) => l.stage === s.id);
+      const sLeads = activeLeads.filter((l) => l.stage === s.id);
       const sum = sLeads.reduce((acc, l) => acc + l.estimatedValue, 0);
       return {
         ...s,
@@ -938,6 +1015,176 @@ export function DashboardView({
                 </div>
               </div>
             )}
+          </section>
+        </div>
+
+        {/* Row 4: Fluxo de Caixa Real + Conversão por Origem + Minhas Ações Agendadas */}
+        <div
+          className="double-bezel stagger-in md:col-span-6 xl:col-span-4"
+          style={{ ["--stagger" as string]: 7 }}
+        >
+          <section className="double-bezel-core h-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--status-success-bg)] text-[var(--status-success)]">
+                  <DollarSign className="h-4 w-4" aria-hidden="true" />
+                </span>
+                Fluxo de Caixa Real &amp; Conversão
+              </div>
+              <span className="badge-accent rounded-md px-2 py-0.5 font-mono-num text-[10px] font-bold">
+                {metrics.conversionRate}% CONV.
+              </span>
+            </div>
+
+            <div className="divide-y divide-[var(--border-hairline)] border-t border-[var(--border-hairline)] text-xs">
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-[var(--text-secondary)]">
+                  Caixa Recebido (Sinais + Quitados)
+                </span>
+                <span className="font-mono-num font-bold text-[var(--status-success)]">
+                  {formatCurrency(metrics.confirmedTotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-[var(--text-secondary)]">
+                  A Receber Garantido (Saldo 50%)
+                </span>
+                <span className="font-mono-num font-bold text-[var(--accent-text)]">
+                  {formatCurrency(metrics.accountsReceivable)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-[var(--text-secondary)]">
+                  Receita Líquida (após comissões)
+                </span>
+                <span className="font-mono-num font-bold text-[var(--text-primary)]">
+                  {formatCurrency(metrics.netRevenue)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-[var(--text-secondary)]">
+                  Ganhos vs. Perdidos / Arquivados
+                </span>
+                <span className="font-mono-num font-semibold text-[var(--text-primary)]">
+                  {metrics.wonCount} ganho(s) · {metrics.lostCount} perdido(s)
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2.5">
+                <span className="text-[var(--text-secondary)]">
+                  Ticket Médio Fechado
+                </span>
+                <span className="font-mono-num font-bold text-[var(--text-primary)]">
+                  {formatCurrency(metrics.avgTicket)}
+                </span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Minhas Próximas Ações (Tarefas Manuais de Follow-up) */}
+        <div
+          className="double-bezel stagger-in md:col-span-6 xl:col-span-4"
+          style={{ ["--stagger" as string]: 8 }}
+        >
+          <section className="double-bezel-core h-full p-6 flex flex-col">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                </span>
+                Próximas Ações &amp; Tarefas
+              </div>
+              <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
+                {metrics.dueActions.length} agendada(s)
+              </span>
+            </div>
+
+            <div className="mt-4 flex-1 border-t border-[var(--border-hairline)]">
+              {metrics.dueActions.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-xs font-medium text-[var(--text-secondary)]">
+                    Nenhuma tarefa pendente.
+                  </p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                    Defina uma Próxima Ação dentro da página do cliente para
+                    aparecer aqui.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[var(--border-hairline)]">
+                  {metrics.dueActions.slice(0, 5).map((act) => (
+                    <button
+                      key={`${act.lead.id}-${act.dueAt}`}
+                      type="button"
+                      onClick={() => onSelectLead(act.lead)}
+                      className="w-full py-3 px-2 -mx-2 rounded-lg text-left hover:bg-[var(--bg-surface-hover)] transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-bold text-[var(--text-primary)]">
+                          {act.title}
+                        </span>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-md px-2 py-0.5 font-mono-num text-[10px] font-bold",
+                            act.overdue ? "badge-danger" : "badge-info"
+                          )}
+                        >
+                          {act.overdue ? "Atrasada" : act.dueAt.slice(5, 10).split("-").reverse().join("/")}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
+                        {act.lead.companyName} · {act.lead.contactName}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Conversão & Receita por Canal de Origem */}
+        <div
+          className="double-bezel stagger-in md:col-span-12 xl:col-span-4"
+          style={{ ["--stagger" as string]: 9 }}
+        >
+          <section className="double-bezel-core h-full p-6 flex flex-col">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                  <TrendingUp className="h-4 w-4" aria-hidden="true" />
+                </span>
+                Performance por Canal de Origem
+              </div>
+              <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
+                {metrics.originStats.length} canais
+              </span>
+            </div>
+
+            <div className="mt-4 flex-1 divide-y divide-[var(--border-hairline)] border-t border-[var(--border-hairline)]">
+              {metrics.originStats.slice(0, 5).map((row) => {
+                const rate =
+                  row.total > 0 ? Math.round((row.won / row.total) * 100) : 0;
+                return (
+                  <div
+                    key={row.origin}
+                    className="flex items-center justify-between gap-2 py-2.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-[var(--text-primary)]">
+                        {row.origin}
+                      </p>
+                      <p className="font-mono-num text-[11px] text-[var(--text-muted)]">
+                        {row.total} leads · {row.won} ganho(s) ({rate}%)
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono-num font-bold text-[var(--text-primary)]">
+                      {formatCurrency(row.revenue)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         </div>
       </div>

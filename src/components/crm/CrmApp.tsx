@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Bell,
+  Calendar,
   Clock,
   Database,
   Eye,
@@ -27,6 +29,7 @@ import {
   IntegrationStatus,
   InteractionType,
   Lead,
+  LostReasonId,
   Partner,
   ScriptTemplate,
   StageId,
@@ -41,11 +44,11 @@ import {
 import { useTheme } from "@/components/ThemeProvider";
 import { DashboardView } from "@/components/crm/DashboardView";
 import { KanbanView } from "@/components/crm/KanbanView";
+import { AgendaView } from "@/components/crm/AgendaView";
 import { CaptureView } from "@/components/crm/CaptureView";
 import { DispatcherView } from "@/components/crm/DispatcherView";
 import { PartnersView } from "@/components/crm/PartnersView";
 import { SettingsView } from "@/components/crm/SettingsView";
-import { LeadDetailModal } from "@/components/crm/LeadDetailModal";
 import { QuickNewLeadModal } from "@/components/crm/QuickNewLeadModal";
 import { CommandPaletteModal } from "@/components/crm/CommandPaletteModal";
 import type { CreateLeadInput } from "@/lib/repository";
@@ -53,6 +56,7 @@ import type { CreateLeadInput } from "@/lib/repository";
 type ActiveModule =
   | "dashboard"
   | "kanban"
+  | "agenda"
   | "capture"
   | "dispatcher"
   | "partners"
@@ -80,8 +84,8 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const [activeModule, setActiveModule] = useState<ActiveModule>("dashboard");
   const [activeFunnel, setActiveFunnel] = useState<FunnelId>("corporativo");
   const [captureSubTab] = useState<"places" | "manual" | "csv">("places");
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [dispatchLeadId, setDispatchLeadId] = useState<string | null>(null);
+  const [showPortalInbox, setShowPortalInbox] = useState(false);
   const [showQuickNewLead, setShowQuickNewLead] = useState(false);
   const [quickNewLeadFunnel, setQuickNewLeadFunnel] =
     useState<FunnelId>("corporativo");
@@ -90,6 +94,100 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isRemoteLocalMode, setIsRemoteLocalMode] = useState(false);
+
+  // Hydrate module/funnel/leadId from URL query parameters on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab") as ActiveModule | null;
+    const funnel = params.get("funnel") as FunnelId | null;
+    const leadId = params.get("leadId");
+    const validTabs: ActiveModule[] = [
+      "dashboard",
+      "kanban",
+      "agenda",
+      "capture",
+      "dispatcher",
+      "partners",
+      "settings",
+    ];
+    const validFunnels: FunnelId[] = [
+      "corporativo",
+      "estetica",
+      "nightlife",
+      "moda",
+      "gastronomia",
+    ];
+    if (tab && validTabs.includes(tab)) setActiveModule(tab);
+    if (funnel && validFunnels.includes(funnel)) setActiveFunnel(funnel);
+    if (leadId) setDispatchLeadId(leadId);
+  }, []);
+
+  // Keep URL query synchronized with active module & funnel (without page reload)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", activeModule);
+    if (activeModule === "kanban") {
+      url.searchParams.set("funnel", activeFunnel);
+    } else {
+      url.searchParams.delete("funnel");
+    }
+    if (activeModule !== "dispatcher") {
+      url.searchParams.delete("leadId");
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, [activeModule, activeFunnel]);
+
+  // Unified Portal Pending Inbox (Pix notices + Requested meetings + Deliverable adjustment requests)
+  const portalInboxItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      kind: "pix" | "reuniao" | "ajuste";
+      label: string;
+      detail: string;
+      lead: Lead;
+    }> = [];
+    for (const lead of store.leads) {
+      if (lead.archived) continue;
+      if (
+        lead.paymentStatus !== "quitado" &&
+        (lead.paymentNotices?.length ?? 0) > 0
+      ) {
+        const latest = lead.paymentNotices![0];
+        items.push({
+          id: `pix-${lead.id}-${latest.id}`,
+          kind: "pix",
+          label: `Pix informado · ${lead.companyName}`,
+          detail: `${latest.kind === "quitacao" ? "Quitação" : "Sinal 50%"} · R$ ${latest.amount.toLocaleString("pt-BR")}`,
+          lead,
+        });
+      }
+      for (const m of lead.meetings ?? []) {
+        if (m.status === "solicitada") {
+          items.push({
+            id: `meet-${lead.id}-${m.id}`,
+            kind: "reuniao",
+            label: `Reunião solicitada · ${lead.companyName}`,
+            detail: `${m.title} (${m.date} às ${m.time})`,
+            lead,
+          });
+        }
+      }
+      for (const d of lead.deliverables ?? []) {
+        if (d.status === "ajuste_solicitado") {
+          items.push({
+            id: `adj-${lead.id}-${d.id}`,
+            kind: "ajuste",
+            label: `Ajuste pedido · ${lead.companyName}`,
+            detail: `${d.title}: ${d.clientFeedback || "Ver comentário"}`,
+            lead,
+          });
+        }
+      }
+    }
+    return items;
+  }, [store.leads]);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -197,18 +295,39 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     };
   }, [refreshStore, notify]);
 
-  const selectedLead =
-    store.leads.find((l) => l.id === selectedLeadId) ?? null;
-
   const headerAlertCounts = useMemo(() => {
     let stagnant = 0;
     let viewed = 0;
     for (const lead of store.leads) {
+      if (lead.archived) continue;
       if (getLeadStagnation(lead).level !== "none") stagnant += 1;
       if (lead.visualizadaEm && lead.stage !== "fechado") viewed += 1;
     }
     return { stagnant, viewed };
   }, [store.leads]);
+
+  const handleBulkAction = async (params: {
+    leadIds: string[];
+    action: "move_stage" | "assign_partner" | "archive" | "restore";
+    stage?: StageId;
+    partnerId?: string | null;
+    lostReason?: LostReasonId;
+  }) => {
+    const res = await fetch("/api/leads/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      notify("Erro ao executar ação em massa.", "error");
+      return;
+    }
+    const json = (await res.json()) as { updatedCount: number; leads: Lead[] };
+    if (Array.isArray(json.leads)) {
+      setStore((prev) => ({ ...prev, leads: json.leads }));
+    }
+    notify(`${json.updatedCount} lead(s) atualizado(s) em lote.`, "success");
+  };
 
   const handleUpdateLead = async (
     leadId: string,
@@ -283,23 +402,6 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       `${previousLead.companyName} movido para ${getStageLabel(newStage)}.`,
       "success"
     );
-  };
-
-  const handleDeleteLead = async (leadId: string) => {
-    try {
-      const res = await fetch(`/api/leads/${leadId}`, { method: "DELETE" });
-      if (!res.ok) {
-        notify("Erro ao excluir lead.", "error");
-        return;
-      }
-      setStore((prev) => ({
-        ...prev,
-        leads: prev.leads.filter((l) => l.id !== leadId),
-      }));
-      notify("Lead removido do CRM.", "info");
-    } catch {
-      notify("Erro de rede ao excluir lead.", "error");
-    }
   };
 
   const handleCreateLead = async (input: CreateLeadInput) => {
@@ -509,25 +611,32 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       label: "Kanban",
       shortLabel: "Kanban",
       icon: Kanban,
-      badge: store.leads.length,
+      badge: store.leads.filter((l) => !l.archived).length,
+    },
+    {
+      id: "agenda",
+      code: "03",
+      label: "Agenda",
+      shortLabel: "Agenda",
+      icon: Calendar,
     },
     {
       id: "capture",
-      code: "03",
+      code: "04",
       label: "Captação BH",
       shortLabel: "Captar",
       icon: UserPlus,
     },
     {
       id: "dispatcher",
-      code: "04",
+      code: "05",
       label: "Disparador",
       shortLabel: "Disparo",
       icon: Send,
     },
     {
       id: "partners",
-      code: "05",
+      code: "06",
       label: "Parceiros",
       shortLabel: "Parceiros",
       icon: Handshake,
@@ -535,7 +644,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     },
     {
       id: "settings",
-      code: "06",
+      code: "07",
       label: "Config",
       shortLabel: "Config",
       icon: Settings,
@@ -639,8 +748,92 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             })}
           </nav>
 
-          {/* Right: Alerts + Command Search (Ctrl+K) + Sync + Button-in-Button CTA + Theme */}
+          {/* Right: Portal Inbox + Alerts + Command Search (Ctrl+K) + Sync + CTA + Theme */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Portal Pending Inbox Popover Trigger */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowPortalInbox((prev) => !prev)}
+                className={cn(
+                  "relative inline-flex h-[38px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors",
+                  portalInboxItems.length > 0
+                    ? "badge-accent"
+                    : "btn-ghost text-[var(--text-secondary)]"
+                )}
+                title="Central de Pendências do Portal (Pix, Reuniões e Ajustes)"
+                aria-label="Central de Pendências do Portal"
+              >
+                <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                {portalInboxItems.length > 0 && (
+                  <span className="font-mono-num text-[11px] font-bold">
+                    {portalInboxItems.length}
+                  </span>
+                )}
+              </button>
+
+              {showPortalInbox && (
+                <div className="modal-surface absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-[var(--border-hairline)] pb-2.5">
+                    <div>
+                      <p className="text-xs font-bold text-[var(--text-primary)]">
+                        Pendências do Portal do Cliente
+                      </p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        Pix informados, reuniões solicitadas e pedidos de ajuste
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPortalInbox(false)}
+                      className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+
+                  {portalInboxItems.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-[var(--text-muted)]">
+                      Nenhuma pendência de cliente no momento.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-[var(--border-hairline)] max-h-72 overflow-y-auto">
+                      {portalInboxItems.map((it) => (
+                        <button
+                          key={it.id}
+                          type="button"
+                          onClick={() => {
+                            setShowPortalInbox(false);
+                            openClientPage(it.lead);
+                          }}
+                          className="w-full py-2.5 px-2 -mx-2 rounded-lg text-left hover:bg-[var(--bg-surface-hover)] transition-colors space-y-0.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-bold text-[var(--text-primary)]">
+                              {it.label}
+                            </span>
+                            <span
+                              className={cn(
+                                "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase",
+                                it.kind === "pix" && "badge-success",
+                                it.kind === "reuniao" && "badge-warning",
+                                it.kind === "ajuste" && "badge-danger"
+                              )}
+                            >
+                              {it.kind}
+                            </span>
+                          </div>
+                          <p className="truncate text-[11px] text-[var(--text-secondary)]">
+                            {it.detail}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {headerAlertCounts.stagnant > 0 && (
               <button
                 type="button"
@@ -845,6 +1038,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             activeFunnel={activeFunnel}
             onChangeFunnel={setActiveFunnel}
             onMoveStage={handleMoveStage}
+            onBulkAction={handleBulkAction}
             onSelectLead={openClientPage}
             onQuickDispatch={(lead) => {
               setDispatchLeadId(lead.id);
@@ -853,6 +1047,10 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             onOpenNewLead={(funnel) => openQuickNewLead(funnel)}
             onNotify={notify}
           />
+        )}
+
+        {activeModule === "agenda" && (
+          <AgendaView leads={store.leads} onSelectLead={openClientPage} />
         )}
 
         {activeModule === "capture" && (
@@ -925,7 +1123,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
         aria-label="Navegação Mobile"
         className="glass-bar safe-bottom fixed bottom-0 inset-x-0 z-30 border-t border-[var(--border-hairline)] lg:hidden"
       >
-        <div className="grid grid-cols-6 gap-0.5 px-1.5 pt-1.5">
+        <div className="grid grid-cols-7 gap-0.5 px-1 pt-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeModule === item.id;
@@ -971,33 +1169,6 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
           partners={store.partners}
           onClose={() => setShowQuickNewLead(false)}
           onCreateLead={handleCreateLead}
-          onNotify={notify}
-        />
-      )}
-
-      {selectedLead && (
-        <LeadDetailModal
-          lead={selectedLead}
-          partners={store.partners}
-          onClose={() => setSelectedLeadId(null)}
-          onUpdateLead={async (leadId, patch, interaction, touch) => {
-            await handleUpdateLead(leadId, patch, interaction, touch);
-          }}
-          onSyncLead={(updatedLead) =>
-            setStore((prev) => ({
-              ...prev,
-              leads: prev.leads.map((l) =>
-                l.id === updatedLead.id ? updatedLead : l
-              ),
-            }))
-          }
-          onDeleteLead={handleDeleteLead}
-          onCreatePartner={handleCreatePartner}
-          onOpenDispatcher={(lead) => {
-            setSelectedLeadId(null);
-            setDispatchLeadId(lead.id);
-            setActiveModule("dispatcher");
-          }}
           onNotify={notify}
         />
       )}

@@ -5,15 +5,20 @@ import {
   CreateLeadInput,
   getStoreData,
 } from "@/lib/repository";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   const store = await getStoreData();
   return NextResponse.json({ leads: store.leads });
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   try {
     const body = await req.json();
 

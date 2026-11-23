@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   Bot,
   Calendar,
@@ -13,6 +14,7 @@ import {
   ClipboardCheck,
   Clock,
   Copy,
+  CopyPlus,
   CreditCard,
   Download,
   ExternalLink,
@@ -25,9 +27,11 @@ import {
   Instagram,
   KeyRound,
   Link2,
+  ListTodo,
   Mail,
   MessageCircle,
   Plus,
+  RotateCcw,
   Save,
   Search,
   Send,
@@ -43,6 +47,8 @@ import {
   IntegrationStatus,
   InteractionType,
   Lead,
+  LOST_REASONS,
+  LostReasonId,
   MEETING_TYPES,
   MeetingType,
   Partner,
@@ -114,6 +120,21 @@ export function ClientWorkspaceAdmin({
   const [notes, setNotes] = useState(lead.notes);
   const [automacaoAtiva, setAutomacaoAtiva] = useState(lead.automacaoAtiva);
   const [respondeu, setRespondeu] = useState(lead.respondeu);
+  const [nextActionTitle, setNextActionTitle] = useState(
+    lead.nextAction?.title || ""
+  );
+  const [nextActionDueAt, setNextActionDueAt] = useState(
+    lead.nextAction?.dueAt ? lead.nextAction.dueAt.slice(0, 16) : ""
+  );
+  const [nextActionCompleted, setNextActionCompleted] = useState(
+    Boolean(lead.nextAction?.completed)
+  );
+  const [showArchivePanel, setShowArchivePanel] = useState(false);
+  const [lostReason, setLostReason] = useState<LostReasonId>(
+    lead.lostReason || "preco"
+  );
+  const [lostNotes, setLostNotes] = useState(lead.lostNotes || "");
+  const [cloningRecurrence, setCloningRecurrence] = useState(false);
 
   // Finance & Contract Fields
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
@@ -282,6 +303,13 @@ export function ClientWorkspaceAdmin({
       notes: notes.trim(),
       automacaoAtiva,
       respondeu,
+      nextAction: nextActionTitle.trim()
+        ? {
+            title: nextActionTitle.trim(),
+            dueAt: nextActionDueAt || new Date().toISOString().slice(0, 16),
+            completed: nextActionCompleted,
+          }
+        : null,
       postSaleChecklist: checklist,
       portalPin: cleanedPin.length === 4 ? cleanedPin : null,
       productionStage,
@@ -399,19 +427,130 @@ export function ClientWorkspaceAdmin({
       const res = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: website.trim() }),
+        body: JSON.stringify({
+          leadId: lead.id,
+          website: website.trim(),
+          companyName,
+        }),
       });
       const data = await res.json();
-      if (data.email && !email) setEmail(data.email);
-      if (data.instagram && !instagram) setInstagram(data.instagram);
+      if (!res.ok) {
+        notify(data.error || "Não foi possível enriquecer este domínio.", "error");
+        return;
+      }
+      const foundEmail = data.bestEmail || data.email || "";
+      const foundIg = data.bestInstagram || data.instagram || "";
+      if (foundEmail && !email) setEmail(foundEmail);
+      if (foundIg && !instagram) setInstagram(foundIg);
+      if (data.lead) setLead(data.lead as Lead);
       notify(
-        data.email || data.instagram
-          ? "Dados públicos encontrados e preenchidos."
+        foundEmail || foundIg
+          ? `Contatos enriquecidos (${foundEmail || foundIg}).`
           : "Nenhum e-mail ou Instagram público detectado neste domínio.",
-        "info"
+        foundEmail || foundIg ? "success" : "info"
       );
     } finally {
       setEnriching(false);
+    }
+  };
+
+  const handleArchiveLead = async () => {
+    const reasonLabel =
+      LOST_REASONS.find((r) => r.id === lostReason)?.label || lostReason;
+    const updated = await patchLead(
+      {
+        archived: true,
+        lostReason,
+        lostNotes: lostNotes.trim(),
+        archivedAt: new Date().toISOString(),
+        automacaoAtiva: false,
+      },
+      {
+        type: "sistema",
+        title: `Lead arquivado como Perdido (${reasonLabel})`,
+        description: lostNotes.trim() || "Removido do pipeline ativo.",
+      },
+      false
+    );
+    if (updated) {
+      setShowArchivePanel(false);
+      notify("Cliente arquivado como Perdido (histórico preservado).", "info");
+    }
+  };
+
+  const handleRestoreLead = async () => {
+    const updated = await patchLead(
+      {
+        archived: false,
+        archivedAt: null,
+      },
+      {
+        type: "sistema",
+        title: "Lead reativado no pipeline ativo",
+        description: "Retomado a partir dos arquivados.",
+      },
+      true
+    );
+    if (updated) {
+      notify("Cliente reativado para o pipeline ativo.", "success");
+    }
+  };
+
+  const handleCreateRecurringProject = async () => {
+    setCloningRecurrence(true);
+    try {
+      const suffix = new Intl.DateTimeFormat("pt-BR", {
+        month: "short",
+        year: "2-digit",
+      })
+        .format(new Date())
+        .replace(".", "");
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName: `${companyName} (${suffix})`,
+          contactName,
+          contactRole,
+          phone: `${phone || "31999999999"}`,
+          email,
+          instagram,
+          neighborhood: lead.neighborhood,
+          address: lead.address,
+          website,
+          funnel,
+          stage: "proposta_aberta",
+          estimatedValue: numericValue,
+          origin: `Recorrência (${companyName})`,
+          partnerId: partnerId || null,
+          notes: `Novo projeto recorrente derivado de ${lead.companyName} (${lead.id}).`,
+          cnpj,
+          cpf,
+          razaoSocial,
+          parentLeadId: lead.id,
+          allowDuplicate: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.lead) {
+        notify(
+          json.error || "Não foi possível criar o novo projeto recorrente.",
+          "error"
+        );
+        return;
+      }
+      if (json.duplicate) {
+        // Create unique phone-safe clone via PATCH metadata fallback or notify user
+        notify(
+          "Já existe um projeto aberto com este mesmo nome/telefone. Redirecionando...",
+          "info"
+        );
+      } else {
+        notify("Novo projeto recorrente criado! Abrindo workspace...", "success");
+      }
+      router.push(`/clientes/${json.lead.id}`);
+    } finally {
+      setCloningRecurrence(false);
     }
   };
 
@@ -594,7 +733,7 @@ export function ClientWorkspaceAdmin({
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             <Link
-              href="/"
+              href={`/?tab=kanban&funnel=${funnel}`}
               className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
@@ -621,6 +760,28 @@ export function ClientWorkspaceAdmin({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/?tab=dispatcher&leadId=${lead.id}`}
+              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+              title="Abrir este cliente no Disparador com scripts"
+            >
+              <Send className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden lg:inline">Disparador</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleCreateRecurringProject}
+              disabled={cloningRecurrence}
+              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+              title="Criar novo projeto recorrente para o mesmo cliente preservando este contrato"
+            >
+              <CopyPlus className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden xl:inline">
+                {cloningRecurrence ? "Criando..." : "Recorrência"}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={handleCopyPortalLink}
@@ -1064,17 +1225,123 @@ export function ClientWorkspaceAdmin({
                       />
                     </label>
                   </div>
+                  {/* Próxima Ação / Tarefa Comercial */}
+                  <div className="space-y-2.5 border-t border-[var(--border-hairline)] pt-4">
+                    <div className="flex items-center gap-2">
+                      <ListTodo className="h-4 w-4 text-[var(--accent-text)]" />
+                      <h3 className="text-xs font-bold text-[var(--text-primary)]">
+                        Próxima Ação / Lembrete
+                      </h3>
+                    </div>
+                    <input
+                      type="text"
+                      value={nextActionTitle}
+                      onChange={(e) => setNextActionTitle(e.target.value)}
+                      placeholder="Ex.: Ligar terça às 14h para aprovar diária"
+                      className="input-field min-h-[38px] w-full rounded-lg px-3 text-xs"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        value={nextActionDueAt}
+                        onChange={(e) => setNextActionDueAt(e.target.value)}
+                        className="input-field min-h-[38px] flex-1 rounded-lg px-2.5 font-mono-num text-xs"
+                      />
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={nextActionCompleted}
+                          onChange={(e) =>
+                            setNextActionCompleted(e.target.checked)
+                          }
+                          className="h-4 w-4 accent-[var(--accent)]"
+                        />
+                        Feita
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="border-t border-[var(--border-hairline)] pt-4 space-y-2">
+                {/* Perdido / Arquivado + Excluir */}
+                <div className="border-t border-[var(--border-hairline)] pt-4 space-y-2.5">
+                  {lead.archived ? (
+                    <div className="rounded-lg border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-3 space-y-2 text-xs">
+                      <p className="font-bold text-[var(--status-warning)]">
+                        Arquivado / Perdido (
+                        {LOST_REASONS.find((r) => r.id === lead.lostReason)
+                          ?.label || "Sem motivo"}
+                        )
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleRestoreLead}
+                        className="btn-accent w-full min-h-[36px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reativar para o Pipeline Ativo
+                      </button>
+                    </div>
+                  ) : !showArchivePanel ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowArchivePanel(true)}
+                      className="btn-ghost w-full min-h-[40px] inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold text-[var(--status-warning)]"
+                    >
+                      <Archive className="h-3.5 w-3.5" />
+                      Marcar como Perdido / Arquivar
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-[var(--text-primary)]">
+                        Motivo da perda (para métricas de conversão):
+                      </p>
+                      <select
+                        value={lostReason}
+                        onChange={(e) =>
+                          setLostReason(e.target.value as LostReasonId)
+                        }
+                        className="input-field min-h-[36px] w-full rounded-md px-2.5 text-xs"
+                      >
+                        {LOST_REASONS.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={lostNotes}
+                        onChange={(e) => setLostNotes(e.target.value)}
+                        placeholder="Observação opcional (ex.: retomar em março)..."
+                        className="input-field min-h-[36px] w-full rounded-md px-2.5 text-xs"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowArchivePanel(false)}
+                          className="btn-ghost min-h-[34px] rounded-md text-xs"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleArchiveLead}
+                          className="badge-warning min-h-[34px] rounded-md text-xs font-bold"
+                        >
+                          Confirmar Arquivamento
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {!confirmDelete ? (
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(true)}
-                      className="btn-ghost w-full min-h-[40px] inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold text-[var(--status-danger)]"
+                      className="btn-ghost w-full min-h-[38px] inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold text-[var(--status-danger)]"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Excluir Cliente do CRM
+                      Excluir Permanentemente
                     </button>
                   ) : (
                     <div className="space-y-2">

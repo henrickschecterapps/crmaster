@@ -7,6 +7,8 @@ import {
   Bot,
   CheckCircle2,
   Clock,
+  Database,
+  Download,
   Eye,
   EyeOff,
   Lock,
@@ -17,6 +19,7 @@ import {
   Save,
   ShieldCheck,
   Smartphone,
+  Upload,
 } from "lucide-react";
 import {
   CronExecutionLog,
@@ -91,6 +94,39 @@ export function SettingsView({
   const [queueJobs, setQueueJobs] = useState<WhatsappQueueJob[]>([]);
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [processingQueue, setProcessingQueue] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+
+  const handleRestoreBackupFile = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRestoringBackup(true);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const res = await fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onNotify(json.error || "Arquivo de backup inválido.", "error");
+        return;
+      }
+      await onRefreshStore();
+      onNotify(
+        `Backup restaurado: ${json.counts?.leads ?? 0} leads, ${json.counts?.partners ?? 0} parceiros e ${json.counts?.templates ?? 0} templates.`,
+        "success"
+      );
+    } catch {
+      onNotify("Erro ao ler o arquivo JSON de backup.", "error");
+    } finally {
+      setRestoringBackup(false);
+      e.target.value = "";
+    }
+  };
 
   useEffect(() => {
     setWhatsappProvider(settings.whatsappProvider || "evolution");
@@ -974,6 +1010,55 @@ export function SettingsView({
                   ))}
                 </div>
               )}
+            </div>
+          </section>
+        </div>
+
+        {/* Card 4: Full Database Backup & Restore (.json) */}
+        <div
+          className="double-bezel stagger-in xl:col-span-12"
+          style={{ ["--stagger" as string]: 3 }}
+        >
+          <section className="double-bezel-core p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                <Database className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  Backup Completo &amp; Restauração do CRM (.json)
+                </h2>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                  Exporte uma cópia integral de todos os leads, parceiros,
+                  reuniões, entregas 4K, scripts e configurações do estúdio ou
+                  restaure um backup anterior com 1 clique.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <a
+                href="/api/backup"
+                download
+                className="btn-accent inline-flex min-h-[42px] items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold"
+              >
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                Baixar Backup (.json)
+              </a>
+
+              <label className="btn-ghost inline-flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold">
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>
+                  {restoringBackup ? "Restaurando..." : "Restaurar Backup"}
+                </span>
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  disabled={restoringBackup}
+                  onChange={handleRestoreBackupFile}
+                  className="sr-only"
+                />
+              </label>
             </div>
           </section>
         </div>

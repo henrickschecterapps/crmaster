@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Archive,
   Bot,
   Check,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   ClipboardCheck,
   Clock,
   Copy,
+  Download,
   ExternalLink,
   Eye,
   Handshake,
@@ -19,6 +21,7 @@ import {
   List,
   MessageCircle,
   Plus,
+  RotateCcw,
   Search,
   Send,
 } from "lucide-react";
@@ -26,6 +29,7 @@ import {
   FUNNELS,
   FunnelId,
   Lead,
+  LostReasonId,
   Partner,
   STAGES,
   StageId,
@@ -33,6 +37,7 @@ import {
 import {
   buildWhatsappUrl,
   cn,
+  exportLeadsToCsv,
   formatCurrency,
   formatRelativeTime,
   getFunnelLabel,
@@ -45,6 +50,13 @@ interface KanbanViewProps {
   activeFunnel: FunnelId;
   onChangeFunnel: (funnel: FunnelId) => void;
   onMoveStage: (leadId: string, newStage: StageId) => Promise<void>;
+  onBulkAction?: (params: {
+    leadIds: string[];
+    action: "move_stage" | "assign_partner" | "archive" | "restore";
+    stage?: StageId;
+    partnerId?: string | null;
+    lostReason?: LostReasonId;
+  }) => Promise<void>;
   onSelectLead: (lead: Lead) => void;
   onQuickDispatch: (lead: Lead) => void;
   onOpenNewLead: (funnel: FunnelId) => void;
@@ -68,18 +80,24 @@ export function KanbanView({
   activeFunnel,
   onChangeFunnel,
   onMoveStage,
+  onBulkAction,
   onSelectLead,
   onQuickDispatch,
   onOpenNewLead,
   onNotify,
 }: KanbanViewProps) {
   const [showAllFunnels, setShowAllFunnels] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [search, setSearch] = useState("");
   const [onlyStagnant, setOnlyStagnant] = useState(false);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<StageId | null>(null);
   const [copiedLeadId, setCopiedLeadId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkStage, setBulkStage] = useState<StageId>("contatado");
+  const [bulkPartnerId, setBulkPartnerId] = useState<string>("");
+  const [runningBulk, setRunningBulk] = useState(false);
 
   const partnerMap = useMemo(() => {
     const map = new Map<string, Partner>();
@@ -87,8 +105,14 @@ export function KanbanView({
     return map;
   }, [partners]);
 
+  const archivedCount = useMemo(
+    () => leads.filter((l) => Boolean(l.archived)).length,
+    [leads]
+  );
+
   const funnelLeads = useMemo(() => {
     return leads.filter((l) => {
+      if (showArchived ? !l.archived : Boolean(l.archived)) return false;
       if (!showAllFunnels && l.funnel !== activeFunnel) return false;
       if (onlyStagnant && getLeadStagnation(l).level === "none") return false;
       if (search.trim()) {
@@ -106,7 +130,54 @@ export function KanbanView({
       }
       return true;
     });
-  }, [leads, showAllFunnels, activeFunnel, onlyStagnant, search, partnerMap]);
+  }, [leads, showArchived, showAllFunnels, activeFunnel, onlyStagnant, search, partnerMap]);
+
+  const toggleSelectId = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === funnelLeads.length && funnelLeads.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(funnelLeads.map((l) => l.id));
+    }
+  };
+
+  const runBulk = async (
+    action: "move_stage" | "assign_partner" | "archive" | "restore"
+  ) => {
+    if (!onBulkAction || selectedIds.length === 0) return;
+    setRunningBulk(true);
+    try {
+      await onBulkAction({
+        leadIds: selectedIds,
+        action,
+        stage: action === "move_stage" ? bulkStage : undefined,
+        partnerId:
+          action === "assign_partner" ? bulkPartnerId || null : undefined,
+      });
+      setSelectedIds([]);
+    } finally {
+      setRunningBulk(false);
+    }
+  };
+
+  const handleExportFilteredCsv = () => {
+    const csv = exportLeadsToCsv(funnelLeads, partners);
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pipeline-${showAllFunnels ? "todas" : activeFunnel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    onNotify?.(`Exportados ${funnelLeads.length} leads filtrados em CSV.`, "success");
+  };
 
   const leadsByStage = useMemo(() => {
     const grouped: Record<StageId, Lead[]> = {
@@ -320,13 +391,13 @@ export function KanbanView({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setOnlyStagnant((prev) => !prev)}
               aria-pressed={onlyStagnant}
               className={cn(
-                "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold border transition-colors",
+                "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors",
                 onlyStagnant
                   ? "badge-warning"
                   : "btn-ghost text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
@@ -334,6 +405,34 @@ export function KanbanView({
             >
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               Parados &gt;48h
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowArchived((prev) => !prev);
+                setSelectedIds([]);
+              }}
+              aria-pressed={showArchived}
+              className={cn(
+                "inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors",
+                showArchived
+                  ? "badge-danger"
+                  : "btn-ghost text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
+              )}
+            >
+              <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+              Arquivados ({archivedCount})
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportFilteredCsv}
+              className="btn-ghost inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold bg-[var(--bg-surface-solid)]"
+              title="Exportar leads filtrados em CSV"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">CSV</span>
             </button>
 
             <button
@@ -350,6 +449,85 @@ export function KanbanView({
         </div>
       </div>
 
+      {/* Bulk Action Bar (visible when 1+ leads are selected in List view) */}
+      {viewMode === "list" && selectedIds.length > 0 && onBulkAction && (
+        <div className="double-bezel stagger-in">
+          <div className="double-bezel-core flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs">
+            <span className="font-bold text-[var(--accent-text)] font-mono-num">
+              {selectedIds.length} lead(s) selecionado(s)
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1">
+                <select
+                  value={bulkStage}
+                  onChange={(e) => setBulkStage(e.target.value as StageId)}
+                  className="input-field min-h-[34px] rounded-md px-2 text-xs"
+                >
+                  {STAGES.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.shortLabel}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={runningBulk}
+                  onClick={() => runBulk("move_stage")}
+                  className="btn-accent min-h-[34px] rounded-md px-3 text-xs font-bold disabled:opacity-50"
+                >
+                  Mover Etapa
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <select
+                  value={bulkPartnerId}
+                  onChange={(e) => setBulkPartnerId(e.target.value)}
+                  className="input-field min-h-[34px] rounded-md px-2 text-xs"
+                >
+                  <option value="">Sem parceiro</option>
+                  {partners.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={runningBulk}
+                  onClick={() => runBulk("assign_partner")}
+                  className="btn-ghost min-h-[34px] rounded-md px-3 text-xs font-semibold disabled:opacity-50"
+                >
+                  Parceiro
+                </button>
+              </div>
+
+              {showArchived ? (
+                <button
+                  type="button"
+                  disabled={runningBulk}
+                  onClick={() => runBulk("restore")}
+                  className="badge-success min-h-[34px] inline-flex items-center gap-1 rounded-md px-3 text-xs font-bold disabled:opacity-50"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reativar Lote
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={runningBulk}
+                  onClick={() => runBulk("archive")}
+                  className="badge-danger min-h-[34px] inline-flex items-center gap-1 rounded-md px-3 text-xs font-bold disabled:opacity-50"
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  Arquivar Lote
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* VIEW MODE 1: COMPACT DOUBLE-BEZEL TABLE / LIST VIEW */}
       {viewMode === "list" ? (
         <div className="double-bezel stagger-in">
@@ -357,6 +535,18 @@ export function KanbanView({
             <table className="w-full text-left text-xs">
               <thead className="border-b border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                 <tr>
+                  <th className="w-10 px-3 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todos os leads listados"
+                      checked={
+                        funnelLeads.length > 0 &&
+                        selectedIds.length === funnelLeads.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                    />
+                  </th>
                   <th className="px-4 py-3">Empresa &amp; Decisor</th>
                   <th className="px-4 py-3">Vertical</th>
                   <th className="px-4 py-3">Etapa</th>
@@ -369,7 +559,7 @@ export function KanbanView({
                 {funnelLeads.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-8 text-center text-xs text-[var(--text-muted)]"
                     >
                       Nenhum lead encontrado neste filtro.
@@ -378,11 +568,24 @@ export function KanbanView({
                 ) : (
                   funnelLeads.map((lead) => {
                     const stagnation = getLeadStagnation(lead);
+                    const checked = selectedIds.includes(lead.id);
                     return (
                       <tr
                         key={lead.id}
-                        className="hover:bg-[var(--bg-surface-hover)] transition-colors"
+                        className={cn(
+                          "hover:bg-[var(--bg-surface-hover)] transition-colors",
+                          checked && "bg-[var(--accent-soft)]/40"
+                        )}
                       >
+                        <td className="px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Selecionar ${lead.companyName}`}
+                            checked={checked}
+                            onChange={() => toggleSelectId(lead.id)}
+                            className="h-4 w-4 accent-[var(--accent)]"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -830,17 +1033,17 @@ export function KanbanView({
                                 </button>
 
                                 <a
-                                  href={`/proposta/${lead.id}`}
+                                  href={`/portal/${lead.id}`}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="btn-ghost inline-flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-semibold"
-                                  title="Abrir Proposta Web em nova aba"
+                                  title="Abrir Portal do Cliente em nova aba"
                                 >
                                   <ExternalLink
                                     className="h-3 w-3"
                                     aria-hidden="true"
                                   />
-                                  Proposta
+                                  Portal
                                 </a>
                               </div>
 

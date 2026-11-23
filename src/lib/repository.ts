@@ -117,6 +117,12 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
       meetings: Array.isArray(lead.meetings) ? lead.meetings : [],
       deliverables: Array.isArray(lead.deliverables) ? lead.deliverables : [],
       briefing: lead.briefing ?? null,
+      archived: Boolean(lead.archived),
+      lostReason: lead.lostReason ?? null,
+      lostNotes: lead.lostNotes ?? "",
+      archivedAt: lead.archivedAt ?? null,
+      nextAction: lead.nextAction ?? null,
+      parentLeadId: lead.parentLeadId ?? null,
       interactions: Array.isArray(lead.interactions) ? lead.interactions : [],
     };
   });
@@ -602,6 +608,11 @@ export interface CreateLeadInput {
   partnerId?: string | null;
   notes?: string;
   eventDate?: string;
+  cnpj?: string;
+  cpf?: string;
+  razaoSocial?: string;
+  parentLeadId?: string | null;
+  allowDuplicate?: boolean;
 }
 
 export async function createLead(
@@ -611,14 +622,17 @@ export async function createLead(
   const normPhone = normalizePhone(input.phone);
   const normCompany = normalizeName(input.companyName);
 
-  const existing = store.leads.find(
-    (l) =>
-      (normPhone && normalizePhone(l.phone) === normPhone) ||
-      (normCompany && normalizeName(l.companyName) === normCompany)
-  );
+  if (!input.allowDuplicate) {
+    const existing = store.leads.find(
+      (l) =>
+        !l.archived &&
+        ((normPhone && normalizePhone(l.phone) === normPhone) ||
+          (normCompany && normalizeName(l.companyName) === normCompany))
+    );
 
-  if (existing) {
-    return { lead: existing, duplicate: true };
+    if (existing) {
+      return { lead: existing, duplicate: true };
+    }
   }
 
   const now = new Date().toISOString();
@@ -653,6 +667,10 @@ export async function createLead(
     paymentStatus: "pendente",
     notes: input.notes?.trim() || "",
     eventDate: input.eventDate?.trim(),
+    cnpj: input.cnpj?.trim(),
+    cpf: input.cpf?.trim(),
+    razaoSocial: input.razaoSocial?.trim(),
+    parentLeadId: input.parentLeadId ?? null,
     visualizadaEm: null,
     visualizacoesProposta: 0,
     propostaAprovadaEm: null,
@@ -1174,6 +1192,76 @@ export async function deleteTemplate(templateId: string): Promise<boolean> {
   if (store.templates.length === before) return false;
   await writeLocalStore(store);
   return true;
+}
+
+export async function restoreStoreData(
+  incoming: CrmStoreData
+): Promise<CrmStoreData> {
+  const hydrated = hydrateStoreData(incoming);
+
+  if (isFirebaseConfigured()) {
+    try {
+      const db = getFirestoreDb();
+      if (db) {
+        // Chunk writes into batches of <=400 operations (Firestore limit is 500)
+        const ops: Array<() => void> = [];
+        let batch = writeBatch(db);
+        let count = 0;
+
+        const flushIfNeeded = async () => {
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        };
+
+        batch.set(
+          doc(db, FIRESTORE_COLLECTIONS.settings, "default"),
+          stripUndefined(hydrated.settings)
+        );
+        count++;
+
+        for (const p of hydrated.partners) {
+          await flushIfNeeded();
+          batch.set(
+            doc(db, FIRESTORE_COLLECTIONS.partners, p.id),
+            stripUndefined(p)
+          );
+          count++;
+        }
+
+        for (const l of hydrated.leads) {
+          await flushIfNeeded();
+          batch.set(
+            doc(db, FIRESTORE_COLLECTIONS.leads, l.id),
+            stripUndefined(l)
+          );
+          count++;
+        }
+
+        for (const t of hydrated.templates) {
+          await flushIfNeeded();
+          batch.set(
+            doc(db, FIRESTORE_COLLECTIONS.templates, t.id),
+            stripUndefined(t)
+          );
+          count++;
+        }
+
+        if (count > 0) {
+          await batch.commit();
+        }
+        void ops;
+        return hydrated;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
+  await writeLocalStore(hydrated);
+  return hydrated;
 }
 
 export async function resetDemoData(): Promise<CrmStoreData> {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { getStoreData, trackProposalView, updateLead } from "@/lib/repository";
 import { buildWhatsappUrl, formatCurrency } from "@/lib/utils";
+import { sendEmailNotification } from "@/lib/email";
 import {
   resolveWhatsappConfig,
   sendWhatsappViaApi,
@@ -90,9 +90,6 @@ export async function POST(
       process.env.ADMIN_EMAIL ||
       ""
     ).trim();
-    const resendKey = process.env.RESEND_API_KEY;
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL || "ÚLTIMO QUADRO <onboarding@resend.dev>";
     const appUrl = (
       process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     ).replace(/\/+$/, "");
@@ -100,26 +97,21 @@ export async function POST(
     const clientWaMsg = `Olá ${updated.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO. Vi que você está conferindo a proposta da ${updated.companyName}. Posso tirar alguma dúvida ou personalizar algum detalhe para vocês?`;
     const clientWhatsappUrl = buildWhatsappUrl(updated.phone, clientWaMsg);
 
-    if (resendKey && adminEmail) {
-      try {
-        const resend = new Resend(resendKey);
-        const { error } = await resend.emails.send({
-          from: fromEmail,
-          to: [adminEmail],
-          subject: `[RADAR] ${updated.companyName} abriu sua proposta agora`,
-          html: buildRadarEmailHtml({
-            companyName: updated.companyName,
-            contactName: updated.contactName,
-            totalViews: updated.visualizacoesProposta,
-            estimatedValue: updated.estimatedValue,
-            clientWhatsappUrl,
-            crmUrl: appUrl,
-          }),
-        });
-        if (!error) radarEmailSent = true;
-      } catch {
-        // Non-blocking alert failure
-      }
+    if (adminEmail) {
+      const emailRes = await sendEmailNotification({
+        to: adminEmail,
+        subject: `[RADAR] ${updated.companyName} abriu seu Portal agora`,
+        text: `${updated.contactName} (${updated.companyName}) acabou de abrir o Portal/Proposta (visualização nº ${updated.visualizacoesProposta}, valor ${formatCurrency(updated.estimatedValue)}). Abrir cliente: ${appUrl}/clientes/${updated.id}`,
+        html: buildRadarEmailHtml({
+          companyName: updated.companyName,
+          contactName: updated.contactName,
+          totalViews: updated.visualizacoesProposta,
+          estimatedValue: updated.estimatedValue,
+          clientWhatsappUrl,
+          crmUrl: `${appUrl}/clientes/${updated.id}`,
+        }),
+      });
+      radarEmailSent = emailRes.ok;
     }
 
     const waConfig = resolveWhatsappConfig(store.settings);

@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_GUARD_COOKIE,
   ADMIN_SESSION_COOKIE,
-  clearLoginAttempts,
   constantTimeEqual,
   createAdminSessionToken,
-  getRateLimitStatus,
   hashPasswordWithSalt,
   isAdminAuthEnabled,
-  recordFailedLoginAttempt,
 } from "@/lib/auth";
+import {
+  clearPersistedLoginAttempts,
+  getPersistedRateLimitStatus,
+  recordPersistedFailedLoginAttempt,
+} from "@/lib/rateLimitStore";
 import { getStoreData } from "@/lib/repository";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +26,7 @@ function extractClientIp(req: NextRequest): string {
 
 export async function POST(req: NextRequest) {
   const ip = extractClientIp(req);
-  const rateLimit = getRateLimitStatus(ip);
+  const rateLimit = await getPersistedRateLimitStatus(ip);
 
   if (rateLimit.locked) {
     const minutes = Math.ceil(rateLimit.retryAfterSeconds / 60);
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
   // Optional email check when user fills the email field and adminEmail is set
   const expectedEmail = (settings.adminEmail || "").trim().toLowerCase();
   if (providedEmail && expectedEmail && providedEmail !== expectedEmail) {
-    const failed = recordFailedLoginAttempt(ip);
+    const failed = await recordPersistedFailedLoginAttempt(ip);
     return NextResponse.json(
       {
         error: failed.locked
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!passwordMatch) {
-    const failed = recordFailedLoginAttempt(ip);
+    const failed = await recordPersistedFailedLoginAttempt(ip);
     return NextResponse.json(
       {
         error: failed.locked
@@ -112,7 +114,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  clearLoginAttempts(ip);
+  await clearPersistedLoginAttempts(ip);
 
   const rememberMe = body.rememberMe !== false;
   const durationHours = rememberMe ? 24 * 14 : 12; // 14 dias ou 12 horas

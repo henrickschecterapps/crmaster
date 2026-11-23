@@ -79,4 +79,5 @@ export const FIRESTORE_COLLECTIONS = {
   templates: "crm_templates",
   whatsappQueue: "crm_whatsapp_queue",
   cronLogs: "crm_cron_logs",
+  loginRateLimits: "crm_login_rate_limits",
 } as const;

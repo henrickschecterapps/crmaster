@@ -1,6 +1,10 @@
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from "pdf-lib";
 import { BRAND_DEFAULTS, getServiceVertical, Lead } from "@/types/crm";
-import { formatCurrencyExact, formatDateBr } from "@/lib/utils";
+import {
+  formatCurrencyExact,
+  formatDateBr,
+  formatDateTimeBr,
+} from "@/lib/utils";
 
 function toWinAnsiSafe(text: string): string {
   return text
@@ -258,11 +262,17 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
 
   y -= boxHeight + 22;
 
+  const customScopeText =
+    lead.customProposal?.enabled &&
+    lead.customProposal.deliverables.length > 0
+      ? ` Escopo sob medida incluso: ${lead.customProposal.deliverables.join("; ")}.`
+      : "";
+
   const clauses = isPortrait
     ? [
         {
           title: "1. OBJETO E CONDICOES DA PRODUCAO",
-          body: `O presente Termo regula a realizacao de producao fotografica e/ou audiovisual 4K pela ULTIMO QUADRO (${BRAND_DEFAULTS.location}) para ${lead.razaoSocial || lead.contactName}, vertical "${vertical.title}", pacote "${packageName}", agendada para ${eventDateFormatted}.`,
+          body: `O presente Termo regula a realizacao de producao fotografica e/ou audiovisual 4K pela ULTIMO QUADRO (${BRAND_DEFAULTS.location}) para ${lead.razaoSocial || lead.contactName}, vertical "${vertical.title}", pacote "${packageName}", agendada para ${eventDateFormatted}.${customScopeText}`,
         },
         {
           title: "2. INVESTIMENTO, RESERVA (50%) E QUITACAO",
@@ -284,7 +294,7 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
     : [
         {
           title: "1. OBJETO DA PRESTACAO DE SERVICOS",
-          body: `A CONTRATADA (ULTIMO QUADRO - Fotografia Autoral & Producao Audiovisual, Belo Horizonte & Nova Lima - MG) compromete-se a executar a producao contratada por ${lead.razaoSocial || lead.companyName} (CNPJ: ${lead.cnpj || "a informar"}), vertical "${vertical.title}", pacote "${packageName}"${lead.proposalAddons && lead.proposalAddons.length > 0 ? ` + adicionais: ${lead.proposalAddons.join(", ")}` : ""}, prevista para ${eventDateFormatted}.`,
+          body: `A CONTRATADA (ULTIMO QUADRO - Fotografia Autoral & Producao Audiovisual, Belo Horizonte & Nova Lima - MG) compromete-se a executar a producao contratada por ${lead.razaoSocial || lead.companyName} (CNPJ: ${lead.cnpj || "a informar"}), vertical "${vertical.title}", pacote "${packageName}"${lead.proposalAddons && lead.proposalAddons.length > 0 ? ` + adicionais: ${lead.proposalAddons.join(", ")}` : ""}, prevista para ${eventDateFormatted}.${customScopeText}`,
         },
         {
           title: "2. VALORES, SINAL DE 50% E EMISSAO DE NFS-e",
@@ -380,18 +390,28 @@ export async function generateLeadContractPdf(lead: Lead): Promise<{
       color: ink,
     }
   );
-  page.drawText(
-    toWinAnsiSafe(
-      `Aceite digital registrado em ${refDate} via Proposta Web Ultimo Quadro`
-    ),
-    {
-      x: rightX,
-      y: sigY - 32,
-      size: 7.3,
-      font: fontRegular,
-      color: muted,
-    }
-  );
+  const cert = lead.acceptanceCertificate;
+  const acceptanceLine1 = cert
+    ? `Aceite eletronico: ${formatDateTimeBr(cert.acceptedAt)} | IP ${cert.ipAddress}`
+    : `Aceite digital registrado em ${refDate} via Portal Ultimo Quadro`;
+  const acceptanceLine2 = cert
+    ? `Doc: ${cert.signerDocument} | Hash SHA-256: ${cert.hash}`
+    : "Valido conforme MP 2.200-2/2001 (assinatura eletronica)";
+
+  page.drawText(toWinAnsiSafe(acceptanceLine1), {
+    x: rightX,
+    y: sigY - 32,
+    size: 7.1,
+    font: fontRegular,
+    color: muted,
+  });
+  page.drawText(toWinAnsiSafe(acceptanceLine2), {
+    x: rightX,
+    y: sigY - 42,
+    size: 6.7,
+    font: fontBold,
+    color: accent,
+  });
 
   page.drawText(
     "ULTIMO QUADRO - A historia termina. A imagem fica. | https://ultimo-quadro.vercel.app",

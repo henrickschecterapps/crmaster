@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStoreData, upsertTemplate } from "@/lib/repository";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 import { ScriptTemplate } from "@/types/crm";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   const store = await getStoreData();
   return NextResponse.json({ templates: store.templates });
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   try {
     const body = (await req.json()) as Omit<
       ScriptTemplate,

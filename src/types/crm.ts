@@ -122,6 +122,29 @@ export interface ClientPaymentNotice {
   reportedAt: string;
 }
 
+export type LostReasonId =
+  | "preco"
+  | "concorrente"
+  | "sem_orcamento"
+  | "sem_resposta"
+  | "data_indisponivel"
+  | "outro";
+
+export const LOST_REASONS: Array<{ id: LostReasonId; label: string }> = [
+  { id: "preco", label: "Preço / Fora do orçamento" },
+  { id: "concorrente", label: "Fechou com concorrente" },
+  { id: "sem_orcamento", label: "Sem orçamento no momento (Reativar depois)" },
+  { id: "sem_resposta", label: "Sem resposta após follow-ups" },
+  { id: "data_indisponivel", label: "Data indisponível na agenda" },
+  { id: "outro", label: "Outro motivo" },
+];
+
+export interface LeadNextAction {
+  title: string;
+  dueAt: string; // ISO ou YYYY-MM-DDTHH:MM
+  completed?: boolean;
+}
+
 export interface ClientBriefing {
   referencesLinks: string;
   venueAddress: string;
@@ -307,6 +330,12 @@ export interface Lead {
   meetings?: ClientMeeting[];
   deliverables?: ClientDeliverable[];
   briefing?: ClientBriefing | null;
+  archived?: boolean;
+  lostReason?: LostReasonId | null;
+  lostNotes?: string;
+  archivedAt?: string | null;
+  nextAction?: LeadNextAction | null;
+  parentLeadId?: string | null;
   ultimaInteracaoEm: string;
   createdAt: string;
   updatedAt: string;

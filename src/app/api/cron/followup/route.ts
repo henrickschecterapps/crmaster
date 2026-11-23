@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import {
   getCronLogs,
   getStoreData,
@@ -7,6 +6,8 @@ import {
   updateLead,
 } from "@/lib/repository";
 import { generateId, interpolateTemplate } from "@/lib/utils";
+import { sendEmailNotification } from "@/lib/email";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 import {
   enqueueWhatsappBatch,
   processDueWhatsappQueue,
@@ -30,9 +31,10 @@ async function runFollowupCadence(dryRun: boolean = false): Promise<CronExecutio
     store.templates.find((t) => t.id === "tpl-followup-dia5") ??
     store.templates[0];
 
-  const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail =
-    process.env.RESEND_FROM_EMAIL || "ÚLTIMO QUADRO <onboarding@resend.dev>";
+  const emailConfigured = Boolean(
+    (process.env.GMAIL_USER?.trim() && process.env.GMAIL_APP_PASSWORD?.trim()) ||
+      process.env.RESEND_API_KEY?.trim()
+  );
   const waConfig = resolveWhatsappConfig(store.settings);
 
   // Process any pending persisted WhatsApp queue items that are already due
@@ -74,7 +76,7 @@ async function runFollowupCadence(dryRun: boolean = false): Promise<CronExecutio
     if (!targetStep) continue;
 
     const template = targetStep === "dia_5" ? tplDay5 : tplDay2;
-    const proposalUrl = `${baseUrl}/proposta/${lead.id}`;
+    const proposalUrl = `${baseUrl}/portal/${lead.id}`;
     const vars = {
       nome_contato: lead.contactName,
       nome_empresa: lead.companyName,
@@ -88,28 +90,28 @@ async function runFollowupCadence(dryRun: boolean = false): Promise<CronExecutio
     );
     const bodyText = interpolateTemplate(
       template?.body ||
-        `Olá ${lead.contactName}, passando para acompanhar nossa proposta: ${proposalUrl}`,
+        `Olá ${lead.contactName}, passando para acompanhar nosso portal e proposta: ${proposalUrl}`,
       vars
     );
 
     let emailStatus = "sem_email";
 
     if (lead.email) {
-      if (dryRun || !resendKey) {
+      if (dryRun || !emailConfigured) {
         emailStatus = "simulado";
       } else {
-        try {
-          const resend = new Resend(resendKey);
-          const { error } = await resend.emails.send({
-            from: fromEmail,
-            to: [lead.email],
-            subject,
-            text: bodyText,
-          });
-          emailStatus = error ? "erro" : "enviado";
-        } catch {
-          emailStatus = "erro";
-        }
+        const htmlBody = `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#222;"><p>${bodyText
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll("\n", "<br/>")}</p><p><a href="${proposalUrl}" style="display:inline-block;background:#B54512;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:700;">Abrir Portal do Projeto</a></p></div>`;
+        const emailRes = await sendEmailNotification({
+          to: lead.email,
+          subject,
+          text: bodyText,
+          html: htmlBody,
+        });
+        emailStatus = emailRes.ok ? `enviado_${emailRes.provider}` : "erro";
       }
     }
 
@@ -192,15 +194,21 @@ async function runFollowupCadence(dryRun: boolean = false): Promise<CronExecutio
 
 export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("history") === "1") {
-    const history = await getCronLogs(10);
-    return NextResponse.json({ history });
+    const authErr = await requireAdminApiAuth(req);
+    if (authErr) return authErr;
+    const logs = await getCronLogs(10);
+    return NextResponse.json({ history: logs, logs });
   }
 
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = process.env.CRON_SECRET?.trim();
   const authHeader = req.headers.get("authorization");
+  const isCronAuthorized = Boolean(
+    cronSecret && authHeader === `Bearer ${cronSecret}`
+  );
 
-  if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!isCronAuthorized) {
+    const authErr = await requireAdminApiAuth(req);
+    if (authErr) return authErr;
   }
 
   const result = await runFollowupCadence(false);
@@ -208,11 +216,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
+
   try {
     const body = (await req.json().catch(() => ({}))) as { dryRun?: boolean };
     const result = await runFollowupCadence(Boolean(body.dryRun));
-    const history = await getCronLogs(10);
-    return NextResponse.json({ ...result, history });
+    const logs = await getCronLogs(10);
+    return NextResponse.json({ ...result, history: logs, logs });
   } catch {
     return NextResponse.json(
       { error: "Erro ao executar régua de follow-up." },

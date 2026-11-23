@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { getLeadById, updateLead } from "@/lib/repository";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -84,16 +85,25 @@ async function sendViaGmailSmtp(params: {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
+
   try {
     const body = (await req.json()) as {
       leadId: string;
       to: string;
       subject: string;
-      message: string;
-      proposalUrl: string;
+      message?: string;
+      body?: string;
+      proposalUrl?: string;
     };
 
-    if (!body.leadId || !body.to || !body.subject || !body.message) {
+    const resolvedMessage = (body.message || body.body || "").trim();
+    const resolvedProposalUrl =
+      body.proposalUrl ||
+      `${(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "")}/portal/${body.leadId}`;
+
+    if (!body.leadId || !body.to || !body.subject || !resolvedMessage) {
       return NextResponse.json(
         { error: "Destinatário, assunto e mensagem são obrigatórios." },
         { status: 400 }
@@ -110,8 +120,8 @@ export async function POST(req: NextRequest) {
 
     const html = buildEmailHtml({
       companyName: lead.companyName,
-      body: body.message,
-      proposalUrl: body.proposalUrl,
+      body: resolvedMessage,
+      proposalUrl: resolvedProposalUrl,
     });
 
     const gmailConfigured = Boolean(
@@ -131,7 +141,7 @@ export async function POST(req: NextRequest) {
       const gmailRes = await sendViaGmailSmtp({
         to: body.to,
         subject: body.subject,
-        text: body.message,
+        text: resolvedMessage,
         html,
       });
       if (!gmailRes.ok) {
@@ -148,7 +158,7 @@ export async function POST(req: NextRequest) {
         from: fromEmail,
         to: [body.to],
         subject: body.subject,
-        text: body.message,
+        text: resolvedMessage,
         html,
       });
 
@@ -158,7 +168,7 @@ export async function POST(req: NextRequest) {
           const gmailRes = await sendViaGmailSmtp({
             to: body.to,
             subject: body.subject,
-            text: body.message,
+            text: resolvedMessage,
             html,
           });
           if (gmailRes.ok) {

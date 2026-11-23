@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStoreData } from "@/lib/repository";
+import { requireAdminApiAuth } from "@/lib/apiGuard";
 import {
   enqueueWhatsappBatch,
   EnqueueWhatsappInput,
@@ -10,7 +11,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   const store = await getStoreData();
   const config = resolveWhatsappConfig(store.settings);
   const jobs = await getWhatsappQueueJobs();
@@ -22,6 +25,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   try {
     const body = (await req.json()) as { items?: EnqueueWhatsappInput[] };
     const items = body.items ?? [];
@@ -58,6 +63,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authErr = await requireAdminApiAuth(req);
+  if (authErr) return authErr;
   try {
     const body = (await req.json().catch(() => ({}))) as { forceAll?: boolean };
     const store = await getStoreData();
