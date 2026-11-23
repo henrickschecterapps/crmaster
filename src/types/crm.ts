@@ -32,7 +32,131 @@ export type InteractionType =
   | "followup_auto"
   | "contrato"
   | "enriquecimento"
-  | "pos_venda";
+  | "pos_venda"
+  | "reuniao"
+  | "entrega"
+  | "briefing";
+
+export type ProductionStageId =
+  | "pre_producao"
+  | "captacao"
+  | "edicao"
+  | "revisao"
+  | "entregue";
+
+export type MeetingType =
+  | "alinhamento"
+  | "visita_tecnica"
+  | "revisao"
+  | "outro";
+
+export type MeetingStatus =
+  | "solicitada"
+  | "confirmada"
+  | "realizada"
+  | "cancelada";
+
+export interface ClientMeeting {
+  id: string;
+  type: MeetingType;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  format: "online" | "presencial";
+  locationOrUrl?: string;
+  notes?: string;
+  status: MeetingStatus;
+  requestedBy: "cliente" | "admin";
+  createdAt: string;
+}
+
+export type DeliverableType =
+  | "galeria_fotos"
+  | "video_4k"
+  | "raw_drive"
+  | "roteiro"
+  | "outro";
+
+export type DeliverableStatus =
+  | "em_producao"
+  | "pronto_aprovacao"
+  | "aprovado"
+  | "ajuste_solicitado";
+
+export interface ClientDeliverable {
+  id: string;
+  title: string;
+  type: DeliverableType;
+  url: string;
+  description?: string;
+  status: DeliverableStatus;
+  clientFeedback?: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface ClientBriefing {
+  referencesLinks: string;
+  venueAddress: string;
+  accessTime: string;
+  onSiteContactName: string;
+  onSiteContactPhone: string;
+  dressCodeOrNotes: string;
+  updatedAt?: string;
+}
+
+export const PRODUCTION_STAGES: Array<{
+  id: ProductionStageId;
+  label: string;
+  shortLabel: string;
+  description: string;
+}> = [
+  {
+    id: "pre_producao",
+    label: "Pré-produção & Alinhamento",
+    shortLabel: "Pré-produção",
+    description: "Briefing, roteiro, visita técnica e definição de cronograma.",
+  },
+  {
+    id: "captacao",
+    label: "Captação / Diária de Gravação",
+    shortLabel: "Captação",
+    description: "Execução fotográfica e audiovisual 4K no local.",
+  },
+  {
+    id: "edicao",
+    label: "Edição, Curadoria & Color Grading",
+    shortLabel: "Edição",
+    description: "Seleção autoral, tratamento de cor e finalização de áudio.",
+  },
+  {
+    id: "revisao",
+    label: "Revisão & Aprovação do Cliente",
+    shortLabel: "Revisão",
+    description: "Prévias disponibilizadas no portal para validação final.",
+  },
+  {
+    id: "entregue",
+    label: "Projeto Entregue em 4K",
+    shortLabel: "Entregue",
+    description: "Arquivos finais em alta resolução liberados e aprovados.",
+  },
+];
+
+export const MEETING_TYPES: Array<{ id: MeetingType; label: string }> = [
+  { id: "alinhamento", label: "Alinhamento de Roteiro & Briefing" },
+  { id: "visita_tecnica", label: "Visita Técnica ao Local" },
+  { id: "revisao", label: "Revisão de Corte / Galeria" },
+  { id: "outro", label: "Outra Reunião Comercial" },
+];
+
+export const DELIVERABLE_TYPES: Array<{ id: DeliverableType; label: string }> = [
+  { id: "galeria_fotos", label: "Galeria de Fotos" },
+  { id: "video_4k", label: "Vídeo 4K / Reels" },
+  { id: "raw_drive", label: "Pasta Drive / Frame.io" },
+  { id: "roteiro", label: "Roteiro / Cronograma" },
+  { id: "outro", label: "Outro Material" },
+];
 
 export const BRAND_DEFAULTS = {
   name: "ÚLTIMO QUADRO",
@@ -146,6 +270,11 @@ export interface Lead {
   lastRadarAlertAt?: string | null;
   contractDocument?: ContractDocumentRef | null;
   postSaleChecklist: PostSaleChecklistItem[];
+  portalPin?: string | null;
+  productionStage?: ProductionStageId;
+  meetings?: ClientMeeting[];
+  deliverables?: ClientDeliverable[];
+  briefing?: ClientBriefing | null;
   ultimaInteracaoEm: string;
   createdAt: string;
   updatedAt: string;

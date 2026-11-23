@@ -16,10 +16,12 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // Keep client-facing proposal routes and auth endpoints publicly accessible
+  // Keep client-facing proposal/portal routes and auth endpoints publicly accessible
   if (
     pathname.startsWith("/proposta/") ||
+    pathname.startsWith("/portal/") ||
     pathname.startsWith("/api/proposals/") ||
+    pathname.startsWith("/api/portal/") ||
     pathname.startsWith("/api/auth/")
   ) {
     return NextResponse.next();

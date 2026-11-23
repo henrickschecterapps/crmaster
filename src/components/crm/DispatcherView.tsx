@@ -141,7 +141,7 @@ export function DispatcherView({
       typeof window !== "undefined"
         ? window.location.origin
         : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    return `${origin}/proposta/${selectedLead.id}`;
+    return `${origin}/portal/${selectedLead.id}`;
   }, [selectedLead]);
 
   useEffect(() => {

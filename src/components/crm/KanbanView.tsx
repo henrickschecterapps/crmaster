@@ -136,12 +136,12 @@ export function KanbanView({
   const handleCopyProposalUrl = async (lead: Lead) => {
     const origin =
       typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/proposta/${lead.id}`;
+    const url = `${origin}/portal/${lead.id}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedLeadId(lead.id);
       onNotify?.(
-        `Link da proposta de ${lead.companyName} copiado.`,
+        `Link do Portal do Cliente de ${lead.companyName} copiado.`,
         "info"
       );
       setTimeout(() => {

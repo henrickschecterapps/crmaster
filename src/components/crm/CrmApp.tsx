@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Clock,
@@ -65,7 +66,14 @@ interface CrmAppProps {
 const LOCAL_MIRROR_KEY = "crmaster_store_mirror_v1";
 
 export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const openClientPage = useCallback(
+    (lead: Lead) => {
+      router.push(`/clientes/${lead.id}`);
+    },
+    [router]
+  );
 
   const [store, setStore] = useState<CrmStoreData>(initialData);
   const [status, setStatus] = useState<IntegrationStatus>(initialStatus);
@@ -822,7 +830,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             partners={store.partners}
             settings={store.settings}
             onUpdateMonthlyGoal={handleUpdateMonthlyGoal}
-            onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+            onSelectLead={openClientPage}
             onJumpToFunnel={(funnel) => {
               setActiveFunnel(funnel);
               setActiveModule("kanban");
@@ -837,7 +845,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             activeFunnel={activeFunnel}
             onChangeFunnel={setActiveFunnel}
             onMoveStage={handleMoveStage}
-            onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+            onSelectLead={openClientPage}
             onQuickDispatch={(lead) => {
               setDispatchLeadId(lead.id);
               setActiveModule("dispatcher");
@@ -895,7 +903,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             onUpdateLead={async (leadId, patch, interaction, touch) => {
               await handleUpdateLead(leadId, patch, interaction, touch);
             }}
-            onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+            onSelectLead={openClientPage}
             onNotify={notify}
           />
         )}
@@ -947,7 +955,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
           leads={store.leads}
           theme={theme}
           onClose={() => setShowCommandPalette(false)}
-          onSelectLead={(lead) => setSelectedLeadId(lead.id)}
+          onSelectLead={openClientPage}
           onOpenNewLead={() => openQuickNewLead(activeFunnel)}
           onNavigateModule={(mod, funnel) => {
             if (funnel) setActiveFunnel(funnel);

@@ -105,6 +105,11 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
         : lead.stage === "fechado"
         ? buildPostSaleChecklist(normalizedFunnel, lead.updatedAt)
         : [],
+      portalPin: lead.portalPin ?? null,
+      productionStage: lead.productionStage ?? "pre_producao",
+      meetings: Array.isArray(lead.meetings) ? lead.meetings : [],
+      deliverables: Array.isArray(lead.deliverables) ? lead.deliverables : [],
+      briefing: lead.briefing ?? null,
       interactions: Array.isArray(lead.interactions) ? lead.interactions : [],
     };
   });
