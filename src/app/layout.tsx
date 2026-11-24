@@ -1,20 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PwaManager } from "@/components/PwaManager";
 
-const montserrat = Montserrat({
-  subsets: ["latin"],
+const montserrat = localFont({
+  src: "./fonts/montserrat-latin.woff2",
   variable: "--font-montserrat",
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  weight: "300 900",
+  style: "normal",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin.woff2",
   variable: "--font-mono",
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
+  style: "normal",
   display: "swap",
 });
 

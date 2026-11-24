@@ -7,8 +7,10 @@ export async function sendEmailNotification(params: {
   text: string;
   html: string;
 }): Promise<{ ok: boolean; provider?: string; error?: string }> {
-  const gmailUser = process.env.GMAIL_USER?.trim();
-  const gmailPass = process.env.GMAIL_APP_PASSWORD?.trim();
+  const gmailUser = process.env.GMAIL_USER?.trim().replace(/^["']|["']$/g, "");
+  const gmailPass = process.env.GMAIL_APP_PASSWORD?.trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\s+/g, "");
   const resendKey = process.env.RESEND_API_KEY?.trim();
   const resendFrom =
     process.env.RESEND_FROM_EMAIL?.trim() ||

@@ -60,8 +60,10 @@ async function sendViaGmailSmtp(params: {
   text: string;
   html: string;
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
-  const user = process.env.GMAIL_USER?.trim();
-  const pass = process.env.GMAIL_APP_PASSWORD?.trim();
+  const user = process.env.GMAIL_USER?.trim().replace(/^["']|["']$/g, "");
+  const pass = process.env.GMAIL_APP_PASSWORD?.trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\s+/g, "");
   if (!user || !pass) return { ok: false, error: "Gmail SMTP não configurado." };
 
   try {
