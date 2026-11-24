@@ -351,7 +351,7 @@ export function ProposalClient({
     const addonNames = selectedAddons.map((a) => a.name);
     const addonsText =
       addonNames.length > 0 ? ` + ${addonNames.join(", ")}` : "";
-    const msg = `Olá Henrique (ÚLTIMO QUADRO)! Estou vendo a proposta interativa da *${lead.companyName}* (${currentVertical.title}: pacote *${selectedPackage.name}*${addonsText} · ${formatCurrencyExact(totalValue)}) e gostaria de alinhar uma dúvida rápida.`;
+    const msg = `Olá, equipe da ÚLTIMO QUADRO! Estou olhando a proposta da *${lead.companyName}* (${currentVertical.title}: *${selectedPackage.name}*${addonsText} · ${formatCurrencyExact(totalValue)}) e gostaria de alinhar um detalhe.`;
     return buildWhatsappUrl(studioWhatsapp, msg);
   }, [
     lead.companyName,

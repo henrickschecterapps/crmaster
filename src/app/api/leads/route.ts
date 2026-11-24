@@ -3,9 +3,11 @@ import {
   createLead,
   createLeadsBulk,
   CreateLeadInput,
+  getSettingsOnly,
   getStoreData,
 } from "@/lib/repository";
 import { requireAdminApiAuth } from "@/lib/apiGuard";
+import { emitOutgoingWebhook } from "@/lib/automationHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,17 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await createLead(input);
+    if (!result.duplicate && result.lead) {
+      const settings = await getSettingsOnly().catch(() => null);
+      await emitOutgoingWebhook(settings, "lead.created", {
+        leadId: result.lead.id,
+        companyName: result.lead.companyName,
+        contactName: result.lead.contactName,
+        funnel: result.lead.funnel,
+        stage: result.lead.stage,
+        estimatedValue: result.lead.estimatedValue,
+      }).catch(() => {});
+    }
     return NextResponse.json(result, { status: result.duplicate ? 200 : 201 });
   } catch {
     return NextResponse.json(

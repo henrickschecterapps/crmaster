@@ -6,8 +6,10 @@ import {
   Bell,
   BellRing,
   Bot,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   Database,
   Download,
   Eye,
@@ -18,14 +20,20 @@ import {
   Play,
   QrCode,
   RefreshCw,
+  RotateCcw,
   Save,
   ShieldCheck,
+  Sliders,
   Smartphone,
   Upload,
+  Webhook,
+  XCircle,
 } from "lucide-react";
 import { STUDIO_SKINS, useTheme } from "@/components/ThemeProvider";
 import {
+  AutomationSettings,
   CronExecutionLog,
+  DEFAULT_AUTOMATION_SETTINGS,
   IntegrationStatus,
   Lead,
   StudioSettings,
@@ -48,6 +56,8 @@ interface CronRunReport {
   scannedEligible: number;
   triggeredCount: number;
   whatsappQueueScheduled: number;
+  lifecycleTriggered?: number;
+  skippedOutsideBusinessHours?: boolean;
   actions: Array<{
     leadId: string;
     companyName: string;
@@ -88,8 +98,16 @@ export function SettingsView({
   const [pixCity, setPixCity] = useState(settings.pixCity || "BELO HORIZONTE");
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [automation, setAutomation] = useState<AutomationSettings>({
+    ...DEFAULT_AUTOMATION_SETTINGS,
+    ...(settings.automation ?? {}),
+  });
 
   const [saving, setSaving] = useState(false);
+  const [savingAutomation, setSavingAutomation] = useState(false);
+  const [resettingTemplates, setResettingTemplates] = useState(false);
+  const [copiedUrlKey, setCopiedUrlKey] = useState<string | null>(null);
+  const [actingJobId, setActingJobId] = useState<string | null>(null);
   const [runningCron, setRunningCron] = useState(false);
   const [cronReport, setCronReport] = useState<CronRunReport | null>(null);
   const [cronHistory, setCronHistory] = useState<CronExecutionLog[]>([]);
@@ -262,6 +280,10 @@ export function SettingsView({
     setPixKey(settings.pixKey || "");
     setPixRecipientName(settings.pixRecipientName || "Ultimo Quadro");
     setPixCity(settings.pixCity || "BELO HORIZONTE");
+    setAutomation({
+      ...DEFAULT_AUTOMATION_SETTINGS,
+      ...(settings.automation ?? {}),
+    });
   }, [settings]);
 
   const loadQueue = async () => {
@@ -299,6 +321,7 @@ export function SettingsView({
 
   const eligibleForAutomation = leads.filter(
     (l) =>
+      !l.archived &&
       (l.stage === "contatado" || l.stage === "proposta_aberta") &&
       l.automacaoAtiva &&
       !l.respondeu
@@ -307,6 +330,68 @@ export function SettingsView({
   const pendingQueueCount = queueJobs.filter(
     (j) => j.status === "pendente"
   ).length;
+
+  const appOrigin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://crmaster-alpha.vercel.app";
+
+  const copyHelperUrl = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedUrlKey(key);
+      onNotify("URL copiada para a área de transferência.", "info");
+      setTimeout(() => setCopiedUrlKey(null), 1800);
+    } catch {
+      onNotify("Não foi possível copiar a URL.", "error");
+    }
+  };
+
+  const handleSaveAutomation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingAutomation(true);
+    try {
+      await onUpdateSettings({
+        automation: {
+          ...automation,
+          followupDay1Hours: Math.max(12, Number(automation.followupDay1Hours) || 48),
+          followupDay2Hours: Math.max(
+            Math.max(12, Number(automation.followupDay1Hours) || 48) + 12,
+            Number(automation.followupDay2Hours) || 120
+          ),
+          businessHourStart: Math.min(22, Math.max(0, Number(automation.businessHourStart) || 8)),
+          businessHourEnd: Math.min(23, Math.max(1, Number(automation.businessHourEnd) || 19)),
+          outgoingWebhookUrl: (automation.outgoingWebhookUrl || "").trim(),
+          outgoingWebhookSecret: (automation.outgoingWebhookSecret || "").trim(),
+          whatsappWebhookToken: (automation.whatsappWebhookToken || "").trim(),
+        },
+      });
+      onNotify("Regras de automação e ciclo de vida salvas.", "success");
+    } finally {
+      setSavingAutomation(false);
+    }
+  };
+
+  const handleResetDefaultTemplates = async () => {
+    setResettingTemplates(true);
+    try {
+      const res = await fetch("/api/templates/reset-defaults", {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onNotify(json.error || "Falha ao atualizar templates padrão.", "error");
+        return;
+      }
+      await onRefreshStore();
+      onNotify(
+        `${json.updated ?? 0} templates padrão da ÚLTIMO QUADRO atualizados (seus scripts customizados foram preservados).`,
+        "success"
+      );
+    } finally {
+      setResettingTemplates(false);
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -398,7 +483,7 @@ export function SettingsView({
       const res = await fetch("/api/whatsapp/queue", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force: true }),
+        body: JSON.stringify({ forceAll: true }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -406,14 +491,43 @@ export function SettingsView({
         return;
       }
       setQueueJobs(json.jobs || []);
+      const count = Number(json.processedCount ?? json.processed ?? 0);
       onNotify(
-        json.processed > 0
-          ? `${json.processed} disparo(s) pendente(s) processados na fila.`
+        count > 0
+          ? `${count} disparo(s) pendente(s) processados na fila.`
           : "Nenhum disparo pendente pronto para envio.",
         "success"
       );
     } finally {
       setProcessingQueue(false);
+    }
+  };
+
+  const handleQueueJobAction = async (
+    jobId: string,
+    action: "retry" | "cancel"
+  ) => {
+    setActingJobId(jobId);
+    try {
+      const res = await fetch("/api/whatsapp/queue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onNotify(json.error || "Não foi possível atualizar o item da fila.", "error");
+        return;
+      }
+      setQueueJobs(json.jobs || []);
+      onNotify(
+        action === "retry"
+          ? "Item recolocado na fila para reenvio."
+          : "Item cancelado e removido da fila.",
+        "info"
+      );
+    } finally {
+      setActingJobId(null);
     }
   };
 
@@ -498,7 +612,7 @@ export function SettingsView({
               </p>
               <p className="text-[var(--text-secondary)] leading-relaxed">
                 {integrationStatus.adminAuthEnabled
-                  ? "Sessão assinada por cookie HttpOnly com expiração e limite de 5 tentativas por IP ativa. As propostas públicas (/proposta/[id]) permanecem liberadas para clientes."
+                  ? "Sessão assinada por cookie HttpOnly com expiração e limite de 5 tentativas por IP ativa. Os portais públicos (/portal/[id]) permanecem liberados para clientes."
                   : "Cadastre uma senha no formulário abaixo (salva criptografada no Firebase) ou defina CRM_ADMIN_PASSWORD na Vercel para ativar o login."}
               </p>
             </div>
@@ -547,20 +661,36 @@ export function SettingsView({
                   Motor de Follow-up Automático (Cron diário às 09:00 BRT)
                 </h2>
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  Varre leads em <strong>Contatado</strong> e{" "}
+                  Varre leads ativos (não arquivados) em <strong>Contatado</strong> e{" "}
                   <strong>Proposta Aberta</strong> com{" "}
                   <code className="font-mono-num text-[var(--accent-text)]">
                     automacao_ativa = true
                   </code>
-                  : Dia 2 (Follow-up 1) e Dia 5 (Follow-up 2 + tag{" "}
-                  <em>Último Toque</em>). Desliga automaticamente em{" "}
-                  <em>Sinal Pago</em>, <em>Fechado</em> ou{" "}
-                  <em>Respondeu</em>.
+                  : Etapa 1 ({automation.followupDay1Hours}h) e Etapa 2 ({automation.followupDay2Hours}h + tag{" "}
+                  <em>Último Toque</em>), além de lembretes de reunião, briefing, validade, sinal 50%, pós-entrega e resumo matinal (horário de Brasília).
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleResetDefaultTemplates}
+                disabled={resettingTemplates}
+                className="btn-ghost inline-flex min-h-[42px] items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-xs font-semibold disabled:opacity-50"
+                title="Atualiza os scripts padrão (tpl-*) no banco com a copy revisada da ÚLTIMO QUADRO sem apagar seus scripts personalizados"
+              >
+                <RotateCcw
+                  className={cn(
+                    "h-3.5 w-3.5 text-[var(--accent-text)]",
+                    resettingTemplates && "animate-spin"
+                  )}
+                  aria-hidden="true"
+                />
+                {resettingTemplates
+                  ? "Atualizando..."
+                  : "Atualizar Scripts Padrão"}
+              </button>
               <button
                 type="button"
                 onClick={() => handleRunCron(true)}
@@ -619,13 +749,22 @@ export function SettingsView({
                 <span className="font-bold text-[var(--text-primary)]">
                   Resultado da{" "}
                   {cronReport.dryRun ? "Simulação (Dry-Run)" : "Execução Real"}:{" "}
-                  {cronReport.triggeredCount} disparo(s) de{" "}
-                  {cronReport.scannedEligible} elegíveis
+                  {cronReport.triggeredCount} ação(ões) ({cronReport.actions.length} follow-up(s)
+                  {cronReport.lifecycleTriggered
+                    ? ` + ${cronReport.lifecycleTriggered} ciclo de vida`
+                    : ""}
+                  ) de {cronReport.scannedEligible} elegíveis
                 </span>
                 <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
                   {formatDateTimeBr(cronReport.executedAt)}
                 </span>
               </div>
+
+              {cronReport.skippedOutsideBusinessHours && !cronReport.dryRun && (
+                <p className="rounded-lg badge-warning px-3 py-2 text-[11px] font-semibold">
+                  Fora da janela comercial configurada ({automation.businessHourStart}h às {automation.businessHourEnd}h BRT). Disparos reais foram adiados para proteger a experiência do cliente.
+                </p>
+              )}
 
               {cronReport.actions.length === 0 ? (
                 <p className="text-xs text-[var(--text-secondary)]">
@@ -730,6 +869,414 @@ export function SettingsView({
             )}
           </div>
           </section>
+        </div>
+
+        {/* Card 1.5: Central No-Code de Automações, Ciclo de Vida & Webhooks */}
+        <div
+          className="double-bezel stagger-in xl:col-span-12"
+          style={{ ["--stagger" as string]: 1 }}
+        >
+          <form
+            onSubmit={handleSaveAutomation}
+            className="double-bezel-core p-6 space-y-6"
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                  <Sliders className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-[var(--text-primary)]">
+                    Central No-Code de Automações, Ciclo de Vida &amp; Webhooks
+                  </h2>
+                  <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                    Controle prazos, canal de disparo, horário comercial (BH/Brasília), 8 gatilhos de relacionamento e integração com n8n, Make ou Zapier sem alterar código.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={savingAutomation}
+                className="btn-accent inline-flex min-h-[42px] items-center gap-2 self-start rounded-lg pl-4 pr-2 py-1.5 text-xs font-bold disabled:opacity-60"
+              >
+                <span>
+                  {savingAutomation ? "Salvando..." : "Salvar Regras de Automação"}
+                </span>
+                <span className="btn-icon-badge">
+                  <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+              {/* Cadence & Business Hours */}
+              <div className="lg:col-span-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
+                  1. Cadência Comercial &amp; Janela BRT
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="auto-day1"
+                      className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                    >
+                      Follow-up 1 (horas)
+                    </label>
+                    <input
+                      id="auto-day1"
+                      type="number"
+                      min={12}
+                      max={240}
+                      value={automation.followupDay1Hours}
+                      onChange={(e) =>
+                        setAutomation((prev) => ({
+                          ...prev,
+                          followupDay1Hours: Number(e.target.value) || 48,
+                        }))
+                      }
+                      className="input-field min-h-[40px] w-full rounded-lg px-3 py-2 font-mono-num text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="auto-day2"
+                      className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                    >
+                      Follow-up 2 (horas)
+                    </label>
+                    <input
+                      id="auto-day2"
+                      type="number"
+                      min={24}
+                      max={480}
+                      value={automation.followupDay2Hours}
+                      onChange={(e) =>
+                        setAutomation((prev) => ({
+                          ...prev,
+                          followupDay2Hours: Number(e.target.value) || 120,
+                        }))
+                      }
+                      className="input-field min-h-[40px] w-full rounded-lg px-3 py-2 font-mono-num text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="auto-channel"
+                    className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                  >
+                    Canal dos Follow-ups Automáticos
+                  </label>
+                  <select
+                    id="auto-channel"
+                    value={automation.followupChannel}
+                    onChange={(e) =>
+                      setAutomation((prev) => ({
+                        ...prev,
+                        followupChannel: e.target.value as AutomationSettings["followupChannel"],
+                      }))
+                    }
+                    className="input-field min-h-[40px] w-full rounded-lg px-3 py-2 text-xs font-medium"
+                  >
+                    <option value="ambos">E-mail + Fila WhatsApp (Recomendado)</option>
+                    <option value="email">Somente E-mail (0% risco de ban)</option>
+                    <option value="whatsapp">Somente Fila WhatsApp</option>
+                  </select>
+                </div>
+
+                <label className="flex items-start gap-2.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={automation.businessHoursOnly}
+                    onChange={(e) =>
+                      setAutomation((prev) => ({
+                        ...prev,
+                        businessHoursOnly: e.target.checked,
+                      }))
+                    }
+                    className="mt-0.5 h-4 w-4 rounded accent-[var(--accent)]"
+                  />
+                  <span className="text-xs leading-snug text-[var(--text-secondary)]">
+                    <strong className="text-[var(--text-primary)] block">
+                      Respeitar horário comercial (BH / BRT)
+                    </strong>
+                    Bloqueia envios de madrugada, domingos e sábado após 13h.
+                  </span>
+                </label>
+
+                {automation.businessHoursOnly && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="auto-hour-start"
+                        className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                      >
+                        Início (hora)
+                      </label>
+                      <input
+                        id="auto-hour-start"
+                        type="number"
+                        min={6}
+                        max={20}
+                        value={automation.businessHourStart}
+                        onChange={(e) =>
+                          setAutomation((prev) => ({
+                            ...prev,
+                            businessHourStart: Number(e.target.value) || 8,
+                          }))
+                        }
+                        className="input-field min-h-[38px] w-full rounded-lg px-3 py-1.5 font-mono-num text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="auto-hour-end"
+                        className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                      >
+                        Fim (hora)
+                      </label>
+                      <input
+                        id="auto-hour-end"
+                        type="number"
+                        min={10}
+                        max={23}
+                        value={automation.businessHourEnd}
+                        onChange={(e) =>
+                          setAutomation((prev) => ({
+                            ...prev,
+                            businessHourEnd: Number(e.target.value) || 19,
+                          }))
+                        }
+                        className="input-field min-h-[38px] w-full rounded-lg px-3 py-1.5 font-mono-num text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 8 Lifecycle Triggers */}
+              <div className="lg:col-span-8 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
+                  2. Gatilhos Inteligentes de Ciclo de Vida (Anti-Duplicação Ativa)
+                </p>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {(
+                    [
+                      {
+                        key: "enableApprovalClientEmail",
+                        title: "Confirmação ao Aprovar Proposta",
+                        desc: "Envia e-mail elegante ao cliente com link do Portal e próximos passos.",
+                      },
+                      {
+                        key: "enableMeetingReminder24h",
+                        title: "Lembrete de Reunião (24h antes)",
+                        desc: "Avisa o cliente sobre reuniões confirmadas no dia seguinte.",
+                      },
+                      {
+                        key: "enableBriefingReminder48h",
+                        title: "Lembrete de Briefing (48h antes)",
+                        desc: "Pede endereço, horário e referências se o briefing ainda estiver vazio.",
+                      },
+                      {
+                        key: "enableProposalExpiring24h",
+                        title: "Proposta Vencendo (24h antes)",
+                        desc: "Lembra de forma consultiva quando a validade da proposta está próxima.",
+                      },
+                      {
+                        key: "enableSignalReminder24h",
+                        title: "Lembrete Gentil do Sinal 50%",
+                        desc: "Envia link do Pix no Portal 24h após aprovação se ainda pendente.",
+                      },
+                      {
+                        key: "enableReviewRequest3d",
+                        title: "Pedido de Avaliação (3 dias pós-4K)",
+                        desc: "Convida o cliente a deixar depoimento após material entregue.",
+                      },
+                      {
+                        key: "enableRecurrenceRadar60d",
+                        title: "Radar de Recorrência (60 dias)",
+                        desc: "Alerta interno no resumo matinal para reofertar nova campanha.",
+                      },
+                      {
+                        key: "enableMorningDigest",
+                        title: "Resumo Matinal do Estúdio",
+                        desc: "Envia E-mail + Push diário com tarefas, diárias e pendências do Portal.",
+                      },
+                    ] as const
+                  ).map((item) => (
+                    <label
+                      key={item.key}
+                      className="flex items-start gap-2.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] p-3 cursor-pointer hover:border-[var(--border-strong)] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(automation[item.key])}
+                        onChange={(e) =>
+                          setAutomation((prev) => ({
+                            ...prev,
+                            [item.key]: e.target.checked,
+                          }))
+                        }
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded accent-[var(--accent)]"
+                      />
+                      <span className="text-xs leading-snug">
+                        <strong className="block text-[var(--text-primary)]">
+                          {item.title}
+                        </strong>
+                        <span className="text-[11px] text-[var(--text-secondary)]">
+                          {item.desc}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Webhooks & External Triggers */}
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Webhook className="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
+                  3. Webhooks Bidirecionais (n8n / Make / Zapier + Resposta Automática WhatsApp)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
+                <div>
+                  <label
+                    htmlFor="auto-out-webhook"
+                    className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                  >
+                    Webhook de Saída (n8n / Make / Zapier)
+                  </label>
+                  <input
+                    id="auto-out-webhook"
+                    type="url"
+                    value={automation.outgoingWebhookUrl || ""}
+                    onChange={(e) =>
+                      setAutomation((prev) => ({
+                        ...prev,
+                        outgoingWebhookUrl: e.target.value,
+                      }))
+                    }
+                    placeholder="https://hook.us1.make.com/..."
+                    className="input-field min-h-[40px] w-full rounded-lg px-3 py-2 font-mono-num text-xs"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="auto-out-secret"
+                    className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                  >
+                    Segredo Header (X-UQ-Secret)
+                  </label>
+                  <input
+                    id="auto-out-secret"
+                    type="password"
+                    value={automation.outgoingWebhookSecret || ""}
+                    onChange={(e) =>
+                      setAutomation((prev) => ({
+                        ...prev,
+                        outgoingWebhookSecret: e.target.value,
+                      }))
+                    }
+                    placeholder="Opcional para validar origem"
+                    className="input-field min-h-[40px] w-full rounded-lg px-3 py-2 font-mono-num text-xs"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="auto-wa-token"
+                    className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1"
+                  >
+                    Token do Webhook de Resposta WA
+                  </label>
+                  <input
+                    id="auto-wa-token"
+                    type="text"
+                    value={automation.whatsappWebhookToken || ""}
+                    onChange={(e) =>
+                      setAutomation((prev) => ({
+                        ...prev,
+                        whatsappWebhookToken: e.target.value,
+                      }))
+                    }
+                    placeholder="Ex: uq-wa-2026"
+                    className="input-field min-h-[40px] w-full rounded-lg px-3 py-2 font-mono-num text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Webhook de Resposta WhatsApp (Pausa Automação sozinho)
+                    </p>
+                    <p className="truncate font-mono-num text-[11px] text-[var(--text-primary)]">
+                      {`${appOrigin}/api/webhooks/whatsapp${
+                        automation.whatsappWebhookToken
+                          ? `?token=${automation.whatsappWebhookToken}`
+                          : ""
+                      }`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyHelperUrl(
+                        "wa-webhook",
+                        `${appOrigin}/api/webhooks/whatsapp${
+                          automation.whatsappWebhookToken
+                            ? `?token=${automation.whatsappWebhookToken}`
+                            : ""
+                        }`
+                      )
+                    }
+                    className="btn-ghost shrink-0 inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold"
+                  >
+                    {copiedUrlKey === "wa-webhook" ? (
+                      <Check className="h-3.5 w-3.5 text-[var(--status-success)]" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                    Copiar
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Tick Anti-Ban da Fila WhatsApp (Cron externo 5 em 5 min)
+                    </p>
+                    <p className="truncate font-mono-num text-[11px] text-[var(--text-primary)]">
+                      {`${appOrigin}/api/whatsapp/queue/tick?token=SEU_CRON_SECRET`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyHelperUrl(
+                        "queue-tick",
+                        `${appOrigin}/api/whatsapp/queue/tick?token=SEU_CRON_SECRET`
+                      )
+                    }
+                    className="btn-ghost shrink-0 inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold"
+                  >
+                    {copiedUrlKey === "queue-tick" ? (
+                      <Check className="h-3.5 w-3.5 text-[var(--status-success)]" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                    Copiar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
         </div>
 
         {/* Card 2: Settings Form */}
@@ -1130,6 +1677,30 @@ export function SettingsView({
                         <p className="text-[11px] text-[var(--status-danger)]">
                           {job.error}
                         </p>
+                      )}
+                      {(job.status === "erro" || job.status === "pendente") && (
+                        <div className="flex items-center gap-2 pt-1">
+                          {job.status === "erro" && (
+                            <button
+                              type="button"
+                              disabled={actingJobId === job.id}
+                              onClick={() => handleQueueJobAction(job.id, "retry")}
+                              className="btn-ghost inline-flex min-h-[30px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50"
+                            >
+                              <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                              Reenviar
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={actingJobId === job.id}
+                            onClick={() => handleQueueJobAction(job.id, "cancel")}
+                            className="btn-ghost inline-flex min-h-[30px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold text-[var(--status-danger)] disabled:opacity-50"
+                          >
+                            <XCircle className="h-3 w-3" aria-hidden="true" />
+                            Cancelar
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}

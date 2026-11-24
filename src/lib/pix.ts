@@ -18,7 +18,7 @@ function sanitizeTxId(txId: string): string {
     .replace(/[^A-Za-z0-9]/g, "")
     .toUpperCase()
     .slice(0, 25);
-  return cleaned || "HMSTUDIO01";
+  return cleaned || "UQSTUDIO01";
 }
 
 function tlv(id: string, value: string): string {

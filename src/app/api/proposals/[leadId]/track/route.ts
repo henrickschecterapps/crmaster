@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStoreData, trackProposalView, updateLead } from "@/lib/repository";
+import { getLeadById, getSettingsOnly, trackProposalView, updateLead } from "@/lib/repository";
 import { buildWhatsappUrl, formatCurrency } from "@/lib/utils";
 import { sendEmailNotification } from "@/lib/email";
 import { sendAdminPushNotification } from "@/lib/webPush";
+import {
+  emitOutgoingWebhook,
+  getPublicAppUrl,
+} from "@/lib/automationHelpers";
+import {
+  ADMIN_SESSION_COOKIE,
+  verifyAdminSessionToken,
+} from "@/lib/auth";
 import {
   resolveWhatsappConfig,
   sendWhatsappViaApi,
@@ -54,18 +62,39 @@ function buildRadarEmailHtml(params: {
 }
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ leadId: string }> }
 ) {
   const { leadId } = await context.params;
-  const store = await getStoreData();
-  const previousLead = store.leads.find((l) => l.id === leadId);
+  const [previousLead, settings] = await Promise.all([
+    getLeadById(leadId),
+    getSettingsOnly(),
+  ]);
 
   if (!previousLead) {
     return NextResponse.json(
       { error: "Proposta não encontrada." },
       { status: 404 }
     );
+  }
+
+  // Prevent false Radar alerts & false view counts when the Admin tests "Ver como Cliente"
+  const adminToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (adminToken) {
+    const isAdminPreview = await verifyAdminSessionToken(
+      adminToken,
+      settings,
+      true
+    );
+    if (isAdminPreview) {
+      return NextResponse.json({
+        tracked: false,
+        adminPreviewIgnored: true,
+        visualizadaEm: previousLead.visualizadaEm,
+        visualizacoesProposta: previousLead.visualizacoesProposta,
+        stage: previousLead.stage,
+      });
+    }
   }
 
   const lastAlertMs = previousLead.lastRadarAlertAt
@@ -87,22 +116,20 @@ export async function POST(
 
   if (!isDebounced) {
     const adminEmail = (
-      store.settings.adminEmail ||
+      settings.adminEmail ||
       process.env.ADMIN_EMAIL ||
       ""
     ).trim();
-    const appUrl = (
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    ).replace(/\/+$/, "");
+    const appUrl = getPublicAppUrl();
 
-    const clientWaMsg = `Olá ${updated.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO. Vi que você está conferindo a proposta da ${updated.companyName}. Posso tirar alguma dúvida ou personalizar algum detalhe para vocês?`;
+    const clientWaMsg = `Olá ${updated.contactName}, tudo bem? Aqui é da ÚLTIMO QUADRO. Vi que você deu uma olhada no portal da ${updated.companyName}. Posso ajudar com alguma dúvida ou ajustar algum detalhe do formato para vocês?`;
     const clientWhatsappUrl = buildWhatsappUrl(updated.phone, clientWaMsg);
 
     if (adminEmail) {
       const emailRes = await sendEmailNotification({
         to: adminEmail,
-        subject: `[RADAR] ${updated.companyName} abriu seu Portal agora`,
-        text: `${updated.contactName} (${updated.companyName}) acabou de abrir o Portal/Proposta (visualização nº ${updated.visualizacoesProposta}, valor ${formatCurrency(updated.estimatedValue)}). Abrir cliente: ${appUrl}/clientes/${updated.id}`,
+        subject: `[RADAR] ${updated.companyName} abriu o Portal agora`,
+        text: `${updated.contactName} (${updated.companyName}) acabou de abrir o Portal (visualização nº ${updated.visualizacoesProposta}, valor ${formatCurrency(updated.estimatedValue)}). Abrir cliente: ${appUrl}/clientes/${updated.id}`,
         html: buildRadarEmailHtml({
           companyName: updated.companyName,
           contactName: updated.contactName,
@@ -122,7 +149,14 @@ export async function POST(
       tag: `radar-${updated.id}`,
     }).catch(() => {});
 
-    const waConfig = resolveWhatsappConfig(store.settings);
+    await emitOutgoingWebhook(settings, "proposal.viewed", {
+      leadId: updated.id,
+      companyName: updated.companyName,
+      contactName: updated.contactName,
+      totalViews: updated.visualizacoesProposta,
+    });
+
+    const waConfig = resolveWhatsappConfig(settings);
     const adminWhatsapp =
       process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5531983997195";
 

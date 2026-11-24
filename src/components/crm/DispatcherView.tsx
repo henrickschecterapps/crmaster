@@ -3,8 +3,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
+  Bot,
   Calendar,
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   Edit3,
@@ -13,11 +15,14 @@ import {
   Mail,
   MessageCircle,
   Plus,
+  RotateCcw,
   Send,
+  SkipForward,
   Trash2,
   X,
 } from "lucide-react";
 import {
+  DEFAULT_AUTOMATION_SETTINGS,
   FUNNELS,
   IntegrationStatus,
   InteractionType,
@@ -33,6 +38,7 @@ import {
   getStageLabel,
   interpolateTemplate,
 } from "@/lib/utils";
+import { buildContextualFollowupMessage } from "@/lib/automationHelpers";
 
 interface DispatcherViewProps {
   leads: Lead[];
@@ -54,6 +60,7 @@ interface DispatcherViewProps {
   ) => Promise<ScriptTemplate>;
   onDeleteTemplate: (templateId: string) => Promise<void>;
   onUpdateNextDate: (nextDate: string) => Promise<void>;
+  onRefreshStore?: () => Promise<void>;
   onNotify: (message: string, tone?: "success" | "info" | "error") => void;
 }
 
@@ -75,10 +82,19 @@ export function DispatcherView({
   onSaveTemplate,
   onDeleteTemplate,
   onUpdateNextDate,
+  onRefreshStore,
   onNotify,
 }: DispatcherViewProps) {
+  const activeLeads = useMemo(
+    () => leads.filter((l) => !l.archived),
+    [leads]
+  );
+
+  const [viewMode, setViewMode] = useState<"dispatcher" | "assisted">(
+    "dispatcher"
+  );
   const [selectedLeadId, setSelectedLeadId] = useState<string>(
-    initialLeadId || leads[0]?.id || ""
+    initialLeadId || activeLeads[0]?.id || leads[0]?.id || ""
   );
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
     templates[0]?.id || ""
@@ -90,10 +106,26 @@ export function DispatcherView({
   const [customSubject, setCustomSubject] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [resettingTemplates, setResettingTemplates] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
   const [batchLeadIds, setBatchLeadIds] = useState<string[]>([]);
   const [enqueueingBatch, setEnqueueingBatch] = useState(false);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(
+    null
+  );
+
+  // Assisted 1-Click Follow-up Session state
+  const [includeUpcomingFollowups, setIncludeUpcomingFollowups] =
+    useState(false);
+  const [skippedSessionIds, setSkippedSessionIds] = useState<string[]>([]);
+  const [assistedDrafts, setAssistedDrafts] = useState<Record<string, string>>(
+    {}
+  );
+  const [assistedAiLoadingId, setAssistedAiLoadingId] = useState<string | null>(
+    null
+  );
+  const [assistedSendingId, setAssistedSendingId] = useState<string | null>(
     null
   );
 
@@ -123,8 +155,12 @@ export function DispatcherView({
   }, [initialLeadId]);
 
   const selectedLead = useMemo(
-    () => leads.find((l) => l.id === selectedLeadId) ?? leads[0] ?? null,
-    [leads, selectedLeadId]
+    () =>
+      leads.find((l) => l.id === selectedLeadId) ??
+      activeLeads[0] ??
+      leads[0] ??
+      null,
+    [leads, activeLeads, selectedLeadId]
   );
 
   const selectedTemplate = useMemo(
@@ -135,14 +171,83 @@ export function DispatcherView({
     [templates, selectedTemplateId]
   );
 
+  const appOrigin = useMemo(() => {
+    if (typeof window !== "undefined") return window.location.origin;
+    const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (envUrl && !envUrl.includes("localhost")) {
+      return envUrl.replace(/\/+$/, "");
+    }
+    return "https://crmaster-alpha.vercel.app";
+  }, []);
+
   const proposalUrl = useMemo(() => {
     if (!selectedLead) return "";
-    const origin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    return `${origin}/portal/${selectedLead.id}`;
-  }, [selectedLead]);
+    return `${appOrigin}/portal/${selectedLead.id}`;
+  }, [selectedLead, appOrigin]);
+
+  const autoCfg = useMemo(
+    () => ({
+      ...DEFAULT_AUTOMATION_SETTINGS,
+      ...(settings.automation ?? {}),
+    }),
+    [settings.automation]
+  );
+
+  const assistedQueue = useMemo(() => {
+    const nowMs = Date.now();
+    return activeLeads
+      .filter(
+        (l) =>
+          (l.stage === "contatado" || l.stage === "proposta_aberta") &&
+          l.automacaoAtiva &&
+          !l.respondeu &&
+          !skippedSessionIds.includes(l.id)
+      )
+      .map((lead) => {
+        const lastMs = new Date(lead.ultimaInteracaoEm).getTime();
+        const hoursSince = Math.max(0, Math.round((nowMs - lastMs) / (1000 * 60 * 60)));
+        const step: "dia_2" | "dia_5" =
+          lead.followupStep >= 1 || hoursSince >= autoCfg.followupDay2Hours
+            ? "dia_5"
+            : "dia_2";
+        const isDue =
+          (step === "dia_2" &&
+            lead.followupStep < 1 &&
+            hoursSince >= autoCfg.followupDay1Hours) ||
+          (step === "dia_5" &&
+            lead.followupStep < 2 &&
+            hoursSince >= autoCfg.followupDay2Hours);
+        const generated = buildContextualFollowupMessage({
+          lead,
+          step,
+          portalUrl: `${appOrigin}/portal/${lead.id}`,
+          nextAvailableDate,
+        });
+        return {
+          lead,
+          hoursSince,
+          step,
+          isDue,
+          defaultSubject: generated.subject,
+          defaultBody: generated.body,
+        };
+      })
+      .filter((item) => (includeUpcomingFollowups ? true : item.isDue))
+      .sort((a, b) => Number(b.isDue) - Number(a.isDue) || b.hoursSince - a.hoursSince);
+  }, [
+    activeLeads,
+    skippedSessionIds,
+    autoCfg.followupDay1Hours,
+    autoCfg.followupDay2Hours,
+    appOrigin,
+    nextAvailableDate,
+    includeUpcomingFollowups,
+  ]);
+
+  const dueFollowupsCount = useMemo(
+    () => assistedQueue.filter((item) => item.isDue).length,
+    [assistedQueue]
+  );
 
   useEffect(() => {
     if (selectedLead) {
@@ -268,6 +373,149 @@ export function DispatcherView({
     }
   };
 
+  const handleGenerateAiMessage = async () => {
+    if (!selectedLead) return;
+    setGeneratingAi(true);
+    try {
+      const res = await fetch("/api/ai/followup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: selectedLead.id,
+          channel: "ambos",
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onNotify(json.error || "Não foi possível gerar sugestão.", "error");
+        return;
+      }
+      if (json.subject) setCustomSubject(json.subject);
+      if (json.body) setCustomMessage(json.body);
+      onNotify(
+        json.source === "gemini"
+          ? "Texto personalizado gerado com Gemini IA."
+          : "Texto contextual da vertical gerado (adicione GEMINI_API_KEY na Vercel para variações com IA).",
+        "success"
+      );
+    } catch {
+      onNotify("Erro ao gerar mensagem inteligente.", "error");
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
+  const handleResetDefaultTemplates = async () => {
+    setResettingTemplates(true);
+    try {
+      const res = await fetch("/api/templates/reset-defaults", {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onNotify(json.error || "Erro ao atualizar scripts padrão.", "error");
+        return;
+      }
+      if (onRefreshStore) await onRefreshStore();
+      onNotify(
+        `${json.updated ?? 0} scripts padrão da ÚLTIMO QUADRO atualizados.`,
+        "success"
+      );
+    } finally {
+      setResettingTemplates(false);
+    }
+  };
+
+  const handleAssistedGenerateAi = async (leadId: string) => {
+    setAssistedAiLoadingId(leadId);
+    try {
+      const res = await fetch("/api/ai/followup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, channel: "whatsapp" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.body) {
+        onNotify(json.error || "Não foi possível gerar variação.", "error");
+        return;
+      }
+      setAssistedDrafts((prev) => ({ ...prev, [leadId]: json.body }));
+      onNotify(
+        json.source === "gemini"
+          ? "Mensagem única gerada via Gemini IA."
+          : "Mensagem contextual pronta para envio.",
+        "info"
+      );
+    } finally {
+      setAssistedAiLoadingId(null);
+    }
+  };
+
+  const handleAssistedSendWhatsapp = async (item: {
+    lead: Lead;
+    step: "dia_2" | "dia_5";
+    defaultBody: string;
+  }) => {
+    const text = (assistedDrafts[item.lead.id] ?? item.defaultBody).trim();
+    if (!text) return;
+    setAssistedSendingId(item.lead.id);
+    try {
+      const waUrl = buildWhatsappUrl(item.lead.phone, text);
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+
+      const nextStep: 1 | 2 = item.step === "dia_5" ? 2 : 1;
+      const nextTags =
+        item.step === "dia_5" && !(item.lead.tags || []).includes("Último Toque")
+          ? [...(item.lead.tags || []), "Último Toque"]
+          : item.lead.tags || [];
+
+      await onUpdateLead(
+        item.lead.id,
+        {
+          followupStep: nextStep,
+          tags: nextTags,
+        },
+        {
+          type: "followup_auto",
+          title:
+            item.step === "dia_5"
+              ? "Follow-up Etapa 2 (Sessão 1-Clique WhatsApp)"
+              : "Follow-up Etapa 1 (Sessão 1-Clique WhatsApp)",
+          description: `Mensagem contextual enviada no Modo Seguro (wa.me) para ${item.lead.contactName}.`,
+        },
+        true
+      );
+      onNotify(
+        `WhatsApp aberto para ${item.lead.companyName} e etapa ${nextStep} registrada.`,
+        "success"
+      );
+    } finally {
+      setAssistedSendingId(null);
+    }
+  };
+
+  const handleAssistedMarkReplied = async (lead: Lead) => {
+    setAssistedSendingId(lead.id);
+    try {
+      await onUpdateLead(
+        lead.id,
+        { respondeu: true, automacaoAtiva: false },
+        {
+          type: "whatsapp",
+          title: "Lead marcado como Respondeu (automação pausada)",
+          description: "Pausado diretamente na Sessão Assistida de Follow-up.",
+        },
+        true
+      );
+      onNotify(
+        `${lead.companyName} marcado como Respondeu. Cadência pausada.`,
+        "info"
+      );
+    } finally {
+      setAssistedSendingId(null);
+    }
+  };
+
   const toggleBatchLead = (id: string) => {
     setBatchLeadIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -285,11 +533,6 @@ export function DispatcherView({
 
     setEnqueueingBatch(true);
     try {
-      const origin =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
       const items = batchLeadIds
         .map((id) => leads.find((l) => l.id === id))
         .filter((l): l is Lead => Boolean(l))
@@ -300,7 +543,7 @@ export function DispatcherView({
           message: interpolateTemplate(selectedTemplate.body, {
             nome_contato: lead.contactName,
             nome_empresa: lead.companyName,
-            link_proposta: `${origin}/proposta/${lead.id}`,
+            link_proposta: `${appOrigin}/portal/${lead.id}`,
             proxima_data_livre: nextAvailableDate,
           }),
         }));
@@ -369,26 +612,212 @@ export function DispatcherView({
           </h1>
         </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            setEditingTemplate({
-              name: "",
-              funnel: "corporativo",
-              channel: "ambos",
-              subject: "Proposta Exclusiva | {{nome_empresa}} | ÚLTIMO QUADRO",
-              body: "Olá {{nome_contato}}, tudo bem?\n\nPreparei uma proposta personalizada da ÚLTIMO QUADRO para a {{nome_empresa}}: {{link_proposta}}\n\nTenho agenda em {{proxima_data_livre}}.",
-            })
-          }
-          className="btn-accent group inline-flex min-h-[40px] items-center gap-2 self-start rounded-lg pl-4 pr-2 py-2 text-xs font-bold"
-        >
-          <span>Novo Script</span>
-          <span className="btn-icon-badge">
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          </span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="dock-shell inline-flex gap-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("dispatcher")}
+              className={cn(
+                "min-h-[36px] rounded-md px-3 text-xs font-semibold transition-colors",
+                viewMode === "dispatcher"
+                  ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+            >
+              Disparador &amp; Scripts
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("assisted")}
+              className={cn(
+                "inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors",
+                viewMode === "assisted"
+                  ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--border-hairline)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+            >
+              <span>Follow-up 1-Clique</span>
+              {dueFollowupsCount > 0 && (
+                <span className="badge-accent rounded-full px-1.5 py-0.5 font-mono-num text-[10px] font-bold">
+                  {dueFollowupsCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setEditingTemplate({
+                name: "",
+                funnel: "corporativo",
+                channel: "ambos",
+                subject: "Proposta Exclusiva | {{nome_empresa}} | ÚLTIMO QUADRO",
+                body: "Olá {{nome_contato}}, tudo bem?\n\nPreparamos os formatos da ÚLTIMO QUADRO para a {{nome_empresa}} neste portal: {{link_proposta}}\n\nTemos disponibilidade próxima de {{proxima_data_livre}}.",
+              })
+            }
+            className="btn-accent group inline-flex min-h-[40px] items-center gap-2 rounded-lg pl-4 pr-2 py-2 text-xs font-bold"
+          >
+            <span>Novo Script</span>
+            <span className="btn-icon-badge">
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+          </button>
+        </div>
       </div>
 
+      {viewMode === "assisted" && (
+        <div className="double-bezel stagger-in">
+          <section className="double-bezel-core p-6 space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">
+                  Sessão Assistida de Follow-up (WhatsApp 1-Clique Seguro)
+                </h2>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                  0% risco de bloqueio: abre o WhatsApp com o texto contextual da vertical já pronto, registra a etapa na timeline e avança para o próximo cliente.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={includeUpcomingFollowups}
+                    onChange={(e) => setIncludeUpcomingFollowups(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
+                  />
+                  Incluir leads aguardando prazo
+                </label>
+                {skippedSessionIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSkippedSessionIds([])}
+                    className="btn-ghost min-h-[36px] rounded-lg px-3 text-xs font-semibold"
+                  >
+                    Restaurar pulados ({skippedSessionIds.length})
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {assistedQueue.length === 0 ? (
+              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] py-10 px-4 text-center space-y-2">
+                <CheckCircle2
+                  className="mx-auto h-7 w-7 text-[var(--status-success)]"
+                  aria-hidden="true"
+                />
+                <p className="text-sm font-bold text-[var(--text-primary)]">
+                  Nenhum follow-up pendente no momento
+                </p>
+                <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
+                  Todos os leads ativos estão em dia com a régua ({autoCfg.followupDay1Hours}h / {autoCfg.followupDay2Hours}h). Marque &quot;Incluir leads aguardando prazo&quot; acima se quiser adiantar algum contato.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {assistedQueue.map((item) => {
+                  const draft = assistedDrafts[item.lead.id] ?? item.defaultBody;
+                  const isBusy = assistedSendingId === item.lead.id;
+                  const isAiLoading = assistedAiLoadingId === item.lead.id;
+                  return (
+                    <div
+                      key={item.lead.id}
+                      className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-4 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                              {item.lead.companyName}
+                            </h3>
+                            <span className="badge-accent rounded-md px-2 py-0.5 text-[10px] font-bold">
+                              {getFunnelLabel(item.lead.funnel)}
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded-md px-2 py-0.5 text-[10px] font-bold",
+                                item.isDue ? "badge-warning" : "badge-info"
+                              )}
+                            >
+                              {item.step === "dia_5"
+                                ? "Etapa 2 · Encerramento"
+                                : "Etapa 1 · Retomada"}{" "}
+                              · {item.hoursSince}h
+                            </span>
+                          </div>
+                          <p className="mt-0.5 font-mono-num text-[11px] text-[var(--text-secondary)]">
+                            {item.lead.contactName} · {item.lead.phone} · Etapa:{" "}
+                            {getStageLabel(item.lead.stage)}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={isAiLoading}
+                            onClick={() => handleAssistedGenerateAi(item.lead.id)}
+                            className="btn-ghost inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold disabled:opacity-50"
+                          >
+                            <Bot className="h-3.5 w-3.5 text-[var(--accent-text)]" aria-hidden="true" />
+                            {isAiLoading ? "Gerando..." : "Variar com IA"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleAssistedMarkReplied(item.lead)}
+                            className="btn-ghost inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold text-[var(--status-success)] disabled:opacity-50"
+                          >
+                            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                            Já Respondeu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSkippedSessionIds((prev) => [...prev, item.lead.id])
+                            }
+                            className="btn-ghost inline-flex min-h-[34px] items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold"
+                          >
+                            <SkipForward className="h-3.5 w-3.5" aria-hidden="true" />
+                            Pular
+                          </button>
+                        </div>
+                      </div>
+
+                      <textarea
+                        rows={5}
+                        value={draft}
+                        onChange={(e) =>
+                          setAssistedDrafts((prev) => ({
+                            ...prev,
+                            [item.lead.id]: e.target.value,
+                          }))
+                        }
+                        className="input-field w-full rounded-lg p-3 text-xs leading-relaxed"
+                      />
+
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleAssistedSendWhatsapp(item)}
+                          className="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 active:scale-[0.98] transition-all disabled:opacity-50"
+                        >
+                          <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                          {isBusy
+                            ? "Registrando..."
+                            : `Abrir WhatsApp & Marcar Etapa ${item.step === "dia_5" ? "2" : "1"}`}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {viewMode === "dispatcher" && (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         {/* LEFT PANE: SMART DISPATCHER */}
         <div
@@ -437,7 +866,7 @@ export function DispatcherView({
                 onChange={(e) => setSelectedLeadId(e.target.value)}
                 className="input-field min-h-[44px] w-full rounded-lg px-3 py-2.5 text-xs font-medium"
               >
-                {leads.map((l) => (
+                {activeLeads.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.companyName} ({l.contactName} · {getStageLabel(l.stage)})
                   </option>
@@ -549,26 +978,37 @@ export function DispatcherView({
               >
                 Mensagem Pronta (Editável antes do disparo)
               </label>
-              <button
-                type="button"
-                onClick={handleCopyMessage}
-                className="inline-flex min-h-[32px] items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-text)]"
-              >
-                {copiedMsg ? (
-                  <>
-                    <Check
-                      className="h-3 w-3 text-[var(--status-success)]"
-                      aria-hidden="true"
-                    />
-                    Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3" aria-hidden="true" />
-                    Copiar Texto
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={!selectedLead || generatingAi}
+                  onClick={handleGenerateAiMessage}
+                  className="inline-flex min-h-[32px] items-center gap-1.5 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-[11px] font-semibold text-[var(--accent-text)] hover:border-[var(--accent)] disabled:opacity-50"
+                >
+                  <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+                  {generatingAi ? "Gerando..." : "Gerar com IA"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyMessage}
+                  className="inline-flex min-h-[32px] items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-text)]"
+                >
+                  {copiedMsg ? (
+                    <>
+                      <Check
+                        className="h-3 w-3 text-[var(--status-success)]"
+                        aria-hidden="true"
+                      />
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" aria-hidden="true" />
+                      Copiar Texto
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <textarea
               id="dispatch-message-body"
@@ -635,7 +1075,7 @@ export function DispatcherView({
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              {leads
+              {activeLeads
                 .filter((l) => l.stage !== "fechado")
                 .map((lead) => {
                   const selected = batchLeadIds.includes(lead.id);
@@ -684,7 +1124,7 @@ export function DispatcherView({
           style={{ ["--stagger" as string]: 1 }}
         >
           <section className="double-bezel-core h-full p-6 flex flex-col space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--accent-text)]">
                   <BookOpen className="h-4 w-4" aria-hidden="true" />
@@ -698,6 +1138,22 @@ export function DispatcherView({
                   </p>
                 </div>
               </div>
+              <button
+                type="button"
+                disabled={resettingTemplates}
+                onClick={handleResetDefaultTemplates}
+                className="btn-ghost inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold disabled:opacity-50"
+                title="Atualiza os templates padrão da ÚLTIMO QUADRO com a copy revisada"
+              >
+                <RotateCcw
+                  className={cn(
+                    "h-3 w-3 text-[var(--accent-text)]",
+                    resettingTemplates && "animate-spin"
+                  )}
+                  aria-hidden="true"
+                />
+                {resettingTemplates ? "Atualizando..." : "Scripts Padrão"}
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-1.5 rounded-lg bg-[var(--bg-subtle)] p-3">
@@ -815,6 +1271,7 @@ export function DispatcherView({
           </section>
         </div>
       </div>
+      )}
 
       {/* Template Create/Edit Modal */}
       {editingTemplate && (

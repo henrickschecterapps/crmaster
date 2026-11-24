@@ -10,6 +10,7 @@ import {
 import { generateId } from "@/lib/utils";
 import { sendEmailNotification } from "@/lib/email";
 import { sendAdminPushNotification } from "@/lib/webPush";
+import { emitOutgoingWebhook } from "@/lib/automationHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +153,13 @@ export async function POST(
         tag: `meeting-${lead.id}`,
       }).catch(() => {});
 
+      await emitOutgoingWebhook(settings, "meeting.requested", {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        contactName: lead.contactName,
+        meeting: newMeeting,
+      }).catch(() => {});
+
       return NextResponse.json({
         meeting: newMeeting,
         meetings: updated?.meetings ?? updatedMeetings,
@@ -253,6 +261,13 @@ export async function POST(
         tag: `pix-${lead.id}`,
       }).catch(() => {});
 
+      await emitOutgoingWebhook(settings, "payment.reported", {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        contactName: lead.contactName,
+        notice,
+      }).catch(() => {});
+
       return NextResponse.json({
         paymentNotices: updated?.paymentNotices ?? nextNotices,
       });
@@ -340,6 +355,15 @@ export async function POST(
         body: `${lead.companyName}: ${(body.feedback || "").trim() || "Ver detalhes no CRM."}`,
         url: `/clientes/${lead.id}`,
         tag: `deliv-${lead.id}`,
+      }).catch(() => {});
+
+      await emitOutgoingWebhook(settings, "deliverable.reviewed", {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        deliverableId: body.deliverableId,
+        deliverableTitle: target.title,
+        decision: body.decision,
+        feedback: (body.feedback || "").trim(),
       }).catch(() => {});
 
       return NextResponse.json({

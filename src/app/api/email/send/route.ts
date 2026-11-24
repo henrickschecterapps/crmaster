@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { getLeadById, updateLead } from "@/lib/repository";
 import { requireAdminApiAuth } from "@/lib/apiGuard";
+import { getPublicAppUrl } from "@/lib/automationHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -100,8 +101,7 @@ export async function POST(req: NextRequest) {
 
     const resolvedMessage = (body.message || body.body || "").trim();
     const resolvedProposalUrl =
-      body.proposalUrl ||
-      `${(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "")}/portal/${body.leadId}`;
+      body.proposalUrl || `${getPublicAppUrl()}/portal/${body.leadId}`;
 
     if (!body.leadId || !body.to || !body.subject || !resolvedMessage) {
       return NextResponse.json(
@@ -206,14 +206,15 @@ export async function POST(req: NextRequest) {
       {
         type: "email",
         title: `E-mail enviado via ${providerLabel} (${body.to})`,
-        description: `Assunto: ${body.subject}. Link rastreável incluído: ${body.proposalUrl}`,
+        description: `Assunto: ${body.subject}. Link rastreável incluído: ${resolvedProposalUrl}`,
       },
       true
     );
 
     return NextResponse.json({
       sent: true,
-      mode,
+      mode: mode === "simulated" ? "simulated" : "live",
+      provider: mode,
       providerId,
       lead: updatedLead,
     });

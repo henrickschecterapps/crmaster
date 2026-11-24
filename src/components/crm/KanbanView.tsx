@@ -672,7 +672,7 @@ export function KanbanView({
                             <a
                               href={buildWhatsappUrl(
                                 lead.phone,
-                                `Olá ${lead.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO.`
+                                `Olá ${lead.contactName}, tudo bem? Aqui é da ÚLTIMO QUADRO, entrando em contato sobre o projeto da ${lead.companyName}.`
                               )}
                               target="_blank"
                               rel="noreferrer"
@@ -1072,7 +1072,7 @@ export function KanbanView({
                                 <a
                                   href={buildWhatsappUrl(
                                     lead.phone,
-                                    `Olá ${lead.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO.`
+                                    `Olá ${lead.contactName}, tudo bem? Aqui é da ÚLTIMO QUADRO, entrando em contato sobre o projeto da ${lead.companyName}.`
                                   )}
                                   target="_blank"
                                   rel="noreferrer"

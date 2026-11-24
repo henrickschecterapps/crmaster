@@ -14,39 +14,52 @@ export function createPhase2FollowupTemplates(): ScriptTemplate[] {
   return [
     {
       id: "tpl-followup-dia2",
-      name: "Follow-up Automático: Dia 2 (Retomada Suave)",
+      name: "Follow-up Dia 2: Proposta Aberta (Consultivo)",
       funnel: "geral",
       channel: "ambos",
-      subject:
-        "Re: Proposta Fotografia & Audiovisual 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
+      subject: "Sobre o projeto da {{nome_empresa}} | ÚLTIMO QUADRO",
       body: `Olá {{nome_contato}}, tudo bem?
 
-Passando rapidamente pela ÚLTIMO QUADRO para saber se você conseguiu abrir a proposta personalizada que preparei para a {{nome_empresa}}.
+Aqui é da equipe da ÚLTIMO QUADRO. Passando para saber se conseguiu dar uma olhada no material que montamos para a {{nome_empresa}}.
 
-Caso queira ajustar o formato, carga horária ou quantidade de Reels 4K, consigo adaptar o escopo para atender exatamente a meta de vocês.
+Se fizer sentido ajustar o formato, quantidade de entregas ou encaixar em uma data específica, adaptamos o escopo sem burocracia.
 
-Deixo novamente o link interativo aqui para facilitar:
+Deixo o acesso direto ao portal do projeto aqui:
 {{link_proposta}}
 
-Me avise se fizer sentido alinharmos essa semana!`,
+Fico por aqui se quiser alinhar algum ponto.`,
+      createdAt: hoursAgo(280),
+      updatedAt: hoursAgo(280),
+    },
+    {
+      id: "tpl-followup-dia2-contato",
+      name: "Follow-up Dia 2: Primeiro Contato (Sem Proposta Enviada)",
+      funnel: "geral",
+      channel: "ambos",
+      subject: "Produção audiovisual para a {{nome_empresa}} | ÚLTIMO QUADRO",
+      body: `Olá {{nome_contato}}, tudo bem?
+
+Sei que a rotina aí na {{nome_empresa}} costuma ser corrida. Aqui é da ÚLTIMO QUADRO e deixei reunidos neste link alguns exemplos de como organizamos nossas produções de fotografia e vídeo aqui em BH e Nova Lima:
+{{link_proposta}}
+
+Se estiver nos planos para as próximas semanas, podemos conversar brevemente para entender a necessidade de vocês.`,
       createdAt: hoursAgo(280),
       updatedAt: hoursAgo(280),
     },
     {
       id: "tpl-followup-dia5",
-      name: "Follow-up Automático: Dia 5 (Último Toque / Escassez)",
+      name: "Follow-up Dia 5: Encerramento Elegante de Agenda",
       funnel: "geral",
       channel: "ambos",
-      subject:
-        "Última verificação de agenda ({{proxima_data_livre}}) | {{nome_empresa}} | ÚLTIMO QUADRO",
+      subject: "Agenda perto de {{proxima_data_livre}} | {{nome_empresa}} | ÚLTIMO QUADRO",
       body: `Olá {{nome_contato}}, tudo bem?
 
-Estou fechando as últimas datas de produção da ÚLTIMO QUADRO em Belo Horizonte e Nova Lima perto de {{proxima_data_livre}} e não queria deixar a {{nome_empresa}} sem retorno antes de liberar a agenda.
+Estamos finalizando o cronograma de produções da ÚLTIMO QUADRO em BH e Nova Lima para a janela de {{proxima_data_livre}} e queria confirmar se ainda faz sentido manter a {{nome_empresa}} no nosso radar para esse período.
 
-Se a produção ainda estiver nos planos, você pode selecionar o pacote e reservar diretamente pelo link abaixo:
+Caso queira revisar os valores ou reservar a data, o portal continua disponível aqui:
 {{link_proposta}}
 
-Se preferir deixar para o próximo ciclo, sem problemas. Seguimos à disposição!`,
+Se preferir retomar em um próximo momento, sem problema algum. Seguimos à disposição.`,
       createdAt: hoursAgo(280),
       updatedAt: hoursAgo(280),
     },
@@ -378,99 +391,107 @@ export function createInitialSeedData(): CrmStoreData {
     templates: [
       {
         id: "tpl-rh-endomarketing",
-        name: "Corporativo: RH & Eventos B2B (Cobertura 360°)",
+        name: "Corporativo: Eventos B2B, RH & Marca",
         funnel: "corporativo",
         channel: "ambos",
-        subject:
-          "Cobertura Corporativa 360° & Reels 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
+        subject: "Cobertura fotográfica e audiovisual | {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
-Aqui é o Henrique, diretor da ÚLTIMO QUADRO, produtora de fotografia autoral e audiovisual 4K em Belo Horizonte e Nova Lima.
+Aqui é da ÚLTIMO QUADRO, produtora de fotografia autoral e vídeo em Belo Horizonte e Nova Lima.
 
-Acompanhei o momento da {{nome_empresa}} e sei o peso que um evento corporativo bem documentado tem para Employer Branding, endomarketing e LinkedIn.
+Trabalhamos com empresas em encontros de liderança, confraternizações e eventos de marca com uma cobertura discreta e foco editorial, entregando uma prévia selecionada já na manhã seguinte para o time de RH e comunicação usar no LinkedIn e canais internos.
 
-Trabalhamos com equipamento Full-Frame 4K em backup duplo simultâneo, emissão de NFS-e e Prévia Expressa de 15 fotos já às 10h da manhã seguinte.
-
-Tenho disponibilidade próxima de {{proxima_data_livre}} e montei uma proposta interativa exclusiva para a {{nome_empresa}}:
+Temos disponibilidade próxima de {{proxima_data_livre}} e organizamos os detalhes pensados para a {{nome_empresa}} neste portal:
 {{link_proposta}}
 
-Podemos alinhar os detalhes em 5 minutos?`,
+Se fizer sentido, podemos alinhar o formato em uma conversa breve esta semana.`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
         id: "tpl-estetica-ads",
-        name: "Estética & Wellness: Performance & Criativos Meta Ads 4K",
+        name: "Estética & Wellness: Retratos & Vídeos de Posicionamento",
         funnel: "estetica",
         channel: "ambos",
-        subject:
-          "Retratos Clean Skin + Criativos 4K para Meta Ads | {{nome_empresa}} | ÚLTIMO QUADRO",
+        subject: "Direção de imagem e vídeos para {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
-Sou o Henrique da ÚLTIMO QUADRO (Fotografia Autoral & Audiovisual 4K em BH e Nova Lima).
+Aqui é da ÚLTIMO QUADRO (BH e Nova Lima). Acompanhamos o posicionamento da {{nome_empresa}} e atuamos justamente ajudando clínicas de estética e wellness a construírem um acervo fotográfico de pele limpa e vídeos curtos que transmitem confiança real, sem aquela cara engessada de anúncio pronto.
 
-Produzimos acervos fotográficos com iluminação Clean Skin + vídeos criativos 4K com áudio lapela sem fio e Hooks (3s) desenhados especificamente para clínicas de estética e wellness escalarem no Instagram e Meta Ads.
-
-Preparei uma proposta interativa sob medida para a {{nome_empresa}} com os pacotes Glow & Posicionamento e Performance & Ads Prime:
+Montamos um portal com opções de formato e investimento pensadas para o perfil da clínica:
 {{link_proposta}}
 
-Tenho agenda aberta perto de {{proxima_data_livre}}. Faz sentido conversarmos rapidamente?`,
+Temos janela aberta perto de {{proxima_data_livre}}. Caso faça sentido para o próximo ciclo de campanhas de vocês, fico à disposição por aqui.`,
+        createdAt: hoursAgo(300),
+        updatedAt: hoursAgo(300),
+      },
+      {
+        id: "tpl-moda-lojistas",
+        name: "Moda & Confecção: Lookbook, Provador & Lançamento",
+        funnel: "moda",
+        channel: "ambos",
+        subject: "Produção de campanha e provador | {{nome_empresa}} | ÚLTIMO QUADRO",
+        body: `Olá {{nome_contato}}, tudo bem?
+
+Aqui é da ÚLTIMO QUADRO aqui em BH. Produzimos lookbooks, provadores e vídeos verticais para marcas e confecções com foco em caimento, textura de tecido e entrega ágil, com prévias no mesmo dia para você já subir os lançamentos no Instagram e no WhatsApp de vendas.
+
+Organizamos os formatos de diária e pacotes para a {{nome_empresa}} neste link:
+{{link_proposta}}
+
+Se estiver preparando o próximo drop perto de {{proxima_data_livre}}, podemos montar um roteiro sob medida para a coleção.`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
         id: "tpl-parceria-modelos",
-        name: "Moda & Provador: Parceria VIP Modelos (15% Pix)",
-        funnel: "moda",
+        name: "Parceiros (Somente Modelos): Parceria VIP 15% Pix",
+        funnel: "geral",
         channel: "whatsapp",
-        subject:
-          "Parceria VIP Modelos de Provador BH (15% Pix) | ÚLTIMO QUADRO",
-        body: `Oi {{nome_contato}}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO aqui em BH!
+        subject: "Parceria VIP para Modelos de Provador BH | ÚLTIMO QUADRO",
+        body: `Oi {{nome_contato}}, tudo bem? Aqui é da ÚLTIMO QUADRO aqui em BH.
 
-Curti muito seu trabalho como modelo de provador e queria te apresentar nossa Parceria VIP para marcas e atacados de moda em BH e Barro Preto:
-- 15% de comissão direta via Pix em toda loja que fechar produção com a Último Quadro;
-- Spoilers entregues no mesmo dia (até 6h) + Fashion Reels 4K em alta qualidade para valorizar também o seu portfólio.
+Acompanhamos seu trabalho como modelo de provador e queremos te convidar para nossa Parceria VIP com marcas de moda em BH e Barro Preto:
+- 15% de comissão direta via Pix em cada produção fechada por indicação sua;
+- Prévias no mesmo dia e vídeos verticais em alta definição que também fortalecem o seu portfólio.
 
-Deixo aqui nosso link de proposta interativa para você conhecer os pacotes de Moda & Provador (e até o Projeto Impulso Moda BH):
+Aqui estão nossos formatos de Moda para você conhecer nosso padrão de entrega:
 {{link_proposta}}
 
-Podemos conversar perto de {{proxima_data_livre}} para te incluir no nosso casting parceiro?`,
+Se fizer sentido, podemos conversar perto de {{proxima_data_livre}} para te incluir no nosso grupo de parceiras.`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
         id: "tpl-gastronomia-ifood",
-        name: "Gastronomia & iFood: Estúdio Portátil + Food Reels 4K",
+        name: "Gastronomia: Fotografia de Pratos & Vídeos de Salão",
         funnel: "gastronomia",
         channel: "ambos",
-        subject:
-          "Fotografia Gastronômica (iFood) & Food Reels 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
+        subject: "Fotografia gastronômica e vídeos | {{nome_empresa}} | ÚLTIMO QUADRO",
         body: `Olá {{nome_contato}}, tudo bem?
 
-Aqui é o Henrique, da ÚLTIMO QUADRO (BH & Nova Lima). Levamos um estúdio de iluminação portátil direto para o salão da {{nome_empresa}} para produzir fotos de apetite (Alta Res + otimizadas para iFood) e Food Reels 4K/ASMR.
+Aqui é da ÚLTIMO QUADRO (BH e Nova Lima). Levamos nosso estúdio portátil direto para o salão da {{nome_empresa}}, fora do horário de pico, para fotografar os pratos com luz natural controlada (tanto para Instagram quanto otimizados para cardápio e iFood) junto com vídeos curtos que valorizam preparo e textura.
 
-Montei uma proposta interativa transparente para vocês compararem os pacotes Menu & Delivery Essencial e Chef's Table & Reels Prime:
+Deixamos os formatos e valores organizados para vocês avaliarem com calma:
 {{link_proposta}}
 
-Tenho janela livre em {{proxima_data_livre}} para fazermos a produção fora do horário de pico. Faz sentido?`,
+Temos janela disponível perto de {{proxima_data_livre}}. Se quiserem atualizar o visual do cardápio ou lançar novos pratos, fico à disposição.`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },
       {
         id: "tpl-nightlife-promoters",
-        name: "Festas & Nightlife: Low-Light & Aftermovie 4K",
+        name: "Nightlife & Bares: Cobertura Noturna & Aftermovie",
         funnel: "nightlife",
         channel: "whatsapp",
-        subject:
-          "Cobertura Noturna & Aftermovie 4K | {{nome_empresa}} | ÚLTIMO QUADRO",
-        body: `Fala {{nome_contato}}, tudo certo? Aqui é o Henrique da ÚLTIMO QUADRO (BH).
+        subject: "Cobertura noturna e aftermovie | {{nome_empresa}} | ÚLTIMO QUADRO",
+        body: `Olá {{nome_contato}}, tudo bem? Aqui é da ÚLTIMO QUADRO em BH.
 
-Cobrimos bares, clubs e labels com equipamento Full-Frame Low-Light, flash criativo (shutter drag) e Aftermovies Verticais 4K editados no beat em até 48h, com prévia de 15 fotos já às 14h do dia seguinte pra manter o hype da casa no topo.
+Trabalhamos na cobertura de bares, rooftops e noites autorais com foco em atmosfera real de baixa luz e vídeos verticais editados no ritmo da casa, entregando prévias já no início da tarde seguinte, enquanto o público ainda está repercutindo a noite nos stories.
 
-Deixei a proposta interativa da {{nome_empresa}} pronta aqui:
+Montamos o portal com as opções avulsas e de residência mensal para a {{nome_empresa}}:
 {{link_proposta}}
 
-Temos agenda aberta em {{proxima_data_livre}} (e também plano residente mensal). Bora conversar?`,
+Temos agenda aberta perto de {{proxima_data_livre}}. Se fizer sentido para as próximas datas da casa, podemos alinhar por aqui.`,
         createdAt: hoursAgo(300),
         updatedAt: hoursAgo(300),
       },

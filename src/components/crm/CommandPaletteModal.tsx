@@ -348,7 +348,7 @@ export function CommandPaletteModal({
                         <a
                           href={buildWhatsappUrl(
                             lead.phone,
-                            `Olá ${lead.contactName}, tudo bem? Aqui é o Henrique da ÚLTIMO QUADRO.`
+                            `Olá ${lead.contactName}, tudo bem? Aqui é da ÚLTIMO QUADRO, entrando em contato sobre o projeto da ${lead.companyName}.`
                           )}
                           target="_blank"
                           rel="noreferrer"
@@ -362,7 +362,7 @@ export function CommandPaletteModal({
                           />
                         </a>
                         <a
-                          href={`/proposta/${lead.id}`}
+                          href={`/portal/${lead.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="btn-ghost flex h-8 w-8 items-center justify-center rounded-md bg-[var(--bg-surface-solid)]"

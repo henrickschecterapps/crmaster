@@ -242,12 +242,16 @@ export async function enqueueWhatsappBatch(params: {
 }
 
 /**
- * Processes all pending persisted jobs whose scheduledFor timestamp has arrived (or all pending when force=true).
+ * Processes pending persisted jobs safely.
+ * - By default (anti-burst mode), executes at most `maxPerRun` (default 1) due job per tick
+ *   and re-staggers any remaining overdue jobs by 3–6 min so a daily/periodic cron never bursts all at once.
+ * - When `forceAll` is true (manual admin button), still limits safely or executes requested jobs.
  */
 export async function processDueWhatsappQueue(params: {
   config: WhatsappApiConfig | null;
   forceAll?: boolean;
-}): Promise<{ processed: WhatsappQueueJob[] }> {
+  maxPerRun?: number;
+}): Promise<{ processed: WhatsappQueueJob[]; rescheduled: number }> {
   const jobs = await getPersistedWhatsappQueue();
   const nowMs = Date.now();
 
@@ -262,11 +266,53 @@ export async function processDueWhatsappQueue(params: {
         new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
     );
 
+  const limit = params.forceAll ? due.length : Math.max(1, params.maxPerRun ?? 1);
+  const toRunNow = due.slice(0, limit);
+  const overflow = due.slice(limit);
+
   const processed: WhatsappQueueJob[] = [];
-  for (const job of due) {
+  for (const job of toRunNow) {
     const done = await executeSingleJob(job, params.config);
     processed.push(done);
   }
 
-  return { processed };
+  // Anti-burst protection: re-stagger remaining overdue jobs with 3-6 min intervals
+  let cumulativeDelay = 0;
+  let rescheduled = 0;
+  for (const job of overflow) {
+    cumulativeDelay += getRandomAntiBanDelayMs();
+    await saveWhatsappQueueJob({
+      ...job,
+      delaySeconds: Math.round(cumulativeDelay / 1000),
+      scheduledFor: new Date(Date.now() + cumulativeDelay).toISOString(),
+    });
+    rescheduled += 1;
+  }
+
+  return { processed, rescheduled };
+}
+
+export async function retryOrCancelWhatsappJob(params: {
+  jobId: string;
+  action: "retry" | "cancel";
+  config: WhatsappApiConfig | null;
+}): Promise<WhatsappQueueJob | null> {
+  const jobs = await getPersistedWhatsappQueue();
+  const target = jobs.find((j) => j.id === params.jobId);
+  if (!target) return null;
+
+  if (params.action === "cancel") {
+    const cancelled: WhatsappQueueJob = {
+      ...target,
+      status: "erro",
+      error: "Cancelado manualmente pelo administrador.",
+    };
+    await saveWhatsappQueueJob(cancelled);
+    return cancelled;
+  }
+
+  return executeSingleJob(
+    { ...target, status: "pendente", error: undefined },
+    params.config
+  );
 }

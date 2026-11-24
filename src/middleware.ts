@@ -16,23 +16,32 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // Keep client-facing proposal/portal routes and auth endpoints publicly accessible
+  // Keep client-facing proposal/portal routes, incoming webhooks, and auth endpoints accessible
   if (
     pathname.startsWith("/proposta/") ||
     pathname.startsWith("/portal/") ||
     pathname.startsWith("/api/proposals/") ||
     pathname.startsWith("/api/portal/") ||
     pathname.startsWith("/api/upload") ||
+    pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/auth/")
   ) {
     return NextResponse.next();
   }
 
-  // Allow Vercel Cron GET requests authenticated with CRON_SECRET
-  if (pathname === "/api/cron/followup" && req.method === "GET") {
+  // Allow Vercel Cron / external tick GET requests authenticated with CRON_SECRET
+  if (
+    (pathname === "/api/cron/followup" ||
+      pathname === "/api/whatsapp/queue/tick") &&
+    req.method === "GET"
+  ) {
     const cronSecret = process.env.CRON_SECRET?.trim();
     const authHeader = req.headers.get("authorization");
-    if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    const tokenParam = req.nextUrl.searchParams.get("token");
+    if (
+      cronSecret &&
+      (authHeader === `Bearer ${cronSecret}` || tokenParam === cronSecret)
+    ) {
       return NextResponse.next();
     }
   }

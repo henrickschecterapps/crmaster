@@ -1130,6 +1130,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               onSaveTemplate={handleSaveTemplate}
               onDeleteTemplate={handleDeleteTemplate}
               onUpdateNextDate={handleUpdateNextDate}
+              onRefreshStore={() => refreshStore(false)}
               onNotify={notify}
             />
           )}

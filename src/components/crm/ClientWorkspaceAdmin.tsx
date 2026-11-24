@@ -430,7 +430,8 @@ export function ClientWorkspaceAdmin({
           leadId: lead.id,
           to: email.trim(),
           subject: `Portal Exclusivo do Projeto | ${studioSettings.studioName} x ${companyName}`,
-          body: `Olá ${contactName},\n\nPreparamos o Portal Exclusivo da ${companyName} na ${studioSettings.studioName}.\n\nPor lá você acompanha a proposta comercial, contrato PDF, agendamento de reuniões, briefing e entregas em 4K:\n${portalUrl}${pinNote}\n\nQualquer dúvida, estou à disposição no WhatsApp.`,
+          message: `Olá ${contactName},\n\nPreparamos o Portal Exclusivo da ${companyName} na ${studioSettings.studioName}.\n\nPor lá você acompanha a proposta comercial, contrato PDF, agendamento de reuniões, briefing e entregas em 4K:\n${portalUrl}${pinNote}\n\nQualquer dúvida, nossa equipe segue à disposição no WhatsApp.`,
+          proposalUrl: portalUrl,
         }),
       });
       if (res.ok) {

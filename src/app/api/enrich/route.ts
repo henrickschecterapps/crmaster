@@ -96,7 +96,7 @@ async function safeFetchHtml(url: string): Promise<string> {
       signal: controller.signal,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; CRMasterBot/1.0; +https://henriquematos.com.br)",
+          "Mozilla/5.0 (compatible; UltimoQuadroBot/1.0; +https://ultimo-quadro.vercel.app)",
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",

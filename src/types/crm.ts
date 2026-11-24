@@ -337,6 +337,7 @@ export interface Lead {
   archivedAt?: string | null;
   nextAction?: LeadNextAction | null;
   parentLeadId?: string | null;
+  automationMarks?: Record<string, string>;
   ultimaInteracaoEm: string;
   createdAt: string;
   updatedAt: string;
@@ -354,6 +355,46 @@ export interface ScriptTemplate {
   updatedAt: string;
 }
 
+export interface AutomationSettings {
+  followupDay1Hours: number; // padrão 48h (Dia 2)
+  followupDay2Hours: number; // padrão 120h (Dia 5)
+  followupChannel: "email" | "whatsapp" | "ambos";
+  businessHoursOnly: boolean;
+  businessHourStart: number; // 8 (08:00 BH)
+  businessHourEnd: number; // 19 (19:00 BH)
+  enableMeetingReminder24h: boolean;
+  enableBriefingReminder48h: boolean;
+  enableProposalExpiring24h: boolean;
+  enableSignalReminder24h: boolean;
+  enableReviewRequest3d: boolean;
+  enableRecurrenceRadar60d: boolean;
+  enableMorningDigest: boolean;
+  enableApprovalClientEmail: boolean;
+  outgoingWebhookUrl?: string;
+  outgoingWebhookSecret?: string;
+  whatsappWebhookToken?: string;
+}
+
+export const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
+  followupDay1Hours: 48,
+  followupDay2Hours: 120,
+  followupChannel: "ambos",
+  businessHoursOnly: true,
+  businessHourStart: 8,
+  businessHourEnd: 19,
+  enableMeetingReminder24h: true,
+  enableBriefingReminder48h: true,
+  enableProposalExpiring24h: true,
+  enableSignalReminder24h: true,
+  enableReviewRequest3d: true,
+  enableRecurrenceRadar60d: true,
+  enableMorningDigest: true,
+  enableApprovalClientEmail: true,
+  outgoingWebhookUrl: "",
+  outgoingWebhookSecret: "",
+  whatsappWebhookToken: "",
+};
+
 export interface StudioSettings {
   id: string;
   monthlyGoal: number;
@@ -369,6 +410,7 @@ export interface StudioSettings {
   pixKey: string;
   pixRecipientName: string;
   pixCity: string;
+  automation?: AutomationSettings;
   updatedAt: string;
 }
 

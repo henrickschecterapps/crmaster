@@ -14,6 +14,7 @@ import {
   ContractDocumentRef,
   CronExecutionLog,
   CrmStoreData,
+  DEFAULT_AUTOMATION_SETTINGS,
   FunnelId,
   InteractionType,
   Lead,
@@ -81,6 +82,10 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
         ? BRAND_DEFAULTS.pixRecipientName
         : raw.settings.pixRecipientName,
     pixCity: raw.settings?.pixCity || BRAND_DEFAULTS.pixCity,
+    automation: {
+      ...DEFAULT_AUTOMATION_SETTINGS,
+      ...(raw.settings?.automation ?? {}),
+    },
   };
 
   const leads: Lead[] = (raw.leads ?? []).map((lead) => {
@@ -123,6 +128,10 @@ function hydrateStoreData(raw: CrmStoreData): CrmStoreData {
       archivedAt: lead.archivedAt ?? null,
       nextAction: lead.nextAction ?? null,
       parentLeadId: lead.parentLeadId ?? null,
+      automationMarks:
+        lead.automationMarks && typeof lead.automationMarks === "object"
+          ? lead.automationMarks
+          : {},
       interactions: Array.isArray(lead.interactions) ? lead.interactions : [],
     };
   });
@@ -513,15 +522,15 @@ export async function getStoreData(): Promise<CrmStoreData> {
               adminEmail: String(
                 sRow.admin_email ||
                   process.env.ADMIN_EMAIL ||
-                  "henrickschecter@gmail.com"
+                  BRAND_DEFAULTS.email
               ),
               pixKey: String(
                 sRow.pix_key ||
                   process.env.NEXT_PUBLIC_PIX_KEY ||
-                  "henrickschecter@gmail.com"
+                  BRAND_DEFAULTS.email
               ),
               pixRecipientName: String(
-                sRow.pix_recipient_name || "Henrique Matos"
+                sRow.pix_recipient_name || BRAND_DEFAULTS.pixRecipientName
               ),
               pixCity: String(sRow.pix_city || "BELO HORIZONTE"),
               updatedAt: String(sRow.updated_at),
@@ -1157,7 +1166,7 @@ export async function upsertTemplate(
     : undefined;
 
   const template: ScriptTemplate = {
-    id: existing?.id ?? generateId("tpl"),
+    id: existing?.id ?? input.id ?? generateId("tpl"),
     name: input.name.trim(),
     funnel: input.funnel,
     channel: input.channel,
