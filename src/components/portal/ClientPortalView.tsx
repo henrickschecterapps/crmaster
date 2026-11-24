@@ -503,34 +503,36 @@ export function ClientPortalView({
   const milestones = lead.milestoneDates ?? {};
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--bg-canvas)] text-[var(--text-primary)]">
+    <div className="min-h-[100dvh] bg-[var(--bg-canvas)] text-[var(--text-primary)] overflow-x-clip">
       <div className="cinema-grain" aria-hidden="true" />
 
       {/* Top Portal Header */}
       <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3 min-w-0">
-            <BrandMark compact />
-            <div className="hidden sm:block h-5 w-px bg-[var(--border-hairline)]" />
-            <div className="min-w-0">
-              <p className="text-[10px] font-mono-num uppercase tracking-wider text-[var(--accent-text)] font-bold">
-                PORTAL EXCLUSIVO DO CLIENTE
+        <div className="mx-auto flex max-w-[1480px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="hidden sm:block shrink-0">
+              <BrandMark compact />
+            </div>
+            <div className="hidden sm:block h-5 w-px bg-[var(--border-hairline)] shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[10px] font-mono-num uppercase tracking-wider text-[var(--accent-text)] font-bold">
+                ÚLTIMO QUADRO · PORTAL DO CLIENTE
               </p>
-              <h1 className="truncate text-sm sm:text-base font-bold text-[var(--text-primary)]">
+              <h1 className="truncate text-sm sm:text-base lg:text-lg font-bold text-[var(--text-primary)]">
                 {lead.companyName}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <a
               href={buildWhatsappUrl(
                 studioWhatsapp,
-                `Olá equipe ${studioName}! Estou no Portal do Projeto (${lead.companyName}) e gostaria de falar sobre nosso atendimento.`
+                `Olá, equipe da ${studioName}! Estou no Portal do Projeto (${lead.companyName}) e gostaria de falar sobre nosso atendimento.`
               )}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold"
+              className="btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 sm:px-3.5 py-1.5 text-xs font-bold"
             >
               <MessageCircle className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Falar com a Produção</span>
@@ -541,7 +543,7 @@ export function ClientPortalView({
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
+      <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 space-y-6">
         {banner && (
           <div
             role="status"
@@ -613,7 +615,7 @@ export function ClientPortalView({
         </div>
 
         {/* Portal Navigation Dock */}
-        <div className="dock-shell flex flex-wrap gap-1">
+        <div className="dock-shell grid w-full grid-cols-2 gap-1 p-1.5 sm:grid-cols-3 lg:grid-cols-5">
           {(
             [
               {
@@ -647,7 +649,7 @@ export function ClientPortalView({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex min-h-[40px] flex-1 sm:flex-none items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
+                  "inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
                   active
                     ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] border border-[var(--border-hairline)] shadow-sm"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

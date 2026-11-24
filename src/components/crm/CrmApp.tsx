@@ -9,7 +9,6 @@ import {
   Calendar,
   Clock,
   Database,
-  Eye,
   Handshake,
   Kanban,
   LayoutDashboard,
@@ -681,55 +680,22 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
     navItems.find((n) => n.id === activeModule) ?? navItems[0];
 
   return (
-    <div className="min-h-[100dvh] flex flex-col">
+    <div className="min-h-[100dvh] flex flex-col overflow-x-clip">
       {/* Subtle fixed 35mm cinema grain overlay */}
       <div className="cinema-grain" aria-hidden="true" />
 
-      {/* UNIFIED TOP DOCK HEADER (100% full horizontal width, no left sidebar) */}
+      {/* UNIFIED TOP DOCK HEADER (Responsive, zero horizontal overflow) */}
       <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
-        <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
-          {/* Left: Studio Identity + Cloud Persistence Status Pill */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="lg:hidden">
-              <BrandMark compact />
-            </div>
-            <div className="hidden lg:block">
-              <BrandMark compact />
-            </div>
-
-            <div
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-solid)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
-              title={
-                status.databaseMode === "firebase"
-                  ? `Cloud Firestore ativo (${status.firebaseProjectId || "ultimo-quadro"})`
-                  : status.databaseMode === "supabase"
-                  ? "Supabase conectado"
-                  : "Modo Local (.data + localStorage)"
-              }
-            >
-              <Database
-                className={cn(
-                  "h-3 w-3",
-                  status.databaseMode === "firebase"
-                    ? "text-[var(--status-success)]"
-                    : "text-[var(--accent-text)]"
-                )}
-                aria-hidden="true"
-              />
-              <span className="font-mono-num text-[10px] font-semibold">
-                {status.databaseMode === "firebase"
-                  ? "FIRESTORE"
-                  : status.databaseMode === "supabase"
-                  ? "SUPABASE"
-                  : "LOCAL"}
-              </span>
-            </div>
+        <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
+          {/* Left: Studio Identity */}
+          <div className="flex items-center gap-2.5 shrink-0 min-w-0">
+            <BrandMark compact />
           </div>
 
-          {/* Center: Unified macOS/Vercel-style Module Dock (Desktop) with Spring Pill */}
+          {/* Center: Unified Module Dock (Desktop) with Spring Pill */}
           <nav
             aria-label="Navegação Principal"
-            className="dock-shell hidden lg:flex items-center gap-1"
+            className="dock-shell hidden lg:flex items-center gap-0.5 xl:gap-1 min-w-0 max-w-full overflow-x-auto"
           >
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -743,8 +709,9 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                     setActiveModule(item.id);
                   }}
                   aria-current={active ? "page" : undefined}
+                  title={item.label}
                   className={cn(
-                    "relative inline-flex min-h-[36px] items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                    "relative inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors xl:px-3",
                     active
                       ? "text-[var(--text-primary)]"
                       : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -761,7 +728,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                       className="absolute inset-0 rounded-lg bg-[var(--bg-surface-solid)] border border-[var(--accent-border)] shadow-sm"
                     />
                   )}
-                  <span className="relative z-10 inline-flex items-center gap-2">
+                  <span className="relative z-10 inline-flex items-center gap-1.5">
                     <Icon
                       className={cn(
                         "h-3.5 w-3.5 shrink-0",
@@ -771,7 +738,8 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                       )}
                       aria-hidden="true"
                     />
-                    <span>{item.label}</span>
+                    <span className="2xl:hidden">{item.shortLabel}</span>
+                    <span className="hidden 2xl:inline">{item.label}</span>
                     {item.badge !== undefined && (
                       <span
                         className={cn(
@@ -790,15 +758,15 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             })}
           </nav>
 
-          {/* Right: Portal Inbox + Alerts + Command Search (Ctrl+K) + Sync + CTA + Theme */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right: Portal Inbox + Search (Ctrl+K) + Sync + CTA + Theme */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Portal Pending Inbox Popover Trigger */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowPortalInbox((prev) => !prev)}
                 className={cn(
-                  "relative inline-flex h-[38px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors",
+                  "relative inline-flex h-9 sm:h-[38px] items-center gap-1.5 rounded-lg px-2 sm:px-2.5 text-xs font-semibold transition-colors",
                   portalInboxItems.length > 0
                     ? "badge-accent"
                     : "btn-ghost text-[var(--text-secondary)]"
@@ -880,7 +848,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               <button
                 type="button"
                 onClick={() => setActiveModule("dashboard")}
-                className="badge-warning hidden xl:inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hover:opacity-85"
+                className="badge-warning hidden 2xl:inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hover:opacity-85"
                 title="Ver leads parados há mais de 48h"
               >
                 <Clock className="h-3 w-3" aria-hidden="true" />
@@ -891,32 +859,20 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               </button>
             )}
 
-            {headerAlertCounts.viewed > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowCommandPalette(true)}
-                className="badge-accent hidden 2xl:inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hover:opacity-85"
-                title="Propostas visualizadas por clientes"
-              >
-                <Eye className="h-3 w-3" aria-hidden="true" />
-                <span className="font-mono-num">{headerAlertCounts.viewed}</span>
-                <span>vistas</span>
-              </button>
-            )}
-
             {/* Global Search / Command Palette Trigger (Ctrl+K) */}
             <button
               type="button"
               onClick={() => setShowCommandPalette(true)}
-              className="btn-ghost inline-flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
+              className="btn-ghost inline-flex h-9 sm:min-h-[38px] items-center gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface-solid)]"
               title="Busca global de leads e comandos (Ctrl+K)"
+              aria-label="Buscar leads e comandos"
             >
               <Search
                 className="h-3.5 w-3.5 text-[var(--accent-text)]"
                 aria-hidden="true"
               />
-              <span className="hidden md:inline">Buscar...</span>
-              <kbd className="hidden sm:inline-block rounded border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-muted)]">
+              <span className="hidden xl:inline">Buscar...</span>
+              <kbd className="hidden xl:inline-block rounded border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-num text-[10px] font-semibold text-[var(--text-muted)]">
                 Ctrl K
               </kbd>
             </button>
@@ -925,7 +881,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               type="button"
               onClick={() => refreshStore(false)}
               disabled={syncing}
-              className="btn-ghost inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg text-xs font-semibold"
+              className="btn-ghost hidden sm:inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg text-xs font-semibold"
               title="Sincronizar aberturas de proposta e leads"
               aria-label="Sincronizar dados do CRM"
             >
@@ -935,13 +891,13 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
               />
             </button>
 
-            {/* Button-in-Button Primary CTA */}
+            {/* Button-in-Button Primary CTA (Tablet & Desktop; on mobile, dedicated floating + FAB) */}
             <button
               type="button"
               onClick={() => openQuickNewLead(activeFunnel)}
-              className="btn-accent group inline-flex min-h-[38px] items-center gap-2 rounded-lg pl-3.5 pr-2 py-1.5 text-xs font-bold"
+              className="btn-accent group hidden sm:inline-flex min-h-[38px] items-center gap-2 rounded-lg pl-3 pr-1.5 py-1.5 text-xs font-bold"
             >
-              <span className="hidden sm:inline">Novo Lead</span>
+              <span className="hidden md:inline">Novo Lead</span>
               <span className="btn-icon-badge">
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               </span>
@@ -950,7 +906,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             <button
               type="button"
               onClick={toggleTheme}
-              className="btn-ghost flex h-[38px] w-[38px] items-center justify-center rounded-lg"
+              className="btn-ghost flex h-9 w-9 sm:h-[38px] sm:w-[38px] items-center justify-center rounded-lg"
               aria-label={
                 theme === "dark"
                   ? "Mudar para modo claro"
@@ -980,7 +936,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="btn-ghost flex h-[38px] w-[38px] items-center justify-center rounded-lg"
+                className="btn-ghost flex h-9 w-9 sm:h-[38px] sm:w-[38px] items-center justify-center rounded-lg"
                 aria-label="Encerrar sessão administrativa"
                 title="Sair do CRM"
               >
@@ -990,30 +946,60 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
           </div>
         </div>
 
-        {/* Sub-strip: Timecode Breadcrumb & Active Context */}
+        {/* Sub-strip: Timecode Breadcrumb, Cloud Status & Active Context */}
         <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-subtle)]/75">
-          <div className="mx-auto flex max-w-[1720px] items-center justify-between px-4 py-1.5 text-[11px] sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2 text-[var(--text-muted)]">
-              <span className="font-mono-num font-bold text-[var(--accent-text)]">
+          <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-2 px-3 py-1.5 text-[11px] sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2 min-w-0 text-[var(--text-muted)]">
+              <span className="font-mono-num font-bold text-[var(--accent-text)] shrink-0">
                 TC 00:{activeNav.code}:24:00
               </span>
               <span aria-hidden="true">·</span>
-              <span className="font-semibold text-[var(--text-primary)]">
+              <span className="font-semibold text-[var(--text-primary)] truncate">
                 {activeNav.label}
               </span>
               {activeModule === "kanban" && (
                 <>
                   <span aria-hidden="true">/</span>
-                  <span className="text-[var(--text-secondary)]">
+                  <span className="text-[var(--text-secondary)] truncate">
                     {getFunnelLabel(activeFunnel)}
                   </span>
                 </>
               )}
             </div>
-            <div className="hidden sm:flex items-center gap-3 font-mono-num text-[10px] text-[var(--text-muted)]">
-              <span>A HISTÓRIA TERMINA. A IMAGEM FICA.</span>
-              <span aria-hidden="true">·</span>
-              <span>BELO HORIZONTE &amp; NOVA LIMA</span>
+            <div className="flex items-center gap-3 shrink-0 font-mono-num text-[10px] text-[var(--text-muted)]">
+              <span
+                className="inline-flex items-center gap-1 font-semibold"
+                title={
+                  status.databaseMode === "firebase"
+                    ? `Cloud Firestore ativo (${status.firebaseProjectId || "ultimo-quadro"})`
+                    : status.databaseMode === "supabase"
+                    ? "Supabase conectado"
+                    : "Modo Local (.data + localStorage)"
+                }
+              >
+                <Database
+                  className={cn(
+                    "h-3 w-3",
+                    status.databaseMode === "firebase"
+                      ? "text-[var(--status-success)]"
+                      : "text-[var(--accent-text)]"
+                  )}
+                  aria-hidden="true"
+                />
+                <span>
+                  {status.databaseMode === "firebase"
+                    ? "FIRESTORE"
+                    : status.databaseMode === "supabase"
+                    ? "SUPABASE"
+                    : "LOCAL"}
+                </span>
+              </span>
+              <span className="hidden md:inline" aria-hidden="true">
+                ·
+              </span>
+              <span className="hidden md:inline">
+                BELO HORIZONTE &amp; NOVA LIMA
+              </span>
             </div>
           </div>
         </div>
@@ -1164,7 +1150,12 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
       </main>
 
       {/* Native Mobile Floating Action Button (FAB) + Radial Quick Actions */}
-      <div className="fixed bottom-20 right-4 z-30 flex flex-col items-end gap-2 lg:hidden">
+      <div
+        style={{
+          bottom: "calc(4.75rem + env(safe-area-inset-bottom, 0px))",
+        }}
+        className="fixed right-4 z-40 flex flex-col items-end gap-2.5 lg:hidden"
+      >
         <AnimatePresence>
           {showMobileFabMenu && (
             <motion.div
@@ -1181,7 +1172,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                   setShowMobileFabMenu(false);
                   setActiveModule("capture");
                 }}
-                className="modal-surface inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold text-[var(--text-primary)] shadow-lg"
+                className="modal-surface inline-flex min-h-[42px] items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-[var(--text-primary)] shadow-lg"
               >
                 <UserPlus className="h-3.5 w-3.5 text-[var(--accent-text)]" />
                 Captar Overture BH
@@ -1193,7 +1184,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                   setShowMobileFabMenu(false);
                   setActiveModule("agenda");
                 }}
-                className="modal-surface inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold text-[var(--text-primary)] shadow-lg"
+                className="modal-surface inline-flex min-h-[42px] items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-[var(--text-primary)] shadow-lg"
               >
                 <Calendar className="h-3.5 w-3.5 text-[var(--accent-text)]" />
                 Agenda do Estúdio
@@ -1205,7 +1196,7 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
                   setShowMobileFabMenu(false);
                   openQuickNewLead(activeFunnel);
                 }}
-                className="btn-accent inline-flex min-h-[40px] items-center gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-lg"
+                className="btn-accent inline-flex min-h-[42px] items-center gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-lg"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Novo Lead
@@ -1221,14 +1212,14 @@ export function CrmApp({ initialData, initialStatus }: CrmAppProps) {
             triggerHaptic(12);
             setShowMobileFabMenu((prev) => !prev);
           }}
-          className="btn-accent flex h-13 w-13 items-center justify-center rounded-full shadow-xl border border-white/15"
-          aria-label={showMobileFabMenu ? "Fechar menu rápido" : "Ações rápidas"}
+          className="btn-accent flex h-14 w-14 items-center justify-center rounded-full shadow-[0_10px_28px_rgba(181,69,18,0.55)] ring-2 ring-[var(--bg-canvas)] border border-white/20"
+          aria-label={showMobileFabMenu ? "Fechar menu rápido" : "Novo Lead e ações rápidas"}
           aria-expanded={showMobileFabMenu}
         >
           {showMobileFabMenu ? (
-            <X className="h-5 w-5" aria-hidden="true" />
+            <X className="h-6 w-6" aria-hidden="true" />
           ) : (
-            <Plus className="h-5 w-5" aria-hidden="true" />
+            <Plus className="h-6 w-6" aria-hidden="true" />
           )}
         </motion.button>
       </div>

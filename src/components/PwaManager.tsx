@@ -86,7 +86,12 @@ export function PwaManager() {
       )}
 
       {!dismissed && (deferredPrompt || showIosHint) && (
-        <div className="fixed bottom-20 left-3 right-3 sm:left-auto sm:right-5 sm:bottom-5 z-40 sm:max-w-sm">
+        <div
+          style={{
+            bottom: "calc(4.75rem + env(safe-area-inset-bottom, 0px))",
+          }}
+          className="fixed left-3 right-20 sm:left-auto sm:right-5 sm:!bottom-5 z-30 sm:max-w-sm"
+        >
           <div className="double-bezel">
             <div className="double-bezel-core p-3.5 flex items-start gap-3">
               <img

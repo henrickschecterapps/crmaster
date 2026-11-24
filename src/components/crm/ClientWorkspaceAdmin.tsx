@@ -752,30 +752,30 @@ export function ClientWorkspaceAdmin({
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--bg-canvas)] text-[var(--text-primary)]">
+    <div className="min-h-[100dvh] bg-[var(--bg-canvas)] text-[var(--text-primary)] overflow-x-clip">
       <div className="cinema-grain" aria-hidden="true" />
 
-      {/* Top Sticky Studio Context Bar */}
+      {/* Top Sticky Studio Context Bar (Full studio width, balanced spacing) */}
       <header className="glass-bar sticky top-0 z-30 border-b border-[var(--border-hairline)]">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
             <Link
               href={`/?tab=kanban&funnel=${funnel}`}
-              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+              className="btn-ghost shrink-0 inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Pipeline</span>
             </Link>
-            <div className="hidden md:block h-5 w-px bg-[var(--border-hairline)]" />
-            <div className="hidden md:block">
+            <div className="hidden xl:block h-5 w-px bg-[var(--border-hairline)] shrink-0" />
+            <div className="hidden xl:block shrink-0">
               <BrandMark compact />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="truncate text-sm sm:text-base font-bold tracking-tight text-[var(--text-primary)]">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="truncate text-sm sm:text-base lg:text-lg font-bold tracking-tight text-[var(--text-primary)]">
                   {companyName}
                 </h1>
-                <span className="badge-accent hidden sm:inline-flex rounded-md px-2 py-0.5 font-mono-num text-[10px] font-bold uppercase">
+                <span className="badge-accent hidden md:inline-flex shrink-0 rounded-md px-2 py-0.5 font-mono-num text-[10px] font-bold uppercase">
                   VISÃO ADMIN
                 </span>
               </div>
@@ -786,58 +786,40 @@ export function ClientWorkspaceAdmin({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/?tab=dispatcher&leadId=${lead.id}`}
-              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
-              title="Abrir este cliente no Disparador com scripts"
-            >
-              <Send className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="hidden lg:inline">Disparador</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={handleCreateRecurringProject}
-              disabled={cloningRecurrence}
-              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-              title="Criar novo projeto recorrente para o mesmo cliente preservando este contrato"
-            >
-              <CopyPlus className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="hidden xl:inline">
-                {cloningRecurrence ? "Criando..." : "Recorrência"}
-              </span>
-            </button>
-
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={handleCopyPortalLink}
-              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-semibold"
+              title="Copiar link exclusivo do Portal do Cliente"
             >
               {copiedPortal ? (
                 <Check className="h-3.5 w-3.5 text-[var(--status-success)]" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              <span>{copiedPortal ? "Link Copiado" : "Link do Portal"}</span>
+              <span className="hidden md:inline">
+                {copiedPortal ? "Link Copiado" : "Link do Portal"}
+              </span>
             </button>
 
             <Link
               href={`/portal/${lead.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--accent-text)] border-[var(--accent-border)]"
+              className="btn-ghost inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-[var(--accent-text)] border-[var(--accent-border)]"
+              title="Abrir visão do cliente em nova aba"
             >
               <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Ver como Cliente</span>
-              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              <span className="hidden sm:inline">Ver Portal</span>
+              <ExternalLink className="hidden lg:inline h-3 w-3" aria-hidden="true" />
             </Link>
 
             <button
               type="button"
               onClick={() => handleSaveAll()}
               disabled={saving}
-              className="btn-accent inline-flex min-h-[38px] items-center gap-2 rounded-lg pl-4 pr-1.5 py-1 text-xs font-bold disabled:opacity-60"
+              className="btn-accent inline-flex min-h-[38px] items-center gap-2 rounded-lg pl-3.5 pr-1.5 py-1 text-xs font-bold disabled:opacity-60"
             >
               <span>{saving ? "Salvando..." : "Salvar"}</span>
               <span className="btn-icon-badge">
@@ -851,8 +833,8 @@ export function ClientWorkspaceAdmin({
 
         {/* Pipeline Stage Stepper Strip */}
         <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-subtle)]/70">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 overflow-x-auto px-4 py-2 sm:px-6">
-            <div className="flex items-center gap-1.5">
+          <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-3 overflow-x-auto px-4 py-2 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-1.5 shrink-0">
               <span className="font-mono-num text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mr-1">
                 ETAPA COMERCIAL:
               </span>
@@ -864,7 +846,7 @@ export function ClientWorkspaceAdmin({
                     type="button"
                     onClick={() => handleQuickStageChange(s.id)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                      "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-xs font-semibold transition-colors",
                       active
                         ? "bg-[var(--accent-btn)] text-[var(--accent-fg)]"
                         : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
@@ -883,7 +865,7 @@ export function ClientWorkspaceAdmin({
             </div>
 
             {stagnation.level !== "none" && (
-              <span className="badge-warning inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold">
+              <span className="badge-warning inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-0.5 text-[10px] font-bold">
                 <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                 {stagnation.label}
               </span>
@@ -893,7 +875,7 @@ export function ClientWorkspaceAdmin({
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 space-y-6">
+      <main className="mx-auto max-w-[1720px] px-4 py-6 sm:px-6 lg:px-8 space-y-6">
         {/* Toast Banner */}
         {toast && (
           <div
@@ -955,15 +937,33 @@ export function ClientWorkspaceAdmin({
                     : "Tudo em dia no portal"}
                 </p>
               </div>
-              <div className="p-4 flex flex-wrap items-center gap-2">
+              <div className="p-4 flex flex-wrap items-center gap-2 col-span-2 lg:col-span-1">
                 <button
                   type="button"
                   onClick={handleSendPortalEmail}
                   disabled={sendingEmail || !email.trim()}
                   className="btn-ghost inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
                 >
-                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Mail className="h-3.5 w-3.5 text-[var(--accent-text)]" aria-hidden="true" />
                   {sendingEmail ? "Enviando..." : "E-mail Portal"}
+                </button>
+                <Link
+                  href={`/?tab=dispatcher&leadId=${lead.id}`}
+                  className="btn-ghost inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                  title="Abrir este cliente no Disparador com scripts"
+                >
+                  <Send className="h-3.5 w-3.5 text-[var(--accent-text)]" aria-hidden="true" />
+                  <span>Disparador</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleCreateRecurringProject}
+                  disabled={cloningRecurrence}
+                  className="btn-ghost inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                  title="Criar novo projeto recorrente para o mesmo cliente preservando este contrato"
+                >
+                  <CopyPlus className="h-3.5 w-3.5 text-[var(--accent-text)]" aria-hidden="true" />
+                  <span>{cloningRecurrence ? "Criando..." : "Recorrência"}</span>
                 </button>
                 <span className="font-mono-num text-[11px] text-[var(--text-muted)]">
                   {portalPin.length === 4 ? `PIN ${portalPin}` : "Sem PIN"}
@@ -1022,8 +1022,8 @@ export function ClientWorkspaceAdmin({
           </div>
         </div>
 
-        {/* Workspace Navigation Dock */}
-        <div className="dock-shell inline-flex flex-wrap gap-1">
+        {/* Workspace Navigation Dock (Full-width balanced 4-tab bar) */}
+        <div className="dock-shell grid w-full grid-cols-1 gap-1 p-1.5 sm:grid-cols-2 xl:grid-cols-4">
           {(
             [
               { id: "comercial", label: "01. Comercial & Vendas", icon: Search },
@@ -1053,7 +1053,7 @@ export function ClientWorkspaceAdmin({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex min-h-[40px] items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
+                  "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
                   active
                     ? "bg-[var(--bg-surface-solid)] text-[var(--text-primary)] shadow-sm border border-[var(--border-hairline)]"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

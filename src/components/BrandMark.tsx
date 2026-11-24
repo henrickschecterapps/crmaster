@@ -101,7 +101,12 @@ export function BrandMark({
             A história termina. A imagem fica.
           </p>
         ) : (
-          <p className="mt-1 truncate font-mono-num text-[10px] tracking-wider uppercase text-[var(--text-muted)]">
+          <p
+            className={cn(
+              "mt-1 truncate font-mono-num text-[10px] tracking-wider uppercase text-[var(--text-muted)]",
+              compact && "hidden sm:block"
+            )}
+          >
             CRM · BH &amp; Nova Lima · 24FPS
           </p>
         )}
